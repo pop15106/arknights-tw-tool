@@ -1,0 +1,1029 @@
+
+> arknights-tw-roster-prototype@0.1.0 test:coverage
+> node --experimental-strip-types --experimental-test-coverage --test tests/*.test.ts
+
+TAP version 13
+# Subtest: 繁中資料按 ID 合併轉職、技能、天賦與模組，輸出固定來源版本
+ok 1 - 繁中資料按 ID 合併轉職、技能、天賦與模組，輸出固定來源版本
+  ---
+  duration_ms: 84.4588
+  type: 'test'
+  ...
+# Subtest: 缺少穩定技能定義與不支援星級不產生看似成功的資料包
+ok 2 - 缺少穩定技能定義與不支援星級不產生看似成功的資料包
+  ---
+  duration_ms: 3.1897
+  type: 'test'
+  ...
+# Subtest: 遊戲文字只產生純文字，處理百分比與負值；未知參數明示待核對
+ok 3 - 遊戲文字只產生純文字，處理百分比與負值；未知參數明示待核對
+  ---
+  duration_ms: 0.3706
+  type: 'test'
+  ...
+# Subtest: 首次匯入及相同內容重匯：不重複幹員，仍保留兩筆批次
+ok 4 - 首次匯入及相同內容重匯：不重複幹員，仍保留兩筆批次
+  ---
+  duration_ms: 127.7337
+  type: 'test'
+  ...
+# Subtest: 同批重複列補齊缺漏；兩個不同值集中確認，三值明確阻擋
+ok 5 - 同批重複列補齊缺漏；兩個不同值集中確認，三值明確阻擋
+  ---
+  duration_ms: 25.5173
+  type: 'test'
+  ...
+# Subtest: 同值人工確認不遺失，模組開放、解鎖與裝備為不同欄位
+ok 6 - 同值人工確認不遺失，模組開放、解鎖與裝備為不同欄位
+  ---
+  duration_ms: 69.2
+  type: 'test'
+  ...
+# Subtest: 人工明確撤回已知值為未知必須確認，普通缺漏仍不可蓋掉已知
+ok 7 - 人工明確撤回已知值為未知必須確認，普通缺漏仍不可蓋掉已知
+  ---
+  duration_ms: 37.1957
+  type: 'test'
+  ...
+# Subtest: 舊圖不能蓋掉人工確認，必須逐欄決策；未知與局部不刪除
+ok 8 - 舊圖不能蓋掉人工確認，必須逐欄決策；未知與局部不刪除
+  ---
+  duration_ms: 95.0384
+  type: 'test'
+  ...
+# Subtest: 預覽過期、不同服別、示範混入私人資料拒絕
+ok 9 - 預覽過期、不同服別、示範混入私人資料拒絕
+  ---
+  duration_ms: 7.3029
+  type: 'test'
+  ...
+# Subtest: 格式白名單、欄位範圍、未知不帶值及模組 ID 驗證
+ok 10 - 格式白名單、欄位範圍、未知不帶值及模組 ID 驗證
+  ---
+  duration_ms: 3.2815
+  type: 'test'
+  ...
+# Subtest: 備份復原保留未知、人工證據、設定、批次及撤銷；破損與未來版本不接受
+ok 11 - 備份復原保留未知、人工證據、設定、批次及撤銷；破損與未來版本不接受
+  ---
+  duration_ms: 21.2641
+  type: 'test'
+  ...
+# Subtest: 100 筆合成批次完整走預覽、合併、重匯、撤銷、備份復原
+ok 12 - 100 筆合成批次完整走預覽、合併、重匯、撤銷、備份復原
+  ---
+  duration_ms: 824.4695
+  type: 'test'
+  ...
+# Subtest: 新幹員低信心欄位不自動接受；保留未知與採用候選分別有效
+ok 13 - 新幹員低信心欄位不自動接受；保留未知與採用候選分別有效
+  ---
+  duration_ms: 56.4324
+  type: 'test'
+  ...
+# Subtest: 既有未知欄位遇同批兩候選，選左側也能實際補入
+ok 14 - 既有未知欄位遇同批兩候選，選左側也能實際補入
+  ---
+  duration_ms: 37.3803
+  type: 'test'
+  ...
+# Subtest: 人工確認未知遇同批兩個已知候選，視為三個狀態並保留原更正
+ok 15 - 人工確認未知遇同批兩個已知候選，視為三個狀態並保留原更正
+  ---
+  duration_ms: 46.618
+  type: 'test'
+  ...
+# Subtest: 專精不適用、已知零與未知不能互換
+ok 16 - 專精不適用、已知零與未知不能互換
+  ---
+  duration_ms: 124.1562
+  type: 'test'
+  ...
+# Subtest: 資料包異動先核對 checksum，非空庫版本變更拒絕靜默遷移
+ok 17 - 資料包異動先核對 checksum，非空庫版本變更拒絕靜默遷移
+  ---
+  duration_ms: 140.4687
+  type: 'test'
+  ...
+# Subtest: 深層多餘欄位、帳號資料及檔案容量上限在寫入前拒絕
+ok 18 - 深層多餘欄位、帳號資料及檔案容量上限在寫入前拒絕
+  ---
+  duration_ms: 39.354
+  type: 'test'
+  ...
+# Subtest: 明確批次接受低信心新值保留未人工確認，逐欄接受仍標為已核對
+ok 19 - 明確批次接受低信心新值保留未人工確認，逐欄接受仍標為已核對
+  ---
+  duration_ms: 20.8947
+  type: 'test'
+  ...
+# Subtest: 批次來源接受拒絕未知或重複 ID、非 incoming 決策與無效選項
+ok 20 - 批次來源接受拒絕未知或重複 ID、非 incoming 決策與無效選項
+  ---
+  duration_ms: 25.7617
+  type: 'test'
+  ...
+# Subtest: 真正衝突及同批矛盾不能冒充低信心新值，竄改理由也不得降級
+ok 21 - 真正衝突及同批矛盾不能冒充低信心新值，竄改理由也不得降級
+  ---
+  duration_ms: 40.8861
+  type: 'test'
+  ...
+# Subtest: 批次來源接受後仍可人工核對，後續來源不得繞過人工保護
+ok 22 - 批次來源接受後仍可人工核對，後續來源不得繞過人工保護
+  ---
+  duration_ms: 26.4939
+  type: 'test'
+  ...
+# Subtest: 指定繁中公開資料集可於相同來源日期升版，新增幹員與技能並保留舊值
+ok 23 - 指定繁中公開資料集可於相同來源日期升版，新增幹員與技能並保留舊值
+  ---
+  duration_ms: 37.6588
+  type: 'test'
+  ...
+# Subtest: 公開資料集只有名稱更新時撤銷回復原定義與校驗，仍保留全部歷史
+ok 24 - 公開資料集只有名稱更新時撤銷回復原定義與校驗，仍保留全部歷史
+  ---
+  duration_ms: 17.7984
+  type: 'test'
+  ...
+# Subtest: 公開資料集升版拒絕移除現有技能、裝備與歷史所需 ID，原狀態不變
+ok 25 - 公開資料集升版拒絕移除現有技能、裝備與歷史所需 ID，原狀態不變
+  ---
+  duration_ms: 31.0104
+  type: 'test'
+  ...
+# Subtest: 較舊來源日期及其他資料集不適用公開升版例外，checksum 仍驗證
+ok 26 - 較舊來源日期及其他資料集不適用公開升版例外，checksum 仍驗證
+  ---
+  duration_ms: 13.0591
+  type: 'test'
+  ...
+# Subtest: IndexedDB 首存、關閉重開、單次更新與舊分頁衝突
+ok 27 - IndexedDB 首存、關閉重開、單次更新與舊分頁衝突
+  ---
+  duration_ms: 227.2302
+  type: 'test'
+  ...
+# Subtest: 並行交易只接受一筆相同預期修訂，不能最後寫入者覆蓋
+ok 28 - 並行交易只接受一筆相同預期修訂，不能最後寫入者覆蓋
+  ---
+  duration_ms: 15.1782
+  type: 'test'
+  ...
+# Subtest: 容量錯誤與交易中止保留已存資料；重試可成功
+ok 29 - 容量錯誤與交易中止保留已存資料；重試可成功
+  ---
+  duration_ms: 47.0381
+  type: 'test'
+  ...
+# Subtest: 升級被其他連線阻擋時明確失敗，不延後偷偷建庫
+ok 30 - 升級被其他連線阻擋時明確失敗，不延後偷偷建庫
+  ---
+  duration_ms: 0.5871
+  type: 'test'
+  ...
+# Subtest: put 已排入交易後真正 abort，仍不能留下部分新資料
+ok 31 - put 已排入交易後真正 abort，仍不能留下部分新資料
+  ---
+  duration_ms: 23.9311
+  type: 'test'
+  ...
+# Subtest: 未知舊格式留在資料庫，讀取與覆寫皆拒絕
+ok 32 - 未知舊格式留在資料庫，讀取與覆寫皆拒絕
+  ---
+  duration_ms: 15.347
+  type: 'test'
+  ...
+# Subtest: 較新的 IndexedDB schema 不降級、不重建
+ok 33 - 較新的 IndexedDB schema 不降級、不重建
+  ---
+  duration_ms: 11.6215
+  type: 'test'
+  ...
+# Subtest: 公開資料 API 回傳 status、完整 Dataset 與預設分頁，不允許 CORS
+ok 34 - 公開資料 API 回傳 status、完整 Dataset 與預設分頁，不允許 CORS
+  ---
+  duration_ms: 411.8322
+  type: 'test'
+  ...
+# Subtest: 尚無快取回 503；讀取不會暗中同步或請求外網
+ok 35 - 尚無快取回 503；讀取不會暗中同步或請求外網
+  ---
+  duration_ms: 39.8474
+  type: 'test'
+  ...
+# Subtest: 分頁在篩選後計算 total；查詢有界且拒絕未知及重複參數
+ok 36 - 分頁在篩選後計算 total；查詢有界且拒絕未知及重複參數
+  ---
+  duration_ms: 113.326
+  type: 'test'
+  ...
+# Subtest: 所有路由驗證 Host；僅接受實際 loopback 或 Vite 代理 Host
+ok 37 - 所有路由驗證 Host；僅接受實際 loopback 或 Vite 代理 Host
+  ---
+  duration_ms: 97.9389
+  type: 'test'
+  ...
+# Subtest: 同步只允許明確標頭及精確 Origin；Fetch-Site 可省略但不可跨站
+ok 38 - 同步只允許明確標頭及精確 Origin；Fetch-Site 可省略但不可跨站
+  ---
+  duration_ms: 81.2397
+  type: 'test'
+  ...
+# Subtest: 同步不接受 body、Content-Type、chunked、URL 參數或錯誤 method
+ok 39 - 同步不接受 body、Content-Type、chunked、URL 參數或錯誤 method
+  ---
+  duration_ms: 82.1877
+  type: 'test'
+  ...
+# Subtest: 同步失敗回固定 502 且仍能讀舊快取；讀取例外與 lastError 不洩漏路徑
+ok 40 - 同步失敗回固定 502 且仍能讀舊快取；讀取例外與 lastError 不洩漏路徑
+  ---
+  duration_ms: 78.2742
+  type: 'test'
+  ...
+# Subtest: 更新失敗保留前版指標；並發同步共用同一工作
+ok 41 - 更新失敗保留前版指標；並發同步共用同一工作
+  ---
+  duration_ms: 721.5792
+  type: 'test'
+  ...
+# Subtest: 不支援的版本不能用於檔案路徑，且不替換有效快取
+ok 42 - 不支援的版本不能用於檔案路徑，且不替換有效快取
+  ---
+  duration_ms: 21.1764
+  type: 'test'
+  ...
+# Subtest: 研究JSON先確認服別及個人庫，再本機轉換；不會發送帳號JSON
+ok 43 - 研究JSON先確認服別及個人庫，再本機轉換；不會發送帳號JSON
+  ---
+  duration_ms: 405.9919
+  type: 'test'
+  ...
+# Subtest: 標準匯入不連線；資料服務失敗、未知ID與校驗錯誤明確拒絕
+ok 44 - 標準匯入不連線；資料服務失敗、未知ID與校驗錯誤明確拒絕
+  ---
+  duration_ms: 70.4845
+  type: 'test'
+  ...
+# Subtest: 舊 v1 定義不需要新欄位；新圖像、技能說明與天賦版本保留於校驗與備份
+ok 45 - 舊 v1 定義不需要新欄位；新圖像、技能說明與天賦版本保留於校驗與備份
+  ---
+  duration_ms: 165.1524
+  type: 'test'
+  ...
+# Subtest: 只有技能 ID 接受尾端數字括號，總長上限仍為 101
+ok 46 - 只有技能 ID 接受尾端數字括號，總長上限仍為 101
+  ---
+  duration_ms: 5.0765
+  type: 'test'
+  ...
+# Subtest: portrait 只接受固定本機 PNG 路徑，不接受來源網域或路徑穿越
+ok 47 - portrait 只接受固定本機 PNG 路徑，不接受來源網域或路徑穿越
+  ---
+  duration_ms: 1.926
+  type: 'test'
+  ...
+# Subtest: 技能說明最多十級、級別唯一且為 1 至 10 整數；文字最多 6000 字元
+ok 48 - 技能說明最多十級、級別唯一且為 1 至 10 整數；文字最多 6000 字元
+  ---
+  duration_ms: 3.1466
+  type: 'test'
+  ...
+# Subtest: 天賦保留相同名稱的多條件版本，限制數量及精英、等級、潛能範圍
+ok 49 - 天賦保留相同名稱的多條件版本，限制數量及精英、等級、潛能範圍
+  ---
+  duration_ms: 4.4591
+  type: 'test'
+  ...
+# Subtest: 新可選欄位仍拒絕 undefined、缺少子欄位與額外欄位
+ok 50 - 新可選欄位仍拒絕 undefined、缺少子欄位與額外欄位
+  ---
+  duration_ms: 1.2749
+  type: 'test'
+  ...
+# Subtest: 截圖解析保留候選、座標與未知，不捏造穩定 ID 或圖示狀態
+ok 51 - 截圖解析保留候選、座標與未知，不捏造穩定 ID 或圖示狀態
+  ---
+  duration_ms: 24.7125
+  type: 'test'
+  ...
+# Subtest: 跨圖片精確同名合併且保留來源，部分字串與異格不合併
+ok 52 - 跨圖片精確同名合併且保留來源，部分字串與異格不合併
+  ---
+  duration_ms: 1.6313
+  type: 'test'
+  ...
+# Subtest: 重複圖片以內容雜湊去重，不重算處理量
+ok 53 - 重複圖片以內容雜湊去重，不重算處理量
+  ---
+  duration_ms: 1.4727
+  type: 'test'
+  ...
+# Subtest: 相同名稱的不同等級保留衝突，不自行取最大值
+ok 54 - 相同名稱的不同等級保留衝突，不自行取最大值
+  ---
+  duration_ms: 2.9064
+  type: 'test'
+  ...
+# Subtest: 缺漏和超出數字範圍保留未知；不把未辨識當成零
+ok 55 - 缺漏和超出數字範圍保留未知；不把未辨識當成零
+  ---
+  duration_ms: 0.495
+  type: 'test'
+  ...
+# Subtest: 半列保留名字與問題，不補上遮住的養成數字
+ok 56 - 半列保留名字與問題，不補上遮住的養成數字
+  ---
+  duration_ms: 0.2827
+  type: 'test'
+  ...
+# Subtest: 放大版座標還原到原圖且不重複列出同一圖的幹員
+ok 57 - 放大版座標還原到原圖且不重複列出同一圖的幹員
+  ---
+  duration_ms: 0.5515
+  type: 'test'
+  ...
+# Subtest: 空白、未支援版型及錯誤 JSON 均不回報匯入成功
+ok 58 - 空白、未支援版型及錯誤 JSON 均不回報匯入成功
+  ---
+  duration_ms: 1.5075
+  type: 'test'
+  ...
+# Subtest: review 格式可重讀但拒絕版本、命名空間及額外登入資訊
+ok 59 - review 格式可重讀但拒絕版本、命名空間及額外登入資訊
+  ---
+  duration_ms: 17.3514
+  type: 'test'
+  ...
+# Subtest: 拒絕竄改數值、姓名及證據來源的 review
+ok 60 - 拒絕竄改數值、姓名及證據來源的 review
+  ---
+  duration_ms: 1.8757
+  type: 'test'
+  ...
+# Subtest: 處理變體的重複錯字不以多數決覆蓋另一姓名
+ok 61 - 處理變體的重複錯字不以多數決覆蓋另一姓名
+  ---
+  duration_ms: 0.9622
+  type: 'test'
+  ...
+# Subtest: 缺少姓名的列仍保留數字證據但不跨圖合併
+ok 62 - 缺少姓名的列仍保留數字證據但不跨圖合併
+  ---
+  duration_ms: 1.6573
+  type: 'test'
+  ...
+# Subtest: 中間整列未辨識時保留原圖列次，不把後續列往前移
+ok 63 - 中間整列未辨識時保留原圖列次，不把後續列往前移
+  ---
+  duration_ms: 1.4873
+  type: 'test'
+  ...
+# Subtest: audit 只保存白名單安全值，時間與版本不接受外部覆寫
+ok 64 - audit 只保存白名單安全值，時間與版本不接受外部覆寫
+  ---
+  duration_ms: 218.5489
+  type: 'test'
+  ...
+# Subtest: audit 移除未知列舉、非法數值與非 UUID，且不執行 getter
+ok 65 - audit 移除未知列舉、非法數值與非 UUID，且不執行 getter
+  ---
+  duration_ms: 953.8912
+  type: 'test'
+  ...
+# Subtest: audit diagnostic 只保留已有 client sanitizer 接受的欄位位置與型別
+ok 66 - audit diagnostic 只保留已有 client sanitizer 接受的欄位位置與型別
+  ---
+  duration_ms: 928.2094
+  type: 'test'
+  ...
+# Subtest: audit 並行呼叫依 write 順序輸出，呼叫後改動物件不會改紀錄
+ok 67 - audit 並行呼叫依 write 順序輸出，呼叫後改動物件不會改紀錄
+  ---
+  duration_ms: 2582.8323
+  type: 'test'
+  ...
+# Subtest: audit 輪替只保留 active 與兩個備份，各檔及合計均有上限
+ok 68 - audit 輪替只保留 active 與兩個備份，各檔及合計均有上限
+  ---
+  duration_ms: 616.5062
+  type: 'test'
+  ...
+# Subtest: audit 建立與後續 IO 錯誤明確 reject，不把完整系統錯誤寫入
+ok 69 - audit 建立與後續 IO 錯誤明確 reject，不把完整系統錯誤寫入
+  ---
+  duration_ms: 111.5281
+  type: 'test'
+  ...
+# Subtest: audit 拒絕目錄 junction 與連結檔案，不寫到外部目錄
+ok 70 - audit 拒絕目錄 junction 與連結檔案，不寫到外部目錄
+  ---
+  duration_ms: 39.3356
+  type: 'test'
+  ...
+# Subtest: audit 拒絕既有 hard link，保護被連結的原檔
+ok 71 - audit 拒絕既有 hard link，保護被連結的原檔
+  ---
+  duration_ms: 65.5224
+  type: 'test'
+  ...
+# Subtest: audit 拒絕過大單筆與無效事件，但不污染其他有效紀錄
+ok 72 - audit 拒絕過大單筆與無效事件，但不污染其他有效紀錄
+  ---
+  duration_ms: 87.4485
+  type: 'test'
+  ...
+# Subtest: 固定合成簽章向量、主機與路由白名單、禁止重新導向與攜帶 Cookie
+ok 73 - 固定合成簽章向量、主機與路由白名單、禁止重新導向與攜帶 Cookie
+  ---
+  duration_ms: 172.0937
+  type: 'test'
+  ...
+# Subtest: 角色只屬於本次帳號，公開結果不含 UID；清除或換登入後舊 key 失效
+ok 74 - 角色只屬於本次帳號，公開結果不含 UID；清除或換登入後舊 key 失效
+  ---
+  duration_ms: 103.0132
+  type: 'test'
+  ...
+# Subtest: JSON/base64 只投影必要 chars，保留零/null，剔除 PII 與全部非白名單欄位
+ok 75 - JSON/base64 只投影必要 chars，保留零/null，剔除 PII 與全部非白名單欄位
+  ---
+  duration_ms: 15.863
+  type: 'test'
+  ...
+# Subtest: 沒有本作角色回傳空列表；重複或壞 binding 拒絕，禁止推定繁中服
+ok 76 - 沒有本作角色回傳空列表；重複或壞 binding 拒絕，禁止推定繁中服
+  ---
+  duration_ms: 12.354
+  type: 'test'
+  ...
+# Subtest: 10000 只更新簽章 key 一次，再以新 key 重試；10003 只校時重試一次
+ok 77 - 10000 只更新簽章 key 一次，再以新 key 重試；10003 只校時重試一次
+  ---
+  duration_ms: 42.3679
+  type: 'test'
+  ...
+# Subtest: 憑證過期、重試仍失敗或 refresh 過期皆清除登入，不無限重試
+ok 78 - 憑證過期、重試仍失敗或 refresh 過期皆清除登入，不無限重試
+  ---
+  duration_ms: 19.7151
+  type: 'test'
+  ...
+# Subtest: 上游失敗、raw message、重導向與 HTTP 錯誤皆不洩漏秘密或 URL
+ok 79 - 上游失敗、raw message、重導向與 HTTP 錯誤皆不洩漏秘密或 URL
+  ---
+  duration_ms: 10.9285
+  type: 'test'
+  ...
+# Subtest: 回應 Content-Length、串流實際大小與逾時有界
+ok 80 - 回應 Content-Length、串流實際大小與逾時有界
+  ---
+  duration_ms: 51.1603
+  type: 'test'
+  ...
+# Subtest: 在讀取 body 前拒絕 HTTP 或 Content-Length 時也中止下載
+ok 81 - 在讀取 body 前拒絕 HTTP 或 Content-Length 時也中止下載
+  ---
+  duration_ms: 1.9156
+  type: 'test'
+  ...
+# Subtest: 壞 JSON/base64/字元型別、只有助戰或超量資料不當作持有庫
+ok 82 - 壞 JSON/base64/字元型別、只有助戰或超量資料不當作持有庫
+  ---
+  duration_ms: 78.2624
+  type: 'test'
+  ...
+# Subtest: clear 中止在途請求；舊登入完成不得復活 session 或清掉新登入
+ok 83 - clear 中止在途請求；舊登入完成不得復活 session 或清掉新登入
+  ---
+  duration_ms: 5.0188
+  type: 'test'
+  ...
+# Subtest: 建構參數與時鐘錯誤不產生網路請求
+ok 84 - 建構參數與時鐘錯誤不產生網路請求
+  ---
+  duration_ms: 0.7963
+  type: 'test'
+  ...
+# Subtest: content 為 null 或空字串時使用原 chars，但仍拒絕缺少或無效的持有清單
+ok 85 - content 為 null 或空字串時使用原 chars，但仍拒絕缺少或無效的持有清單
+  ---
+  duration_ms: 36.357
+  type: 'test'
+  ...
+# Subtest: 其他 content 型別即使帶有合法 chars 仍嚴格拒絕，非空編碼內容優先驗證
+ok 86 - 其他 content 型別即使帶有合法 chars 仍嚴格拒絕，非空編碼內容優先驗證
+  ---
+  duration_ms: 117.7706
+  type: 'test'
+  ...
+# Subtest: roster 診斷覆蓋資料、幹員、子項、數值與 ID guard，僅保留固定欄位與型別
+ok 87 - roster 診斷覆蓋資料、幹員、子項、數值與 ID guard，僅保留固定欄位與型別
+  ---
+  duration_ms: 183.1012
+  type: 'test'
+  ...
+# Subtest: roster 診斷區分 wire JSON/code、base64 與解碼 JSON；不猜測額外 envelope 層級
+ok 88 - roster 診斷區分 wire JSON/code、base64 與解碼 JSON；不猜測額外 envelope 層級
+  ---
+  duration_ms: 73.3343
+  type: 'test'
+  ...
+# Subtest: 診斷建構器拒絕自由文字、動態鍵與越界索引，並凍結安全副本
+ok 89 - 診斷建構器拒絕自由文字、動態鍵與越界索引，並凍結安全副本
+  ---
+  duration_ms: 0.5391
+  type: 'test'
+  ...
+# Subtest: 只有 identifier 實際空字串會顯示固定 empty string 診斷，其他 ID 仍嚴格驗證
+ok 90 - 只有 identifier 實際空字串會顯示固定 empty string 診斷，其他 ID 仍嚴格驗證
+  ---
+  duration_ms: 13.0296
+  type: 'test'
+  ...
+# Subtest: 技能與預設技能 ID 保留尾端數字括號並可精確匹配
+ok 91 - 技能與預設技能 ID 保留尾端數字括號並可精確匹配
+  ---
+  duration_ms: 23.2015
+  type: 'test'
+  ...
+# Subtest: 技能 ID 拒絕 malformed 括號、HTML、空白及超過 200 字元，診斷不含原值
+ok 92 - 技能 ID 拒絕 malformed 括號、HTML、空白及超過 200 字元，診斷不含原值
+  ---
+  duration_ms: 95.1339
+  type: 'test'
+  ...
+# Subtest: 尾端括號語法僅允許技能，幹員與模組 ID 的限制不變
+ok 93 - 尾端括號語法僅允許技能，幹員與模組 ID 的限制不變
+  ---
+  duration_ms: 18.0341
+  type: 'test'
+  ...
+# Subtest: SDK 代理預設未啟用；開始與停止仍要求既有 CSRF 保護
+ok 94 - SDK 代理預設未啟用；開始與停止仍要求既有 CSRF 保護
+  ---
+  duration_ms: 541.0751
+  type: 'test'
+  ...
+# Subtest: SDK 不需自訂 CSRF header；GET query、POST JSON、無 body DELETE 與業務狀態保留
+ok 95 - SDK 不需自訂 CSRF header；GET query、POST JSON、無 body DELETE 與業務狀態保留
+  ---
+  duration_ms: 49.8796
+  type: 'test'
+  ...
+# Subtest: SDK 拒絕缺少或跨站 metadata、導航、外部 Origin、無效 Cookie 及外部 Host
+ok 96 - SDK 拒絕缺少或跨站 metadata、導航、外部 Origin、無效 Cookie 及外部 Host
+  ---
+  duration_ms: 119.8862
+  type: 'test'
+  ...
+# Subtest: SDK POST 拒絕非 JSON、額外欄位、壞 JSON 與超量 body；GET／DELETE 拒絕 body
+ok 97 - SDK POST 拒絕非 JSON、額外欄位、壞 JSON 與超量 body；GET／DELETE 拒絕 body
+  ---
+  duration_ms: 74.7288
+  type: 'test'
+  ...
+# Subtest: 本機清除、TTL 到期與服務關閉皆清除 proxy
+ok 98 - 本機清除、TTL 到期與服務關閉皆清除 proxy
+  ---
+  duration_ms: 127.1641
+  type: 'test'
+  ...
+# Subtest: 延遲 SDK body 在 clear／stop 後不得轉送，重新開始不得接收上一輪請求
+ok 99 - 延遲 SDK body 在 clear／stop 後不得轉送，重新開始不得接收上一輪請求
+  ---
+  duration_ms: 114.2919
+  type: 'test'
+  ...
+# Subtest: body 傳送期間 TTL 到期不得轉送 SDK 登入
+ok 100 - body 傳送期間 TTL 到期不得轉送 SDK 登入
+  ---
+  duration_ms: 86.227
+  type: 'test'
+  ...
+# Subtest: 在途 SDK 回應在 clear／重新開始／TTL／登入輪換後不可洩出或復活
+ok 101 - 在途 SDK 回應在 clear／重新開始／TTL／登入輪換後不可洩出或復活
+  ---
+  duration_ms: 278.4815
+  type: 'test'
+  ...
+# Subtest: 不同本機 session 的 proxy 與控制用 CSRF 相互隔離
+ok 102 - 不同本機 session 的 proxy 與控制用 CSRF 相互隔離
+  ---
+  duration_ms: 109.3674
+  type: 'test'
+  ...
+# Subtest: SDK 代理例外不回顯合成秘密；密碼登入有獨立次數限制
+ok 103 - SDK 代理例外不回顯合成秘密；密碼登入有獨立次數限制
+  ---
+  duration_ms: 67.6753
+  type: 'test'
+  ...
+# Subtest: 只轉送三個固定 account 路由，使用實際 query/body，Cookie/Origin/Referer 不外送
+ok 104 - 只轉送三個固定 account 路由，使用實際 query/body，Cookie/Origin/Referer 不外送
+  ---
+  duration_ms: 115.9537
+  type: 'test'
+  ...
+# Subtest: 記憶體 cookie-store 契約、session 隔離、DELETE 不呼叫上游且不永久關閉
+ok 105 - 記憶體 cookie-store 契約、session 隔離、DELETE 不呼叫上游且不永久關閉
+  ---
+  duration_ms: 7.4819
+  type: 'test'
+  ...
+# Subtest: 路由、method、query 與 body schema 拒絕不受限代理及額外帳號操作
+ok 106 - 路由、method、query 與 body schema 拒絕不受限代理及額外帳號操作
+  ---
+  duration_ms: 4.7853
+  type: 'test'
+  ...
+# Subtest: 保留 SDK 的 bounded captcha map；拒絕額外結構、特殊屬性與超量 request
+ok 107 - 保留 SDK 的 bounded captcha map；拒絕額外結構、特殊屬性與超量 request
+  ---
+  duration_ms: 17.7104
+  type: 'test'
+  ...
+# Subtest: 合法官方 JSON envelope 保留業務狀態與 HTTP status，絕不回傳上游 headers
+ok 108 - 合法官方 JSON envelope 保留業務狀態與 HTTP status，絕不回傳上游 headers
+  ---
+  duration_ms: 13.1425
+  type: 'test'
+  ...
+# Subtest: 非 2xx 的 message/msg JSON 不需要業務 status，保留原 HTTP 失敗
+ok 109 - 非 2xx 的 message/msg JSON 不需要業務 status，保留原 HTTP 失敗
+  ---
+  duration_ms: 12.903
+  type: 'test'
+  ...
+# Subtest: HTML、redirect、非 envelope、壞 JSON/UTF-8 皆是安全固定錯誤
+ok 110 - HTML、redirect、非 envelope、壞 JSON/UTF-8 皆是安全固定錯誤
+  ---
+  duration_ms: 31.9021
+  type: 'test'
+  ...
+# Subtest: transport 原始錯誤與偽裝成 SkportProxyError 的訊息都不洩漏憑證
+ok 111 - transport 原始錯誤與偽裝成 SkportProxyError 的訊息都不洩漏憑證
+  ---
+  duration_ms: 4.664
+  type: 'test'
+  ...
+# Subtest: response 限額涵蓋宣告大小與實際串流，header 早退會取消 body
+ok 112 - response 限額涵蓋宣告大小與實際串流，header 早退會取消 body
+  ---
+  duration_ms: 12.8833
+  type: 'test'
+  ...
+# Subtest: fetch 與 body stalled 都受逾時限制，舊 fetch 晚到仍取消 body
+ok 113 - fetch 與 body stalled 都受逾時限制，舊 fetch 晚到仍取消 body
+  ---
+  duration_ms: 57.2838
+  type: 'test'
+  ...
+# Subtest: clear 永久關閉 instance、中止在途請求，晚回應與 store 操作不復活 session
+ok 114 - clear 永久關閉 instance、中止在途請求，晚回應與 store 操作不復活 session
+  ---
+  duration_ms: 12.6449
+  type: 'test'
+  ...
+# Subtest: 建構參數有效範圍固定，無效設定不啟動 transport
+ok 115 - 建構參數有效範圍固定，無效設定不啟動 transport
+  ---
+  duration_ms: 1.9729
+  type: 'test'
+  ...
+# Subtest: 每個 instance 至多四個上游在途請求，完成後才重新開放容量
+ok 116 - 每個 instance 至多四個上游在途請求，完成後才重新開放容量
+  ---
+  duration_ms: 12.2534
+  type: 'test'
+  ...
+# Subtest: SDK 載入前設定本機 host；載入中取消後即使 script 晚到也不開啟 auth
+ok 117 - SDK 載入前設定本機 host；載入中取消後即使 script 晚到也不開啟 auth
+  ---
+  duration_ms: 7.522
+  type: 'test'
+  ...
+# Subtest: SDK clearToken 等待期間取消，不會在晚完成後開啟 auth
+ok 118 - SDK clearToken 等待期間取消，不會在晚完成後開啟 auth
+  ---
+  duration_ms: 5.2803
+  type: 'test'
+  ...
+# Subtest: auth 開始後取消會拒絕，晚到 callback 不得交換 code
+ok 119 - auth 開始後取消會拒絕，晚到 callback 不得交換 code
+  ---
+  duration_ms: 24.2894
+  type: 'test'
+  ...
+# Subtest: 正常 callback 只交換 code 一次並等待交換完成，不讀取完整 SDK 結果
+ok 120 - 正常 callback 只交換 code 一次並等待交換完成，不讀取完整 SDK 結果
+  ---
+  duration_ms: 7.5844
+  type: 'test'
+  ...
+# Subtest: 官方取消 callback 回傳 cancelled，沒有 code 交換
+ok 121 - 官方取消 callback 回傳 cancelled，沒有 code 交換
+  ---
+  duration_ms: 3.4706
+  type: 'test'
+  ...
+# Subtest: 已取消的登入不呼叫 SDK auth 或 clearToken
+ok 122 - 已取消的登入不呼叫 SDK auth 或 clearToken
+  ---
+  duration_ms: 0.7369
+  type: 'test'
+  ...
+# Subtest: 清除 SDK 的同步與非同步錯誤不向呼叫者或 console 洩漏
+ok 123 - 清除 SDK 的同步與非同步錯誤不向呼叫者或 console 洩漏
+  ---
+  duration_ms: 14.7621
+  type: 'test'
+  ...
+# Subtest: 登入已輪換但新 cookie 尚未使用，舊 cookie 與原 CSRF 仍能撤銷 successor
+ok 124 - 登入已輪換但新 cookie 尚未使用，舊 cookie 與原 CSRF 仍能撤銷 successor
+  ---
+  duration_ms: 385.4119
+  type: 'test'
+  ...
+# Subtest: 撤銷連結不授予舊 cookie 讀取 session、roster 或重新登入的權限
+ok 125 - 撤銷連結不授予舊 cookie 讀取 session、roster 或重新登入的權限
+  ---
+  duration_ms: 50.3883
+  type: 'test'
+  ...
+# Subtest: 舊 cookie 只有原 CSRF 能撤銷，錯誤或 successor CSRF 不會清除連線
+ok 126 - 舊 cookie 只有原 CSRF 能撤銷，錯誤或 successor CSRF 不會清除連線
+  ---
+  duration_ms: 110.3212
+  type: 'test'
+  ...
+# Subtest: 撤銷連結在原工作階段期限與 15 分鐘上限的較早者到期
+ok 127 - 撤銷連結在原工作階段期限與 15 分鐘上限的較早者到期
+  ---
+  duration_ms: 144.2694
+  type: 'test'
+  ...
+# Subtest: 清除登入中的工作階段後，晚到的登入結果不能建立 successor
+ok 128 - 清除登入中的工作階段後，晚到的登入結果不能建立 successor
+  ---
+  duration_ms: 80.5309
+  type: 'test'
+  ...
+# Subtest: clear 讀取 body 期間登入完成輪換，仍以舊 cookie 撤銷 successor
+ok 129 - clear 讀取 body 期間登入完成輪換，仍以舊 cookie 撤銷 successor
+  ---
+  duration_ms: 136.4265
+  type: 'test'
+  ...
+# Subtest: 延遲 body 的舊 clear 仍撤銷同次登入，晚到的新 cookie 不得恢復連線
+ok 130 - 延遲 body 的舊 clear 仍撤銷同次登入，晚到的新 cookie 不得恢復連線
+  ---
+  duration_ms: 645.2766
+  type: 'test'
+  ...
+# Subtest: 延遲 body 的舊 roster 不可沿用登入前的 Cookie 與 CSRF
+ok 131 - 延遲 body 的舊 roster 不可沿用登入前的 Cookie 與 CSRF
+  ---
+  duration_ms: 85.1778
+  type: 'test'
+  ...
+# Subtest: 兩個 body 都已開始的登入請求仍只允許一個交換
+ok 132 - 兩個 body 都已開始的登入請求仍只允許一個交換
+  ---
+  duration_ms: 42.6821
+  type: 'test'
+  ...
+# Subtest: 清除已成功後才傳完 body 的登入不得再開始交換
+ok 133 - 清除已成功後才傳完 body 的登入不得再開始交換
+  ---
+  duration_ms: 42.0465
+  type: 'test'
+  ...
+# Subtest: body 傳送期間 session 到期時不得交換 code
+ok 134 - body 傳送期間 session 到期時不得交換 code
+  ---
+  duration_ms: 28.3567
+  type: 'test'
+  ...
+# Subtest: 本機 API 拒絕跨來源、外部 Host、缺自訂標頭及跨站 Fetch-Site
+ok 135 - 本機 API 拒絕跨來源、外部 Host、缺自訂標頭及跨站 Fetch-Site
+  ---
+  duration_ms: 286.2625
+  type: 'test'
+  ...
+# Subtest: 工作階段 Cookie 及 CSRF 綁定；登入成功輪換，舊 Cookie 失效
+ok 136 - 工作階段 Cookie 及 CSRF 綁定；登入成功輪換，舊 Cookie 失效
+  ---
+  duration_ms: 124.1717
+  type: 'test'
+  ...
+# Subtest: 未登入不可讀取；角色與服別確認必要；僅返回研究結果
+ok 137 - 未登入不可讀取；角色與服別確認必要；僅返回研究結果
+  ---
+  duration_ms: 109.8979
+  type: 'test'
+  ...
+# Subtest: 輸入白名單、大小與內容型別拒絕；不支援帳密與任意代理
+ok 138 - 輸入白名單、大小與內容型別拒絕；不支援帳密與任意代理
+  ---
+  duration_ms: 58.1646
+  type: 'test'
+  ...
+# Subtest: 失敗不回顯原始例外或 code；登入重試受限
+ok 139 - 失敗不回顯原始例外或 code；登入重試受限
+  ---
+  duration_ms: 48.685
+  type: 'test'
+  ...
+# Subtest: 期限到即清除；清除動作使 Cookie 失效
+ok 140 - 期限到即清除；清除動作使 Cookie 失效
+  ---
+  duration_ms: 138.7169
+  type: 'test'
+  ...
+# Subtest: 同一 session 不重入；清除中止的登入不能復活 session
+ok 141 - 同一 session 不重入；清除中止的登入不能復活 session
+  ---
+  duration_ms: 99.6183
+  type: 'test'
+  ...
+# Subtest: roster 502 只回傳白名單 diagnostic 的欄位位置與型別
+ok 142 - roster 502 只回傳白名單 diagnostic 的欄位位置與型別
+  ---
+  duration_ms: 54.1751
+  type: 'test'
+  ...
+# Subtest: 沒有 diagnostic 的 roster 錯誤維持既有通用 envelope
+ok 143 - 沒有 diagnostic 的 roster 錯誤維持既有通用 envelope
+  ---
+  duration_ms: 83.6162
+  type: 'test'
+  ...
+# Subtest: diagnostic 未知詞彙及額外原始值不會經 roster 回應外漏
+ok 144 - diagnostic 未知詞彙及額外原始值不會經 roster 回應外漏
+  ---
+  duration_ms: 141.4264
+  type: 'test'
+  ...
+# Subtest: audit 對應每次 API request ID、保留安全診斷且不含登入或角色秘密
+ok 145 - audit 對應每次 API request ID、保留安全診斷且不含登入或角色秘密
+  ---
+  duration_ms: 43.3472
+  type: 'test'
+  ...
+# Subtest: 拒絕未標示研究格式、未明確確認產品與服別的輸入
+ok 146 - 拒絕未標示研究格式、未明確確認產品與服別的輸入
+  ---
+  duration_ms: 138.952
+  type: 'test'
+  ...
+# Subtest: 驗證定義校驗與私人命名空間，不由來源名稱產生新定義
+ok 147 - 驗證定義校驗與私人命名空間，不由來源名稱產生新定義
+  ---
+  duration_ms: 4.9753
+  type: 'test'
+  ...
+# Subtest: 呼叫後修改來源或定義，不得改變已驗證中的轉換快照
+ok 148 - 呼叫後修改來源或定義，不得改變已驗證中的轉換快照
+  ---
+  duration_ms: 5.4533
+  type: 'test'
+  ...
+# Subtest: 只投影已知欄位，零與缺值分開；潛能與模組狀態未驗證即保留未知
+ok 149 - 只投影已知欄位，零與缺值分開；潛能與模組狀態未驗證即保留未知
+  ---
+  duration_ms: 9.4613
+  type: 'test'
+  ...
+# Subtest: 缺欄與 null 不補成零，不由空技能與空模組清單推定未解鎖或未裝備
+ok 150 - 缺欄與 null 不補成零，不由空技能與空模組清單推定未解鎖或未裝備
+  ---
+  duration_ms: 23.7603
+  type: 'test'
+  ...
+# Subtest: 輸入確認不等於來源驗證，每個已知候選欄位仍需預覽人工決策
+ok 151 - 輸入確認不等於來源驗證，每個已知候選欄位仍需預覽人工決策
+  ---
+  duration_ms: 51.567
+  type: 'test'
+  ...
+# Subtest: 值域與型別錯誤拒絕，錯誤不得帶回原始值
+ok 152 - 值域與型別錯誤拒絕，錯誤不得帶回原始值
+  ---
+  duration_ms: 41.9999
+  type: 'test'
+  ...
+# Subtest: 缺少穩定定義、序號、假裝 none、重複幹員與重複子 ID 均阻擋整批
+ok 153 - 缺少穩定定義、序號、假裝 none、重複幹員與重複子 ID 均阻擋整批
+  ---
+  duration_ms: 85.6461
+  type: 'test'
+  ...
+# Subtest: 空預設技能與模組 ID 保留未知並回報缺值，不推定 none
+ok 154 - 空預設技能與模組 ID 保留未知並回報缺值，不推定 none
+  ---
+  duration_ms: 6.1538
+  type: 'test'
+  ...
+# Subtest: 沒有技能的正式定義可轉換空技能清單，不產生虛構專精欄位
+ok 155 - 沒有技能的正式定義可轉換空技能清單，不產生虛構專精欄位
+  ---
+  duration_ms: 5.7218
+  type: 'test'
+  ...
+# Subtest: 轉換保留技能方括號 ID 與預設技能的精確對應
+ok 156 - 轉換保留技能方括號 ID 與預設技能的精確對應
+  ---
+  duration_ms: 18.83
+  type: 'test'
+  ...
+# Subtest: 僅助戰不能轉成持有庫；chars 空陣列也不宣稱完整
+ok 157 - 僅助戰不能轉成持有庫；chars 空陣列也不宣稱完整
+  ---
+  duration_ms: 3.8534
+  type: 'test'
+  ...
+# Subtest: PII 與未列入白名單的欄位剔除，憑證在任何層級均拒絕且不洩漏
+ok 158 - PII 與未列入白名單的欄位剔除，憑證在任何層級均拒絕且不洩漏
+  ---
+  duration_ms: 9.0542
+  type: 'test'
+  ...
+# Subtest: 格式錯誤、回應失敗、不明欄位與未觀測形狀安全拒絕
+ok 159 - 格式錯誤、回應失敗、不明欄位與未觀測形狀安全拒絕
+  ---
+  duration_ms: 23.0677
+  type: 'test'
+  ...
+# Subtest: 資料集多餘欄位及來源偽造不可繞過；回應宣稱完整也只輸出局部
+ok 160 - 資料集多餘欄位及來源偽造不可繞過；回應宣稱完整也只輸出局部
+  ---
+  duration_ms: 73.9643
+  type: 'test'
+  ...
+# Subtest: 非 JSON 物件、循環、getter、過深與過量資料在轉換前拒絕
+ok 161 - 非 JSON 物件、循環、getter、過深與過量資料在轉換前拒絕
+  ---
+  duration_ms: 207.015
+  type: 'test'
+  ...
+1..161
+# tests 161
+# suites 0
+# pass 161
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7985.8234
+# start of coverage report
+# ----------------------------------------------------------------------------------
+# file                           | line % | branch % | funcs % | uncovered lines
+# ----------------------------------------------------------------------------------
+# scripts                        |        |          |         |
+#  game-data-server.ts           |  94.07 |    88.30 |   82.35 | 111-117
+#  game-data-sync.ts             |  88.12 |    76.09 |   90.91 | 52-60 86-88
+#  skport-audit.ts               | 100.00 |    89.01 |  100.00 |
+#  skport-client.ts              |  99.76 |    94.10 |   92.68 | 336
+#  skport-proxy.ts               | 100.00 |    97.78 |   88.89 |
+#  skport-server.ts              |  94.85 |    87.34 |   86.84 | 80 237-240 282-291
+# src                            |        |          |         |
+#  catalog                       |        |          |         |
+#   build.ts                     | 100.00 |    61.25 |   86.96 |
+#  demo.ts                       | 100.00 |   100.00 |  100.00 |
+#  domain                        |        |          |         |
+#   import.ts                    | 100.00 |    98.18 |  100.00 |
+#   model.ts                     |  97.24 |    93.49 |   97.83 | 216-220 261-263
+#  importers                     |        |          |         |
+#   local-file.ts                | 100.00 |    76.00 |   50.00 |
+#   screenshots.ts               |  99.58 |    83.73 |   98.59 | 207
+#   skport.ts                    | 100.00 |    97.35 |  100.00 |
+#  skport                        |        |          |         |
+#   sdk.ts                       |  98.98 |    73.17 |   80.95 | 41
+#  storage                       |        |          |         |
+#   backup.ts                    | 100.00 |    80.00 |  100.00 |
+#   database.ts                  |  90.91 |    78.33 |   77.27 | 90-95 97-99
+# tests                          |        |          |         |
+#  catalog.test.ts               | 100.00 |   100.00 |  100.00 |
+#  core.test.ts                  | 100.00 |   100.00 |  100.00 |
+#  database.test.ts              | 100.00 |   100.00 |   92.31 |
+#  game-data-server.test.ts      | 100.00 |   100.00 |  100.00 |
+#  game-data-sync.test.ts        | 100.00 |   100.00 |  100.00 |
+#  local-file.test.ts            | 100.00 |   100.00 |  100.00 |
+#  model-catalog.test.ts         | 100.00 |   100.00 |  100.00 |
+#  screenshots.test.ts           | 100.00 |   100.00 |  100.00 |
+#  skport-audit.test.ts          | 100.00 |    88.89 |   95.45 |
+#  skport-client.test.ts         | 100.00 |    99.44 |   98.90 |
+#  skport-proxy-server.test.ts   | 100.00 |   100.00 |   95.74 |
+#  skport-proxy.test.ts          | 100.00 |   100.00 |  100.00 |
+#  skport-sdk.test.ts            | 100.00 |    91.43 |   73.17 |
+#  skport-server-clear.test.ts   | 100.00 |   100.00 |  100.00 |
+#  skport-server-review.test.ts  | 100.00 |   100.00 |   92.86 |
+#  skport-server.test.ts         | 100.00 |   100.00 |  100.00 |
+#  skport.test.ts                | 100.00 |   100.00 |   94.12 |
+# ----------------------------------------------------------------------------------
+# all files                      |  99.01 |    92.19 |   94.63 |
+# ----------------------------------------------------------------------------------
+# end of coverage report

@@ -1,0 +1,18 @@
+
+> arknights-tw-roster-prototype@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 20 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/skport.html                  0.69 kB │ gzip:  0.40 kB
+dist/index.html                   0.86 kB │ gzip:  0.55 kB
+dist/assets/skport-CoCKgn6V.css   1.32 kB │ gzip:  0.53 kB
+dist/assets/styles-BcuTjTst.css  23.92 kB │ gzip:  5.83 kB
+dist/assets/skport-D52mMxxA.js   10.82 kB │ gzip:  4.91 kB
+dist/assets/styles-DPStZvN4.js   14.03 kB │ gzip:  5.95 kB
+dist/assets/index-DG69eRI8.js    72.15 kB │ gzip: 24.21 kB
+
+✓ built in 532ms

@@ -1,0 +1,24 @@
+{
+  "name": "arknights-tw-roster-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=22.22.0" },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host 127.0.0.1",
+    "skport": "node --experimental-strip-types scripts/skport-server.ts",
+    "game-data": "node --experimental-strip-types scripts/game-data-server.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test tests/*.test.ts"
+  },
+  "dependencies": { "preact": "11.2.0" },
+  "devDependencies": {
+    "@types/node": "22.19.7",
+    "fake-indexeddb": "6.2.8",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}

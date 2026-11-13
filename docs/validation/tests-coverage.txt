@@ -1,0 +1,164 @@
+
+> arknights-tw-roster-prototype@0.1.0 test:coverage
+> node --experimental-strip-types --experimental-test-coverage --test tests/*.test.ts
+
+TAP version 13
+# Subtest: 首次匯入及相同內容重匯：不重複幹員，仍保留兩筆批次
+ok 1 - 首次匯入及相同內容重匯：不重複幹員，仍保留兩筆批次
+  ---
+  duration_ms: 29.8694
+  type: 'test'
+  ...
+# Subtest: 同批重複列補齊缺漏；兩個不同值集中確認，三值明確阻擋
+ok 2 - 同批重複列補齊缺漏；兩個不同值集中確認，三值明確阻擋
+  ---
+  duration_ms: 11.7993
+  type: 'test'
+  ...
+# Subtest: 同值人工確認不遺失，模組開放、解鎖與裝備為不同欄位
+ok 3 - 同值人工確認不遺失，模組開放、解鎖與裝備為不同欄位
+  ---
+  duration_ms: 29.3041
+  type: 'test'
+  ...
+# Subtest: 人工明確撤回已知值為未知必須確認，普通缺漏仍不可蓋掉已知
+ok 4 - 人工明確撤回已知值為未知必須確認，普通缺漏仍不可蓋掉已知
+  ---
+  duration_ms: 17.655
+  type: 'test'
+  ...
+# Subtest: 舊圖不能蓋掉人工確認，必須逐欄決策；未知與局部不刪除
+ok 5 - 舊圖不能蓋掉人工確認，必須逐欄決策；未知與局部不刪除
+  ---
+  duration_ms: 24.4096
+  type: 'test'
+  ...
+# Subtest: 預覽過期、不同服別、示範混入私人資料拒絕
+ok 6 - 預覽過期、不同服別、示範混入私人資料拒絕
+  ---
+  duration_ms: 2.2149
+  type: 'test'
+  ...
+# Subtest: 格式白名單、欄位範圍、未知不帶值及模組 ID 驗證
+ok 7 - 格式白名單、欄位範圍、未知不帶值及模組 ID 驗證
+  ---
+  duration_ms: 2.7582
+  type: 'test'
+  ...
+# Subtest: 備份復原保留未知、人工證據、設定、批次及撤銷；破損與未來版本不接受
+ok 8 - 備份復原保留未知、人工證據、設定、批次及撤銷；破損與未來版本不接受
+  ---
+  duration_ms: 9.7941
+  type: 'test'
+  ...
+# Subtest: 100 筆合成批次完整走預覽、合併、重匯、撤銷、備份復原
+ok 9 - 100 筆合成批次完整走預覽、合併、重匯、撤銷、備份復原
+  ---
+  duration_ms: 388.162
+  type: 'test'
+  ...
+# Subtest: 新幹員低信心欄位不自動接受；保留未知與採用候選分別有效
+ok 10 - 新幹員低信心欄位不自動接受；保留未知與採用候選分別有效
+  ---
+  duration_ms: 4.8233
+  type: 'test'
+  ...
+# Subtest: 既有未知欄位遇同批兩候選，選左側也能實際補入
+ok 11 - 既有未知欄位遇同批兩候選，選左側也能實際補入
+  ---
+  duration_ms: 5.9447
+  type: 'test'
+  ...
+# Subtest: 人工確認未知遇同批兩個已知候選，視為三個狀態並保留原更正
+ok 12 - 人工確認未知遇同批兩個已知候選，視為三個狀態並保留原更正
+  ---
+  duration_ms: 5.4411
+  type: 'test'
+  ...
+# Subtest: 專精不適用、已知零與未知不能互換
+ok 13 - 專精不適用、已知零與未知不能互換
+  ---
+  duration_ms: 6.1985
+  type: 'test'
+  ...
+# Subtest: 資料包異動先核對 checksum，非空庫版本變更拒絕靜默遷移
+ok 14 - 資料包異動先核對 checksum，非空庫版本變更拒絕靜默遷移
+  ---
+  duration_ms: 4.943
+  type: 'test'
+  ...
+# Subtest: 深層多餘欄位、帳號資料及檔案容量上限在寫入前拒絕
+ok 15 - 深層多餘欄位、帳號資料及檔案容量上限在寫入前拒絕
+  ---
+  duration_ms: 16.4574
+  type: 'test'
+  ...
+# Subtest: IndexedDB 首存、關閉重開、單次更新與舊分頁衝突
+ok 16 - IndexedDB 首存、關閉重開、單次更新與舊分頁衝突
+  ---
+  duration_ms: 29.5019
+  type: 'test'
+  ...
+# Subtest: 並行交易只接受一筆相同預期修訂，不能最後寫入者覆蓋
+ok 17 - 並行交易只接受一筆相同預期修訂，不能最後寫入者覆蓋
+  ---
+  duration_ms: 3.5725
+  type: 'test'
+  ...
+# Subtest: 容量錯誤與交易中止保留已存資料；重試可成功
+ok 18 - 容量錯誤與交易中止保留已存資料；重試可成功
+  ---
+  duration_ms: 6.1331
+  type: 'test'
+  ...
+# Subtest: 升級被其他連線阻擋時明確失敗，不延後偷偷建庫
+ok 19 - 升級被其他連線阻擋時明確失敗，不延後偷偷建庫
+  ---
+  duration_ms: 0.4135
+  type: 'test'
+  ...
+# Subtest: put 已排入交易後真正 abort，仍不能留下部分新資料
+ok 20 - put 已排入交易後真正 abort，仍不能留下部分新資料
+  ---
+  duration_ms: 5.5918
+  type: 'test'
+  ...
+# Subtest: 未知舊格式留在資料庫，讀取與覆寫皆拒絕
+ok 21 - 未知舊格式留在資料庫，讀取與覆寫皆拒絕
+  ---
+  duration_ms: 2.1447
+  type: 'test'
+  ...
+# Subtest: 較新的 IndexedDB schema 不降級、不重建
+ok 22 - 較新的 IndexedDB schema 不降級、不重建
+  ---
+  duration_ms: 1.9024
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1389.308
+# start of coverage report
+# -------------------------------------------------------------------
+# file               | line % | branch % | funcs % | uncovered lines
+# -------------------------------------------------------------------
+# src                |        |          |         |
+#  domain            |        |          |         |
+#   import.ts        |  99.26 |    91.60 |  100.00 | 42
+#   model.ts         |  96.88 |    83.90 |   93.18 | 182-186 227-229
+#  storage           |        |          |         |
+#   backup.ts        | 100.00 |    75.00 |  100.00 |
+#   database.ts      |  90.91 |    78.33 |   77.27 | 90-95 97-99
+# tests              |        |          |         |
+#  core.test.ts      | 100.00 |   100.00 |  100.00 |
+#  database.test.ts  | 100.00 |   100.00 |   92.31 |
+# -------------------------------------------------------------------
+# all files          |  97.89 |    87.80 |   93.01 |
+# -------------------------------------------------------------------
+# end of coverage report

@@ -1,0 +1,26 @@
+
+> arknights-tw-roster-prototype@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 28 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/skport.html                   0.69 kB │ gzip:  0.39 kB
+dist/index.html                    0.93 kB │ gzip:  0.56 kB
+dist/assets/skport-CoCKgn6V.css    1.32 kB │ gzip:  0.53 kB
+dist/assets/index-BDTEPBWj.css     1.87 kB │ gzip:  0.68 kB
+dist/assets/styles-82Iy_tPl.css   33.07 kB │ gzip:  7.52 kB
+dist/assets/skport-Cy_8vfUg.js    10.82 kB │ gzip:  4.92 kB
+dist/assets/styles-LPjzncAM.js    14.03 kB │ gzip:  5.95 kB
+dist/assets/index-CJsqrKol.js    126.33 kB │ gzip: 39.93 kB
+
+✓ built in 13.28s
+[PLUGIN_TIMINGS] JavaScript callbacks ran for 12.2s of this 13.3s build (92%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin vite:prepare-out-dir renderStart (88%, 11.7s, 1 call)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:
+  - plugin vite:build-html transform (2 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.

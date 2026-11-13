@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-11-13T07:56:56.836Z",
+  "isolatedMemoryDatabase": true,
+  "actualBrowserPersonalLibraryWritten": false,
+  "rawCount": 409,
+  "previewCounts": {
+    "added": 409,
+    "changed": 0,
+    "repeated": 0,
+    "conflicts": 3489,
+    "missing": 3210
+  },
+  "importedCount": 409,
+  "manuallyConfirmedAfterBatch": 0,
+  "reopen": true,
+  "backupRoundTrip": true,
+  "repeatNoDuplicates": true,
+  "undoToEmpty": true
+}

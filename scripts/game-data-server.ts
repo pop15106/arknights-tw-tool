@@ -1,0 +1,117 @@
+import { createServer, type ServerResponse } from 'node:http';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import type { GameDataSnapshot } from './game-data-sync.ts';
+
+const DEFAULT_PORT = 5188;
+const VITE_ORIGINS = ['http://127.0.0.1:5173', 'http://127.0.0.1:4173'];
+interface ServerOptions {
+  port?: number;
+  load?: () => Promise<GameDataSnapshot | null>;
+  sync?: () => Promise<GameDataSnapshot>;
+}
+class ApiError extends Error {
+  status: number;
+  code: string;
+  constructor(status: number, code: string, message: string) { super(message); this.status = status; this.code = code; }
+}
+function json(res: ServerResponse, status: number, value: unknown): void {
+  const content = JSON.stringify(value);
+  if (res.destroyed || res.writableEnded) return;
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+  });
+  res.end(content);
+}
+function publicStatus(snapshot: GameDataSnapshot) {
+  const status = snapshot.status;
+  return {
+    version: status.version, sourceUpdatedAt: status.sourceUpdatedAt, syncedAt: status.syncedAt,
+    counts: { operators: status.counts.operators, stages: status.counts.stages, events: status.counts.events },
+    sourceKind: status.sourceKind, sourceUrl: status.sourceUrl,
+    ...(status.lastError ? { lastError: '最近一次同步失敗；目前保留先前資料。' } : {}),
+  };
+}
+function queryNumber(params: URLSearchParams, key: string, fallback: number, min: number, max: number): number {
+  const input = params.get(key);
+  if (input === null) return fallback;
+  const value = Number(input);
+  if (!/^\d+$/u.test(input) || !Number.isSafeInteger(value) || value < min || value > max) throw new ApiError(400, 'QUERY', '查詢參數無效。');
+  return value;
+}
+
+export async function startGameDataServer(options: ServerOptions = {}) {
+  // 延後載入正式服務，讓注入的測試不會讀取網路或本機快取。
+  const load = options.load ?? (async () => (await import('./game-data-sync.ts')).loadGameData());
+  const sync = options.sync ?? (async () => (await import('./game-data-sync.ts')).syncGameData());
+  let origin = '', host = '';
+  const paths = new Set(['status', 'operators', 'stages', 'events', 'sync'].map(name => `/api/game-data/${name}`));
+  const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
+    try {
+      if (req.headers.host !== host && !['127.0.0.1:5173', '127.0.0.1:4173'].includes(req.headers.host ?? '')) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
+      if (req.headers.authorization !== undefined) throw new ApiError(400, 'CREDENTIALS', '公開資料服務不接受帳號憑證。');
+      const raw = req.url ?? '';
+      if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') || raw.includes('#') || raw.length > 2048) throw new ApiError(400, 'PATH', '網址格式無效。');
+      const url = new URL(raw, origin);
+      if (!paths.has(url.pathname)) throw new ApiError(404, 'NOT_FOUND', '找不到此資料功能。');
+      const isSync = url.pathname === '/api/game-data/sync';
+      if (req.method !== (isSync ? 'POST' : 'GET')) throw new ApiError(405, 'METHOD', '不支援此請求方法。');
+      const isList = url.pathname === '/api/game-data/stages' || url.pathname === '/api/game-data/events';
+      const allowedQuery = isList ? ['limit', 'offset', 'q'] : [];
+      for (const key of url.searchParams.keys()) {
+        if (!allowedQuery.includes(key) || url.searchParams.getAll(key).length !== 1) throw new ApiError(400, 'QUERY', '查詢參數無效。');
+      }
+      if (isSync) {
+        if (req.headers['x-game-data-sync'] !== '1' || ![origin, ...VITE_ORIGINS].includes(req.headers.origin ?? '')
+          || (req.headers['sec-fetch-site'] !== undefined && !['same-origin', 'same-site'].includes(String(req.headers['sec-fetch-site'])))) {
+          throw new ApiError(403, 'ORIGIN', '同步只接受本機頁面明確發出的請求。');
+        }
+        if (req.headers['content-type'] !== undefined) throw new ApiError(415, 'CONTENT_TYPE', '同步請求不接受 Content-Type 或內容。');
+        if (req.headers['transfer-encoding'] !== undefined || (req.headers['content-length'] !== undefined && req.headers['content-length'] !== '0')) throw new ApiError(400, 'BODY', '同步請求不接受內容。');
+        let updated: GameDataSnapshot;
+        try { updated = await sync(); } catch { throw new ApiError(502, 'SYNC_FAILED', '公開資料同步失敗；先前快取仍可使用。'); }
+        json(res, 200, publicStatus(updated)); return;
+      }
+      const limit = isList ? queryNumber(url.searchParams, 'limit', 100, 1, 1000) : 100;
+      const offset = isList ? queryNumber(url.searchParams, 'offset', 0, 0, Number.MAX_SAFE_INTEGER) : 0;
+      const q = url.searchParams.get('q') ?? '';
+      if (q.length > 100) throw new ApiError(400, 'QUERY', '查詢文字不可超過 100 字。');
+      const snapshot = await load();
+      if (!snapshot) throw new ApiError(503, 'DATA_UNAVAILABLE', '尚未同步公開遊戲資料。');
+      if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
+      if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
+      const rows = url.pathname === '/api/game-data/stages' ? snapshot.stages : snapshot.events;
+      const filtered = q ? rows.filter(row => (JSON.stringify(row) ?? '').includes(q)) : rows;
+      json(res, 200, { items: filtered.slice(offset, offset + limit), total: filtered.length, offset, limit, version: snapshot.status.version });
+    } catch (error) {
+      if (error instanceof ApiError) json(res, error.status, { error: { code: error.code, message: error.message } });
+      else json(res, 500, { error: { code: 'LOCAL_ERROR', message: '本機資料服務暫時無法完成請求。' } });
+    }
+  });
+  await new Promise<void>((resolveListen, reject) => {
+    server.once('error', reject);
+    server.listen(options.port ?? DEFAULT_PORT, '127.0.0.1', () => {
+      server.off('error', reject);
+      const address = server.address();
+      if (!address || typeof address === 'string') { reject(new Error('無法啟動本機資料服務。')); return; }
+      host = `127.0.0.1:${address.port}`; origin = `http://${host}`; resolveListen();
+    });
+  });
+  let closing: Promise<void> | undefined;
+  return { server, origin, close: () => closing ??= new Promise<void>((resolveClose, reject) => {
+    server.close(error => error ? reject(error) : resolveClose()); server.closeAllConnections();
+  }) };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  try {
+    const service = await startGameDataServer();
+    console.info(`公開遊戲資料服務：${service.origin}（僅本機）`);
+    const stop = () => { void service.close().then(() => process.exit(0), () => process.exit(1)); };
+    process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  } catch { console.error('公開遊戲資料服務啟動失敗。請確認 5188 未被使用。'); process.exitCode = 1; }
+}
