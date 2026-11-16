@@ -1742,3 +1742,36 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
     rest,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* 無人機用途：每架無人機加速一個設施 reduceSeconds 秒＝該設施 reduceSeconds 秒的產出。 */
+/* 每日無人機數＝86400 ÷ 產生間隔 ×（1＋各發電站基礎＋技能充能加成）。           */
+/* ------------------------------------------------------------------ */
+export interface DroneOption { facilityId: string; label: string; kind: 'gold' | 'record' | 'trading'; perDrone: { gold: number; exp: number; lmd: number; goldUsed: number }; perDay: { gold: number; exp: number; lmd: number; goldUsed: number } }
+export function droneOptions(evaluation: BaseEvaluation, catalog: BaseCatalog, stats: BaseStatistics): { perDay: number; chargePercent: number; options: DroneOption[]; recommendation: string } | null {
+  const drones = catalog.drones;
+  if (!drones || !stats.available) return null;
+  const power = evaluation.facilities.filter(result => result.facility.type === 'power');
+  const chargePercent = round(power.reduce((sum, result) => sum + drones.powerBasicPercent + result.totals.drone, 0));
+  const perDay = round(86400 / drones.recoverSeconds * (1 + chargePercent / 100));
+  const options: DroneOption[] = [];
+  const share = (seconds: number) => seconds / 86400;
+  for (const item of stats.manufacture) {
+    const f = share(drones.reduceSeconds.MANUFACTURE);
+    const one = { gold: Math.round(item.goldPerDay * f * 1000) / 1000, exp: round(item.expPerDay * f), lmd: 0, goldUsed: 0 };
+    options.push({ facilityId: item.facilityId, label: item.label, kind: item.product, perDrone: one, perDay: { gold: round(one.gold * perDay), exp: Math.round(one.exp * perDay), lmd: 0, goldUsed: 0 } });
+  }
+  for (const item of stats.trading) {
+    const f = share(drones.reduceSeconds.TRADING);
+    const one = { gold: 0, exp: 0, lmd: round(item.lmdPerDay * f), goldUsed: Math.round(item.goldPerDay * f * 1000) / 1000 };
+    options.push({ facilityId: item.facilityId, label: item.label, kind: 'trading', perDrone: one, perDay: { gold: 0, exp: 0, lmd: Math.round(one.lmd * perDay), goldUsed: round(one.goldUsed * perDay) } });
+  }
+  const surplus = stats.goldPerDay - stats.goldConsumedPerDay;
+  const bestTrading = options.filter(item => item.kind === 'trading').sort((a, b) => b.perDrone.lmd - a.perDrone.lmd)[0];
+  const bestGold = options.filter(item => item.kind === 'gold').sort((a, b) => b.perDrone.gold - a.perDrone.gold)[0];
+  const recommendation = !options.length ? '還沒有製造站或貿易站排人。'
+    : surplus > 0 && bestTrading ? `赤金每日多出 ${round(surplus)} 條：無人機給「${bestTrading.label}」，把多出的赤金換成龍門幣（每架約 ${bestTrading.perDrone.lmd} 龍門幣，但每日最多只能多消耗 ${round(surplus)} 條赤金）。`
+    : bestGold ? `赤金不夠貿易站用（每日差 ${round(-surplus)} 條）：無人機給「${bestGold.label}」補赤金（每架約 ${bestGold.perDrone.gold} 條）。`
+    : bestTrading ? `無人機給「${bestTrading.label}」（每架約 ${bestTrading.perDrone.lmd} 龍門幣）。` : '';
+  return { perDay, chargePercent, options, recommendation };
+}

@@ -595,3 +595,15 @@ test('多班輪替與 MAA 匯出格式', async () => {
   assert.ok(json.plans[0].rooms.manufacture && json.plans[0].rooms.trading);
   assert.ok(!('dormitory' in json.plans[0].rooms) && !('training' in json.plans[0].rooms), '宿舍交給 MAA、訓練室不支援');
 });
+
+test('無人機用途：每架＝設施 3 分鐘產出，依赤金收支建議', async () => {
+  const { droneOptions } = await import('../src/domain/base.ts');
+  const catalog = { drones: { recoverSeconds: 360, reduceSeconds: { MANUFACTURE: 180, TRADING: 180 }, powerBasicPercent: 5 } } as never;
+  const evaluation = { facilities: [{ facility: { type: 'power' }, totals: { drone: 15 } }] } as never;
+  const stats = { available: true, goldPerDay: 50, goldConsumedPerDay: 40, manufacture: [{ facilityId: 'm', label: '製造站 1', product: 'gold', goldPerDay: 48, expPerDay: 0 }], trading: [{ facilityId: 't', label: '貿易站 1', lmdPerDay: 48000, goldPerDay: 48 }] } as never;
+  const result = droneOptions(evaluation, catalog, stats)!;
+  assert.equal(result.perDay, 288, '240 架 ×（1＋20%）');
+  assert.equal(result.options[0].perDrone.gold, 0.1, '48 條／日 × 180 秒 ÷ 86400');
+  assert.equal(result.options[1].perDrone.lmd, 100);
+  assert.match(result.recommendation, /貿易站 1/, '赤金有剩 → 給貿易站');
+});

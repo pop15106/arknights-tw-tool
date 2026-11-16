@@ -17,7 +17,7 @@ export interface GameDataStatus {
 }
 export interface GameDataSnapshot { dataset: Dataset; stages: Row[]; events: Row[]; status: GameDataStatus; base?: BaseCatalog; growth?: GrowthCatalog; enemies?: EnemyCatalog; recruit?: RecruitCatalog }
 export const DATA_REPO = 'arkntools/arknights-data-tw-for-maa';
-export const CATALOG_REVISION = 12;
+export const CATALOG_REVISION = 13;
 export const MODULE_DATA_REPO = 'ArknightsAssets/ArknightsGamedata';
 export const MODULE_DATA_COMMIT = '624d3fa212dabc40bdbc2a873d87d0c7dbdf4fe5';
 export const MODULE_DATA_DATE = '2026-11-02T09:23:25Z';

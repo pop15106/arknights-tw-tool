@@ -1,5 +1,5 @@
 import type { BaseCatalog } from '../catalog/base';
-import { baseStatistics, simulateShift, type BaseEvaluation } from '../domain/base';
+import { baseStatistics, droneOptions, simulateShift, type BaseEvaluation } from '../domain/base';
 import type { AppState, Settings } from '../domain/model';
 import { DEFAULT_TRADING } from '../catalog/trading';
 import { ShiftReminder } from './ShiftReminder';
@@ -35,6 +35,17 @@ export function BaseStats({ evaluation, catalog, base, state }: { evaluation: Ba
       <span>班次前段（心情 &gt; 12）<b>{resource.high}</b> 點 · 後段（心情 ≤ 12）<b>{resource.low}</b> 點 · 加成以 <b>{resource.used}</b> 點計算（取較低值）</span>
       <small>來源：{resource.sources.join('、')}</small>
     </div>)}
+    {(() => { const drone = droneOptions(evaluation, catalog, stats); return drone && drone.options.length > 0 && <div className="drone-panel">
+      <h3>無人機用途</h3>
+      <p className="fine-print">每日約產生 {fmt(drone.perDay, 0)} 架（每 {catalog.drones!.recoverSeconds / 60} 分鐘一架，發電站充能合計 +{fmt(drone.chargePercent)}%）；每架加速 {catalog.drones!.reduceSeconds.MANUFACTURE / 60} 分鐘。</p>
+      <p className="callout">{drone.recommendation}</p>
+      <table className="stats-table"><thead><tr><th>給哪裡</th><th>每架</th><th>全部無人機／日</th></tr></thead><tbody>
+        {drone.options.map(item => <tr key={item.facilityId}><td>{item.label}</td>
+          <td>{item.kind === 'gold' ? `${item.perDrone.gold} 條赤金` : item.kind === 'record' ? `${fmt(item.perDrone.exp, 0)} 經驗` : `${fmt(item.perDrone.lmd, 0)} 龍門幣（耗 ${item.perDrone.goldUsed} 條赤金）`}</td>
+          <td>{item.kind === 'gold' ? `${fmt(item.perDay.gold)} 條赤金` : item.kind === 'record' ? `${fmt(item.perDay.exp, 0)} 經驗` : `${fmt(item.perDay.lmd, 0)} 龍門幣（耗 ${fmt(item.perDay.goldUsed)} 條）`}</td></tr>)}
+      </tbody></table>
+      <p className="fine-print">無人機的價值＝該設施 3 分鐘的產出，所以給生產力或訂單效率最高的設施最划算。貿易站加速也會多消耗赤金，赤金有剩時才划算。發電站基礎充能 {catalog.drones!.powerBasicPercent}%／座取自資料表 powerData，假設每座發電站都計入。</p>
+    </div>; })()}
     {stats.storageWarnings.map(text => <p key={text} className="callout warning">{text}</p>)}
     <div className="stats-tables">
       <div>

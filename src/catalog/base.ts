@@ -14,6 +14,8 @@ export interface BaseCatalog {
   rooms: BaseRoom[];
   /** 每名進駐幹員的基礎加成（manufactData／tradingData.basicSpeedBuff，以百分比表示）。 */
   basicSpeedPercent: { MANUFACTURE: number; TRADING: number };
+  /** 無人機：基礎產生間隔（秒）、每架加速秒數、每座發電站基礎充能加成（%）。 */
+  drones?: { recoverSeconds: number; reduceSeconds: { MANUFACTURE: number; TRADING: number }; powerBasicPercent: number };
   skills: Record<string, BaseSkill>;
   /** 幹員 → 技能欄；每欄依序是同一技能的升級版本，後者解鎖後取代前者。 */
   operators: Record<string, BaseSkillSlot[][]>;
@@ -128,6 +130,7 @@ export function buildBaseCatalog(building: unknown, operatorIds: readonly string
     gold: Number(row.goldCost) || 0, byproductRate: Number(row.extraOutcomeRate) || 0, level: Number(row.requireRooms?.[0]?.roomLevel) || 1 }));
   const capacity = Array.isArray(data.manufactData?.phases) ? data.manufactData.phases.map((phase: Row) => Number(phase.outputCapacity) || 0) : undefined;
   return { source, version, rooms, basicSpeedPercent: { MANUFACTURE: percent(data.manufactData?.basicSpeedBuff), TRADING: percent(data.tradingData?.basicSpeedBuff) }, skills, operators,
+    ...(Number(data.laborRecoverTime) > 0 ? { drones: { recoverSeconds: Number(data.laborRecoverTime), reduceSeconds: { MANUFACTURE: Number(data.manufactReduceTimeUnit) || 180, TRADING: Number(data.tradingReduceTimeUnit) || 180 }, powerBasicPercent: percent(data.powerData?.basicSpeedBuff) } } : {}),
     ...(gold && records.length ? { formulas: { gold, records } } : {}), ...(capacity ? { outputCapacity: capacity } : {}), ...(mood ? { mood } : {}), ...(meta ? { meta } : {}),
     ...(Object.keys(usedTerms).length ? { terms: usedTerms } : {}), ...(Object.keys(skillCategories).length ? { skillCategories } : {}), ...(workshop.length ? { workshop } : {}) };
 }
