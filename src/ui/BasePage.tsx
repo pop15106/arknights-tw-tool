@@ -18,7 +18,7 @@ const signed = (value: number, unit = '%') => `${value >= 0 ? '+' : ''}${value}$
 const roomLabel = (room: string) => FACILITY_LABEL[Object.entries(ROOM_OF).find(([, value]) => value === room)?.[0] as FacilityType] ?? room;
 const WORKSHOP_TYPE_LABEL: Record<string, string> = { F_EVOLVE: '精英材料', F_SKILL: '技巧概要', F_BUILDING: '基建材料', F_ASC: '晶片' };
 const targetText = (target: WorkshopTarget) => [target.mood !== undefined ? `原始心情 ${target.mood}` : '', target.types?.map(type => WORKSHOP_TYPE_LABEL[type] ?? type).join('、') ?? '', target.includes ? `${target.includes}類` : '', target.equals ?? ''].filter(Boolean).join('的') || '任意材料';
-function effectText(effect: SkillEffect): string {
+export function effectText(effect: SkillEffect): string {
   switch (effect.kind) {
     case 'productivity': return `${effect.product === 'gold' ? '赤金' : effect.product === 'record' ? '作戰記錄' : effect.product === 'originium' ? '源石類' : ''}生產力 ${signed(effect.value)}`;
     case 'capacity': return `倉庫上限 ${signed(effect.value, '')}`;

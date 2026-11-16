@@ -3,6 +3,8 @@ import type { AppState, OperatorDefinition } from '../domain/model';
 import { analyzeSynergies, DEBUFF_PARTNER, type SynergyLink } from '../domain/synergy';
 import { useBaseCatalog } from './BasePage';
 import { useGrowthCatalog } from './GrowthPage';
+import { effectText } from './BasePage';
+import { IS_THEMES, operatorReview } from '../domain/review';
 import { buildSquad, operatorInfo, TEMPLATES } from '../domain/squad';
 import { useEffect } from 'preact/hooks';
 import type { EnemyCatalog } from '../catalog/enemies';
@@ -13,13 +15,14 @@ const TRIGGER_LABEL: Record<SynergyLink['trigger'], string> = { squad: '編入�
 const KIND_ORDER: SynergyLink['target']['kind'][] = ['operator', 'group', 'profession', 'branch', 'rarity', 'position'];
 const KIND_LABEL: Record<SynergyLink['target']['kind'], string> = { operator: '指定幹員', group: '陣營', profession: '職業', branch: '分支', rarity: '星級', position: '位置' };
 
-export function TeamPage({ state, isDemo }: { state: AppState; isDemo: boolean }) {
-  const [tab, setTab] = useState<'synergy' | 'squad' | 'stage'>('synergy');
-  const tabs = <div className="segmented" role="tablist">{([['synergy', '幹員相性'], ['squad', '編隊建議'], ['stage', '依關卡推薦']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
+export function TeamPage({ state, isDemo, onSaveNotes }: { state: AppState; isDemo: boolean; onSaveNotes?: (notes: NonNullable<AppState['settings']['reviewNotes']>) => void }) {
+  const [tab, setTab] = useState<'synergy' | 'squad' | 'stage' | 'review'>('synergy');
+  const tabs = <div className="segmented" role="tablist">{([['synergy', '幹員相性'], ['squad', '編隊建議'], ['stage', '依關卡推薦'], ['review', '幹員簡評']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
   return <div className="team-page">
     {tab === 'synergy' && <SynergyTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'squad' && <SquadTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'stage' && <StageTab state={state} isDemo={isDemo} tabs={tabs}/>}
+    {tab === 'review' && <ReviewTab state={state} isDemo={isDemo} tabs={tabs} onSaveNotes={onSaveNotes}/>}
   </div>;
 }
 
@@ -191,5 +194,48 @@ function StageTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
       </article>)}</div>
     </section>}
     {enemies.length > 0 && !threats.length && <section className="panel"><p className="fine-print">這關沒有超過門檻的威脅，一般配置即可。</p></section>}
+  </>;
+}
+
+const MODES: { key: string; label: string }[] = [{ key: 'daily', label: '日常（主線／活動）' }, { key: 'base', label: '基建' }, ...IS_THEMES.map((theme, index) => ({ key: `is${index + 1}`, label: `集成戰略：${theme}` })), { key: 'reclamation', label: '生息演算' }, { key: 'security', label: '保全派駐' }];
+function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDemo: boolean; tabs: preact.JSX.Element; onSaveNotes?: (notes: NonNullable<AppState['settings']['reviewNotes']>) => void }) {
+  const { catalog: growth } = useGrowthCatalog(isDemo);
+  const { catalog: base } = useBaseCatalog(isDemo, 0);
+  const [operatorId, setOperatorId] = useState('');
+  const [query, setQuery] = useState('');
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const definitions = state.dataset.operators;
+  const head = <header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>幹員簡評</h2></div>{tabs}</header>;
+  if (!growth) return <section className="panel">{head}<p className="fine-print">讀取遊戲資料中…</p></section>;
+  const definition = definitions.find(def => def.id === operatorId);
+  const matches = query.trim() ? definitions.filter(def => def.displayName.includes(query.trim()) && growth.operators[def.id]).slice(0, 10) : [];
+  const review = definition ? operatorReview(definition, definitions, growth, base, effectText) : null;
+  const saved = (definition && state.settings.reviewNotes?.[definition.id]) ?? {};
+  const note = (key: string) => notes[key] ?? saved[key] ?? '';
+  const dirty = definition && Object.keys(notes).some(key => (notes[key] ?? '') !== (saved[key] ?? ''));
+  const list = (items: { kind: string; name: string; description: string }[]) => <ul className="gap-list">{items.map(item => <li key={item.description}>{item.kind}「{item.name}」：{item.description}</li>)}</ul>;
+  const noteBox = (key: string) => <textarea className="text-area review-note" maxLength={1000} placeholder="我的筆記（只存在這台裝置）" value={note(key)} onInput={event => setNotes(current => ({ ...current, [key]: event.currentTarget.value }))}/>;
+  return <>
+    <section className="panel">
+      {head}
+      <p className="fine-print">只整理遊戲資料寫明的事實與可計算的比較：日常看數值在同分支的排位、費用與技能觸發；基建用本工具的技能解析；集成戰略、生息演算、保全派駐只列出資料明寫的專屬效果。本工具不做主觀強度評分，資料沒有的部分請用筆記補充。</p>
+      <input className="text-input" placeholder="輸入幹員名稱…" value={query} onInput={event => setQuery(event.currentTarget.value)}/>
+      {matches.length > 0 && <div className="growth-matches">{matches.map(def => <button key={def.id} type="button" className="button secondary small" onClick={() => { setOperatorId(def.id); setNotes({}); setQuery(''); }}>{def.displayName}</button>)}</div>}
+    </section>
+    {definition && review && <section className="panel" aria-label="簡評">
+      <header className="recommend-head"><div><h3>{definition.displayName}</h3><p className="fine-print">{definition.rarity}★・{definition.profession}・{definition.branch}</p></div>
+        {onSaveNotes && <button type="button" className="button primary" disabled={!dirty} onClick={() => { const next = { ...(state.settings.reviewNotes ?? {}) }; const merged = Object.fromEntries(Object.entries({ ...saved, ...notes }).filter(([, value]) => value.trim())); if (Object.keys(merged).length) next[definition.id] = merged; else delete next[definition.id]; onSaveNotes(next); setNotes({}); }}>保存筆記</button>}</header>
+      <div className="review-grid">
+        {MODES.map(mode => {
+          let body: preact.JSX.Element;
+          if (mode.key === 'daily') body = <><ul className="gap-list">{review.daily.facts.map(fact => <li key={fact}>{fact}</li>)}</ul><ul className="gap-list">{review.daily.skills.map(skill => <li key={skill}>{skill}</li>)}</ul></>;
+          else if (mode.key === 'base') body = review.base.length ? <ul className="gap-list">{review.base.map(item => <li key={item.skill}><strong>{item.room}</strong>「{item.skill}」：{item.effects}{item.note ? `（${item.note}）` : ''}</li>)}</ul> : <p className="fine-print">沒有基建技能。</p>;
+          else if (mode.key.startsWith('is')) { const theme = review.roguelike[Number(mode.key.slice(2)) - 1]; const items = [...theme.effects, ...review.roguelikeGeneral]; body = items.length ? list(items) : <p className="fine-print">資料沒有此主題（或集成戰略）的專屬效果；強弱取決於各主題的玩法與藏品，本工具不評分。</p>; }
+          else if (mode.key === 'reclamation') body = review.reclamation.length ? list(review.reclamation) : <p className="fine-print">資料沒有生息演算的專屬效果。</p>;
+          else body = review.security.length ? list(review.security) : <p className="fine-print">資料沒有保全派駐的專屬效果；保全派駐的表現取決於關卡與招募組合，本工具不評分。</p>;
+          return <article key={mode.key} className="synergy-card review-card"><header><strong>{mode.label}</strong></header>{body}{noteBox(mode.key)}</article>;
+        })}
+      </div>
+    </section>}
   </>;
 }

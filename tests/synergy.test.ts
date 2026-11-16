@@ -64,3 +64,19 @@ test('依關卡推薦：飛行、高防禦、高法抗、法術攻擊、數量�
   assert.deepEqual(parseDangerLevel('精英2 LV.1'), { elite: 2, level: 1 });
   assert.equal(parseDangerLevel('-'), undefined);
 });
+
+test('幹員簡評：同分支排位、技能觸發、模式明寫效果', async () => {
+  const { operatorReview } = await import('../src/domain/review.ts');
+  const def = (id: string, atk: number, talents: [string, string][] = []) => ({ id, displayName: id, aliases: [], rarity: 6, profession: '狙擊', branch: '速射手', faction: '', availability: 'available', modules: [], skills: [{ id: `${id}_s1`, name: 's1' }],
+    talents: talents.map(([name, description]) => ({ name, description, elite: 2, level: 1, potential: 1 })) }) as never;
+  const defs = [def('a', 600, [['回憶', '在【傀影與猩紅孤鑽】中，攻擊速度+10'], ['沙盒', '在生息演算中，移動速度+1']]), def('b', 400), def('c', 450), def('d', 500)];
+  const stats = (atk: number) => ({ hp: 1000, atk, def: 100, res: 0, cost: 12, block: 1, redeploy: 70, interval: 1 });
+  const growth = { operators: Object.fromEntries([['a', 600], ['b', 400], ['c', 450], ['d', 500]].map(([id, atk]) => [id, { rarity: 6, phases: [], skillUp: [], masteries: {}, stats: stats(atk as number), skillMeta: { [`${id}_s1`]: { type: 'AUTO', sp: 'INCREASE_WITH_TIME', cost: 30, init: 10, duration: 15 } } }])) } as never;
+  const review = operatorReview(defs[0], defs, growth, null, () => '');
+  assert.ok(review.daily.facts.some(fact => /攻擊 600.*偏高/.test(fact)));
+  assert.match(review.daily.skills[0], /自動觸發・自然回復・技力 10\/30・持續 15 秒/);
+  assert.equal(review.roguelike[0].effects.length, 1);
+  assert.equal(review.roguelike[1].effects.length, 0);
+  assert.equal(review.reclamation.length, 1);
+  assert.equal(review.security.length, 0);
+});

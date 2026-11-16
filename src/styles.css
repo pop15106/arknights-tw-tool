@@ -980,3 +980,4 @@ h2 { font-weight: 800; }
 .mood-legend i.s1, .mood-tooltip i.s1 { background: var(--s1); } .mood-legend i.s2, .mood-tooltip i.s2 { background: var(--s2); } .mood-legend i.s3, .mood-tooltip i.s3 { background: var(--s3); }
 .mood-legend i.s4, .mood-tooltip i.s4 { background: var(--s4); } .mood-legend i.s5, .mood-tooltip i.s5 { background: var(--s5); } .mood-legend i.s6, .mood-tooltip i.s6 { background: var(--s6); }
 .mood-tooltip { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 10px; border: 1.5px solid var(--line-strong); border-radius: 10px; background: var(--surface); font-size: 12px; }
+.review-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); margin-top: 10px; } .review-note { min-height: 60px; font-family: inherit; font-size: 13px; } .review-card .gap-list { font-size: 13px; }

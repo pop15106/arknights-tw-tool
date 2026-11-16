@@ -114,6 +114,8 @@ export interface Settings {
     /** 加工站要加工的配方（workshopFormulas 的 formulaId）。 */
     workshopFormula?: string;
   };
+  /** 幹員簡評的個人筆記：幹員 ID → 模式 → 文字（只存在本機）。 */
+  reviewNotes?: Record<string, Record<string, string>>;
   /** 養成計畫：各幹員的目標，以及材料庫存（本機手動輸入）。 */
   growth?: { plans: { operatorId: string; target: { elite: number; level: number; skillLevel: number; masteries: Record<string, number>; modules: Record<string, number> } }[]; expand?: boolean; inventory?: Record<string, number> };
   analysis: { mode: 'story' | 'integrated-strategies' | 'reclamation' | 'stationary-security' | 'defense'; goal: string; budget: number };
@@ -345,7 +347,8 @@ export function parseJson(textValue: string, maxBytes: number): unknown {
 export function parseImportText(textValue: string): ImportDocument { return validateImportDocument(parseJson(textValue, MAX_IMPORT_BYTES)); }
 
 function validateSettings(value: unknown): void {
-  const settings = object(value, ['base', 'analysis', 'lastBackupAt', 'growth'], ['base', 'analysis']);
+  const settings = object(value, ['base', 'analysis', 'lastBackupAt', 'growth', 'reviewNotes'], ['base', 'analysis']);
+  if (settings.reviewNotes !== undefined) for (const [key, notes] of Object.entries(object(settings.reviewNotes, Object.keys(settings.reviewNotes as object), []))) { id(key); for (const [mode, note] of Object.entries(object(notes, Object.keys(notes as object), []))) { if (!/^[a-z0-9_-]{1,40}$/u.test(mode) || typeof note !== 'string' || note.length > 1000) throw new Error('簡評筆記格式不正確（每則最多 1000 字）。'); } }
   if (settings.growth !== undefined) {
     const growth = object(settings.growth, ['plans', 'expand', 'inventory'], ['plans']); list(growth.plans, 200, '養成計畫');
     for (const item of growth.plans as unknown[]) {
