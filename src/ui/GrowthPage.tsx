@@ -6,7 +6,7 @@ import { OperatorPortrait } from '../OperatorEncyclopedia';
 import { Icon } from './Icon';
 import { useStageData } from './gameData';
 import { parseDepot, type DepotImport } from '../domain/depot';
-import { bestAcquire, materialSources, OCCURRENCE, type Acquire } from '../domain/stages';
+import { bestAcquire, farmingPlan, materialSources, OCCURRENCE, type Acquire, type FarmingPlan } from '../domain/stages';
 
 type Growth = NonNullable<Settings['growth']>;
 const fmt = (value: number) => value.toLocaleString('zh-TW');
@@ -54,6 +54,7 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
   const [depotText, setDepotText] = useState<string | null>(null);
   const [depot, setDepot] = useState<DepotImport | null>(null);
   const [depotError, setDepotError] = useState('');
+  const [farm, setFarm] = useState<{ key: string; plan: FarmingPlan } | null>(null);
   const definitions = useMemo(() => new Map(state.dataset.operators.map(op => [op.id, op])), [state.dataset]);
   const rows = useMemo(() => new Map(state.roster.map(row => [row.operatorId, row])), [state.roster]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(state.settings.growth ?? { plans: [] });
@@ -104,6 +105,8 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
 
   const previewDepot = (text: string) => { setDepotError(''); setDepot(null); try { setDepot(parseDepot(text, new Set(Object.keys(catalog.items)))); } catch (err) { setDepotError(err instanceof Error ? err.message : '無法讀取。'); } };
   const applyDepot = () => { if (!depot) return; setDraft(current => { const next = { ...(current.inventory ?? {}) }; for (const [id, count] of Object.entries(depot.items)) { if (count > 0) next[id] = count; else delete next[id]; } return { ...current, inventory: next }; }); setDepot(null); setDepotText(null); };
+  const needKey = JSON.stringify(missing.map(entry => [entry.id, entry.count - entry.have]));
+  const runFarm = async () => { if (!stageData?.drops) return; const need = Object.fromEntries(missing.map(entry => [entry.id, entry.count - entry.have])); setFarm({ key: needKey, plan: await farmingPlan(need, stageData.stages, stageData.events, now, stageData.drops, catalog.recipes) }); };
   const setHave = (id: string, value: string) => setDraft(current => { const next = { ...(current.inventory ?? {}) }; const count = Math.max(0, Math.min(10_000_000, Math.round(Number(value) || 0))); if (count) next[id] = count; else delete next[id]; return { ...current, inventory: next }; });
   return <div className="growth-page">
     <section className="panel">
@@ -145,6 +148,17 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
           <td>{entry.count > entry.have ? fmt(entry.count - entry.have) : '—'}</td>
           <td className="growth-farm">{farmText(entry)}</td></tr>)}
       </tbody></table>
+      {stageData?.drops && missing.length > 0 && <div className="farm-plan">
+        <div className="inline-actions"><button type="button" className="button secondary" onClick={() => void runFarm()}>{farm?.key === needKey ? '重新計算刷關方案' : '計算最省理智的刷關方案'}</button><span className="fine-print">用線性規劃一次決定整個缺口：一關同時掉多種材料會一起算，並比較直接刷與合成。</span></div>
+        {farm && farm.key === needKey && <>
+          <p className="growth-summary"><strong>合計 {fmt(farm.plan.sanity)} 理智</strong>（逐項挑最佳約 {fmt(sanity)}）・合成另需龍門幣 {fmt(farm.plan.craftLmd)}{farm.plan.unmet.length ? `・${farm.plan.unmet.length} 種無法從關卡或合成取得：${farm.plan.unmet.map(id => catalog.items[id]?.name ?? id).join('、')}` : ''}</p>
+          <table className="stats-table farm-table"><thead><tr><th>關卡</th><th>次數</th><th>理智</th><th>主要產出（期望值）</th></tr></thead><tbody>
+            {farm.plan.runs.map(run => <tr key={run.stage.id}><td>{run.stage.code} {run.stage.name}{run.event ? `（${run.event.name}）` : ''}</td><td>{run.runs}</td><td>{fmt(run.sanity)}</td><td>{run.yields.slice(0, 5).map(item => `${catalog.items[item.id]?.name ?? item.id}×${item.amount}`).join('、')}</td></tr>)}
+          </tbody></table>
+          {farm.plan.crafts.length > 0 && <p className="fine-print">加工站合成：{farm.plan.crafts.map(item => `${catalog.items[item.id]?.name ?? item.id}×${item.count}`).join('、')}。</p>}
+          <p className="fine-print">次數取整數，產出為企鵝物流陸服掉率的期望值；資源收集關卡依星期開放；合成副產品沒有計入（實際會更省）。</p>
+        </>}
+      </div>}
       {expanded && Object.keys(expanded.crafted).length > 0 && <p className="fine-print">需要合成：{Object.entries(expanded.crafted).map(([id, count]) => `${catalog.items[id]?.name ?? id}×${count}`).join('、')}。</p>}
     </section>}
 

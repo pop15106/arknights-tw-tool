@@ -49,3 +49,22 @@ test('取得方式：直接刷與合成取理智較低者', async () => {
   const way = bestAcquire('30013', extra, events, now, drops, { '30013': { costs: [{ id: '30012', count: 3 }] } });
   assert.equal(way?.kind, 'craft'); assert.equal(way?.apPerItem, 18);
 });
+
+test('理智規劃：一關多掉落合併計算、合成、無法取得的材料', async () => {
+  const { farmingPlan } = await import('../src/domain/stages.ts');
+  const list: Stage[] = [
+    { id: 'main_a', code: 'A', name: 'a', type: 'MAIN', zoneId: 'z', apCost: 10, drops: [] },
+    { id: 'main_b', code: 'B', name: 'b', type: 'MAIN', zoneId: 'z', apCost: 6, drops: [] },
+    { id: 'main_c', code: 'C', name: 'c', type: 'MAIN', zoneId: 'z', apCost: 6, drops: [] },
+  ];
+  const drops = parsePenguinMatrix({ matrix: [
+    { stageId: 'main_a', itemId: 'x', quantity: 1000, times: 1000, end: null }, { stageId: 'main_a', itemId: 'y', quantity: 1000, times: 1000, end: null },
+    { stageId: 'main_b', itemId: 'x', quantity: 1000, times: 1000, end: null }, { stageId: 'main_c', itemId: 'y', quantity: 1000, times: 1000, end: null },
+  ] }, 'CN', '2026-11-10T00:00:00Z');
+  const plan = await farmingPlan({ x: 5, y: 5, chip: 2 }, list, [], now, drops, {});
+  assert.equal(plan.sanity, 50, '刷 A 五次（50）比 B、C 各五次（60）省');
+  assert.deepEqual(plan.unmet, ['chip']);
+  const crafted = await farmingPlan({ z: 2 }, list, [], now, drops, { z: { costs: [{ id: 'x', count: 3 }], gold: 100 } });
+  assert.deepEqual(crafted.crafts, [{ id: 'z', count: 2 }]);
+  assert.equal(crafted.sanity, 36); assert.equal(crafted.craftLmd, 200);
+});

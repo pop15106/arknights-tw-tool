@@ -946,3 +946,4 @@ h2 { font-weight: 800; }
 .stats-table tr.best td { font-weight: 800; color: var(--accent); }
 .bar { display: inline-block; width: 80px; height: 8px; margin-right: 6px; border-radius: 999px; background: var(--surface); vertical-align: middle; overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); }
 .shift-reminder span { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .shift-reminder .text-input { width: 120px; min-height: 32px; }
+.farm-plan { display: grid; gap: 8px; margin-top: 12px; } .farm-table td:nth-child(2), .farm-table td:nth-child(3) { font-family: var(--font-mono); text-align: right; } @media (max-width: 640px) { .farm-plan { overflow-x: auto; } .farm-table { min-width: 520px; } }

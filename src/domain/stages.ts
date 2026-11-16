@@ -83,3 +83,54 @@ export function bestAcquire(itemId: string, stages: readonly Stage[], events: re
   memo.set(itemId, best);
   return best;
 }
+
+/* ------------------------------------------------------------------ */
+/* 理智規劃：線性規劃一次決定整個缺口要刷哪些關卡、各幾次、哪些用合成。     */
+/* 關卡一次會掉多種材料，合併計算比逐項挑最佳關卡更省；合成不計副產品。      */
+/* ------------------------------------------------------------------ */
+export interface FarmingPlan { runs: { stage: Stage; event?: GameEvent; runs: number; sanity: number; yields: { id: string; amount: number }[] }[]; crafts: { id: string; count: number }[]; sanity: number; craftLmd: number; unmet: string[] }
+export async function farmingPlan(need: Record<string, number>, stages: readonly Stage[], events: readonly GameEvent[], now: number, drops: DropRates, recipes: Record<string, { costs: { id: string; count: number }[]; gold: number }>, minSamples = 100): Promise<FarmingPlan> {
+  const { solveMin } = await import('./lp.ts');
+  // 需要考慮的材料：缺口＋可合成材料的原料（遞迴）。
+  const universe = new Set<string>();
+  const visit = (id: string, depth: number) => { if (universe.has(id) || depth > 6) return; universe.add(id); for (const part of recipes[id]?.costs ?? []) visit(part.id, depth + 1); };
+  for (const id of Object.keys(need)) if (need[id] > 0) visit(id, 0);
+  const ongoing = new Map<string, GameEvent>();
+  for (const event of events.filter(item => item.hasStage && eventPhase(item, now) === 'ongoing')) for (const stage of stagesOfEvent(event, stages)) ongoing.set(stage.id, event);
+  const candidates = stages.filter(stage => (PERMANENT.has(stage.type) || ongoing.has(stage.id)) && stage.apCost && !stage.id.endsWith('#f#') && !/^easy_/u.test(stage.id)).map(stage => {
+    const stat = drops.stages[stage.id] ?? {};
+    const rates = Object.entries(stat).filter(([id, entry]) => universe.has(id) && entry.times >= minSamples && entry.quantity > 0).map(([id, entry]) => ({ id, rate: entry.quantity / entry.times }));
+    return { stage, rates };
+  }).filter(item => item.rates.length);
+  const crafts = [...universe].filter(id => recipes[id]);
+  const obtainable = new Set([...candidates.flatMap(item => item.rates.map(rate => rate.id)), ...crafts]);
+  const unmet = Object.keys(need).filter(id => need[id] > 0 && !obtainable.has(id));
+  const items = [...universe].filter(id => obtainable.has(id));
+  const index = new Map(items.map((id, position) => [id, position]));
+  // 每種材料加一個「無法取得」的補差變數，成本極高：保證可解，並找出真正取不到的材料。
+  const n = candidates.length + crafts.length + items.length;
+  const PENALTY = 1e6;
+  const A = items.map(() => new Array(n).fill(0));
+  candidates.forEach((item, j) => { for (const rate of item.rates) if (index.has(rate.id)) A[index.get(rate.id)!][j] += rate.rate; });
+  crafts.forEach((id, k) => { const j = candidates.length + k; A[index.get(id)!][j] += 1; for (const part of recipes[id].costs) if (index.has(part.id)) A[index.get(part.id)!][j] -= part.count; });
+  const b = items.map(id => need[id] ?? 0);
+  items.forEach((_, i) => { A[i][candidates.length + crafts.length + i] = 1; });
+  const c = [...candidates.map(item => item.stage.apCost ?? 0), ...crafts.map(() => 0), ...items.map(() => PENALTY)];
+  const result = solveMin(c, A, b);
+  if (result.status !== 'optimal') return { runs: [], crafts: [], sanity: 0, craftLmd: 0, unmet: [...unmet, ...items.filter(id => (need[id] ?? 0) > 0)] };
+  for (const [i, id] of items.entries()) if (result.x[candidates.length + crafts.length + i] > 1e-6 && !unmet.includes(id)) unmet.push(id);
+  const runs = candidates.map((item, j) => ({ item, x: result.x[j] })).filter(entry => entry.x > 1e-6)
+    .map(({ item, x }) => { const count = Math.ceil(x - 1e-6); return { stage: item.stage, ...(ongoing.get(item.stage.id) ? { event: ongoing.get(item.stage.id) } : {}), runs: count, sanity: count * (item.stage.apCost ?? 0), yields: item.rates.filter(rate => (need[rate.id] ?? 0) > 0 || crafts.some(id => recipes[id].costs.some(part => part.id === rate.id))).map(rate => ({ id: rate.id, amount: Math.round(rate.rate * count * 10) / 10 })).sort((p, q) => q.amount - p.amount) }; })
+    .sort((p, q) => q.sanity - p.sanity);
+  // 同一關的標準／磨難環境合併成一列（次數與產出相加）。
+  const merged = new Map<string, FarmingPlan['runs'][number]>();
+  for (const run of runs) {
+    const key = `${run.stage.zoneId}:${run.stage.code}`, current = merged.get(key);
+    if (!current) { merged.set(key, { ...run, yields: run.yields.map(item => ({ ...item })) }); continue; }
+    current.runs += run.runs; current.sanity += run.sanity;
+    for (const item of run.yields) { const found = current.yields.find(entry => entry.id === item.id); if (found) found.amount = Math.round((found.amount + item.amount) * 10) / 10; else current.yields.push({ ...item }); }
+  }
+  runs.splice(0, runs.length, ...[...merged.values()].sort((p, q) => q.sanity - p.sanity));
+  const craftList = crafts.map((id, k) => ({ id, count: Math.ceil(result.x[candidates.length + k] - 1e-6) })).filter(item => item.count > 0);
+  return { runs, crafts: craftList, sanity: runs.reduce((sum, item) => sum + item.sanity, 0), craftLmd: craftList.reduce((sum, item) => sum + item.count * recipes[item.id].gold, 0), unmet };
+}
