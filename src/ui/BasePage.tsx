@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { AppState, Settings } from '../domain/model';
 import type { BaseCatalog } from '../catalog/base';
-import { candidatesFor, DEFAULT_WEIGHTS, evaluateBase, optimizeBase, type ObjectiveWeights, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
+import { candidatesFor, compareLayout, DEFAULT_WEIGHTS, evaluateBase, LAYOUTS, layoutFacilities, optimizeBase, type LayoutComparison, type ObjectiveWeights, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -11,11 +11,6 @@ import { BaseStats } from './BaseStats';
 
 type Base = Settings['base'];
 const TYPES: FacilityType[] = ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'];
-const TEMPLATES: { label: string; layout: [FacilityType, number, number, Facility['product']?][] }[] = [
-  { label: '243（貿易 2、製造 4、發電 3）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 2, 3, 'record'], ['power', 3, 3], ['meeting', 1, 3], ['office', 1, 3], ['training', 1, 3], ['workshop', 1, 3], ['dormitory', 4, 5]] },
-  { label: '153（貿易 1、製造 5、發電 3）', layout: [['control', 1, 5], ['trading', 1, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 3, 3], ['meeting', 1, 3], ['office', 1, 3], ['training', 1, 3], ['workshop', 1, 3], ['dormitory', 4, 5]] },
-  { label: '252（貿易 2、製造 5、發電 2）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 2, 3], ['meeting', 1, 3], ['office', 1, 3], ['training', 1, 3], ['workshop', 1, 3], ['dormitory', 4, 5]] },
-];
 const newId = () => `f-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const signed = (value: number, unit = '%') => `${value >= 0 ? '+' : ''}${value}${unit}`;
 
@@ -147,11 +142,55 @@ function OptimizedView({ result, base, catalog, state, weights }: { result: Opti
   </div>;
 }
 
+/** 布局比較：逐一對常見布局跑整體最佳化，避免一次阻塞畫面太久。 */
+function LayoutCompare({ state, catalog, weights, busy, onApply }: { state: AppState; catalog: BaseCatalog; weights: ObjectiveWeights; busy: boolean; onApply: (facilities: Facility[], assignments: Record<string, string[]>) => void }) {
+  const [results, setResults] = useState<LayoutComparison[]>([]);
+  const [progress, setProgress] = useState<number | null>(null);
+  const run = () => {
+    const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+    const collected: LayoutComparison[] = [];
+    setResults([]); setProgress(0);
+    const step = (index: number) => {
+      if (index >= LAYOUTS.length) { setProgress(null); return; }
+      window.setTimeout(() => {
+        collected.push(compareLayout(LAYOUTS[index], catalog, state.roster, definitions, { weights, timeBudgetMs: 4000 }));
+        setResults([...collected]); setProgress(index + 1); step(index + 1);
+      }, 30);
+    };
+    step(0);
+  };
+  const feasible = results.filter(item => item.electricity.consumed <= item.electricity.produced);
+  const bestId = feasible.length ? feasible.reduce((a, b) => b.objective.total > a.objective.total ? b : a).template.id : undefined;
+  const fmt = (value: number) => value.toLocaleString('zh-TW', { maximumFractionDigits: 1 });
+  return <div className="layout-compare">
+    <div className="inline-actions">
+      <button type="button" className="button secondary" disabled={busy || progress !== null} onClick={run}>{progress !== null ? `比較中…（${progress}／${LAYOUTS.length}）` : results.length ? '重新比較布局' : '比較常見布局'}</button>
+      <span className="fine-print">對 {LAYOUTS.map(item => item.id).join('、')} 各自用你的幹員跑整體最佳化（每種約數秒），依目前權重比較。</span>
+    </div>
+    {results.length > 0 && <div className="layout-table-wrap"><table className="stats-table layout-table">
+      <thead><tr><th>布局</th><th>整體效益</th><th>赤金（產／耗）</th><th>經驗／日</th><th>龍門幣／日</th><th>電力</th><th></th></tr></thead>
+      <tbody>{results.map(item => {
+        const short = item.electricity.consumed > item.electricity.produced;
+        return <tr key={item.template.id} className={item.template.id === bestId ? 'is-best' : short ? 'is-infeasible' : ''}>
+          <td><strong>{item.template.id}</strong>{item.template.id === bestId && <span className="tag amber">最適合</span>}<small>{item.template.label.replace(/^\d+/u, '')}</small></td>
+          <td>{fmt(item.objective.total)}</td>
+          <td>{fmt(item.gold)}／{fmt(item.goldConsumed)}</td>
+          <td>{fmt(item.exp)}</td>
+          <td>{fmt(item.lmd)}</td>
+          <td>{short ? <span className="tag error">不足 {item.electricity.consumed}／{item.electricity.produced}</span> : `${item.electricity.consumed}／${item.electricity.produced}`}</td>
+          <td><button type="button" className="button ghost small" disabled={busy} onClick={() => onApply(item.facilities, item.assignments)}>套用</button></td>
+        </tr>;
+      })}</tbody>
+    </table></div>}
+    {results.length > 0 && <p className="fine-print">「最適合」只在電力足夠的布局中挑選。所有設施以最高等級計；電力不足的布局需要降低部分設施等級（例如宿舍或訓練室）才能運作，降級後產出會不同。套用會取代目前的設施與進駐名單，保存前可按「還原」。</p>}
+  </div>;
+}
+
 interface DataStatus { version: string; sourceUpdatedAt: string; syncedAt: string; counts: { operators: number } }
 
 /** 推薦前先確認目前的繁中服資料版本與可用幹員，再用已持有幹員產生配置。 */
-function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefreshed }: {
-  state: AppState; isDemo: boolean; busy: boolean; catalog: BaseCatalog; base: Base; onApply: (assignments: Record<string, string[]>, products?: Record<string, 'gold' | 'record'>) => void; onRefreshed: () => void;
+function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLayout, onRefreshed }: {
+  state: AppState; isDemo: boolean; busy: boolean; catalog: BaseCatalog; base: Base; onApply: (assignments: Record<string, string[]>, products?: Record<string, 'gold' | 'record'>) => void; onApplyLayout: (facilities: Facility[], assignments: Record<string, string[]>) => void; onRefreshed: () => void;
 }) {
   const [status, setStatus] = useState<DataStatus | null>(null);
   const [message, setMessage] = useState('');
@@ -215,6 +254,7 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefresh
       <button type="button" className="button ghost small" onClick={() => { setWeights(DEFAULT_WEIGHTS); try { localStorage.removeItem('arknights-tw-base-weights'); } catch { /* 不影響使用 */ } }}>恢復等重</button>
       <p className="fine-print">調整後按「產生推薦」重新計算。權重只影響最佳化如何取捨，不改變各設施的實際數值；設定只存在這台裝置。</p>
     </fieldset>
+    <LayoutCompare state={state} catalog={catalog} weights={weights} busy={busy || running} onApply={onApplyLayout}/>
     <div className="inline-actions">
       <button type="button" className="button primary" disabled={busy || syncing || !base.facilities.length} onClick={generate}>{running ? '最佳化計算中…' : result ? '重新產生推薦' : '產生推薦'}</button>
       {result && <button type="button" className="button secondary" disabled={busy || running} onClick={() => onApply(optimized?.assignments ?? result.assignments, optimized?.products)}>套用到配置草稿</button>}
@@ -264,10 +304,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
   const assign = (id: string, operatorId: string) => update({ ...draft, assignments: { ...(draft.assignments ?? {}), [id]: [...(draft.assignments?.[id] ?? []), operatorId] } });
   const unassign = (id: string, operatorId: string) => update({ ...draft, assignments: { ...(draft.assignments ?? {}), [id]: (draft.assignments?.[id] ?? []).filter(item => item !== operatorId) } });
   const addFacility = (type: FacilityType, level = 1, product?: Facility['product']) => ({ id: newId(), type, level, ...(product ? { product } : {}) });
-  const applyTemplate = (index: number) => {
-    const facilities = TEMPLATES[index].layout.flatMap(([type, count, level, product]) => Array.from({ length: count }, () => addFacility(type, level, product)));
-    update({ ...draft, facilities, assignments: {} });
-  };
+  const applyTemplate = (index: number) => update({ ...draft, facilities: layoutFacilities(LAYOUTS[index], newId()), assignments: {} });
   const { produced, consumed } = evaluation.electricity;
   const unsupportedTotal = evaluation.facilities.reduce((sum, f) => sum + f.unsupported.length + f.uncertain.length, 0);
   const editingResult = editing ? evaluation.facilities.find(result => result.facility.id === editing) : undefined;
@@ -287,10 +324,10 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
       </div>
     </div>
     {draft.facilities.length > 0 && <BaseStats evaluation={evaluation} catalog={catalog}/>}
-    <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApply={(assignments, products) => update({ ...draft, facilities: draft.facilities.map(f => products?.[f.id] ? { ...f, product: products[f.id] } : f), assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
+    <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApplyLayout={(facilities, assignments) => update({ ...draft, facilities, assignments })} onApply={(assignments, products) => update({ ...draft, facilities: draft.facilities.map(f => products?.[f.id] ? { ...f, product: products[f.id] } : f), assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
     {evaluation.issues.length > 0 && <div className="callout danger" role="status"><strong>配置有 {evaluation.issues.length} 個問題</strong><ul>{evaluation.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
     {!draft.facilities.length && <section className="empty-inline base-empty"><strong>先建立設施配置</strong><span>選一個常見布局作為起點，或逐一新增設施；之後可以再調整等級與數量。</span>
-      <div className="inline-actions center">{TEMPLATES.map((template, index) => <button type="button" key={template.label} className="button secondary small" disabled={busy} onClick={() => applyTemplate(index)}>{template.label}</button>)}</div>
+      <div className="inline-actions center">{LAYOUTS.map((template, index) => <button type="button" key={template.label} className="button secondary small" disabled={busy} onClick={() => applyTemplate(index)}>{template.label}</button>)}</div>
     </section>}
     {draft.facilities.length > 0 && <div className="segmented view-switch" role="tablist" aria-label="基建檢視方式">
       <button type="button" role="tab" aria-selected={view === 'map'} className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>一圖流布局</button>
@@ -307,7 +344,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
     <div className="base-add">
       <select className="filter" aria-label="新增設施種類" value={addType} disabled={busy} onChange={event => setAddType(event.currentTarget.value as FacilityType)}>{TYPES.map(type => <option key={type} value={type}>{FACILITY_LABEL[type]}</option>)}</select>
       <button type="button" className="button secondary" disabled={busy || draft.facilities.length >= 20} onClick={() => update({ ...draft, facilities: [...draft.facilities, addFacility(addType, 1, addType === 'manufacturing' ? 'gold' : undefined)] })}><Icon name="plus" size={16}/>新增設施</button>
-      {draft.facilities.length > 0 && <details className="base-templates"><summary className="button ghost small">改用常見布局</summary><div className="inline-actions">{TEMPLATES.map((template, index) => <button type="button" key={template.label} className="button secondary small" disabled={busy} onClick={() => applyTemplate(index)}>{template.label}</button>)}</div><p className="fine-print">套用會取代目前的設施與進駐名單（保存前可按「還原」）。</p></details>}
+      {draft.facilities.length > 0 && <details className="base-templates"><summary className="button ghost small">改用常見布局</summary><div className="inline-actions">{LAYOUTS.map((template, index) => <button type="button" key={template.label} className="button secondary small" disabled={busy} onClick={() => applyTemplate(index)}>{template.label}</button>)}</div><p className="fine-print">套用會取代目前的設施與進駐名單（保存前可按「還原」）。</p></details>}
     </div>
     <details className="panel plain-details base-method"><summary>計算方式與限制</summary>
       <ul className="gap-list">

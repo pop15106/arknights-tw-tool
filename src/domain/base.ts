@@ -760,3 +760,31 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
   }
   return { assignments: current, products, objective: best, start: startObjective, moves, evaluations, timedOut };
 }
+
+/* ------------------------------------------------------------------ */
+/* 布局比較：對每種常見布局各自跑整體最佳化，比較產出與整體效益。           */
+/* ------------------------------------------------------------------ */
+export interface LayoutTemplate { id: string; label: string; layout: [FacilityType, number, number, Facility['product']?][] }
+const FUNCTION_ROOMS: LayoutTemplate['layout'] = [['meeting', 1, 3], ['office', 1, 3], ['training', 1, 3], ['workshop', 1, 3], ['dormitory', 4, 5]];
+export const LAYOUTS: LayoutTemplate[] = [
+  { id: '243', label: '243（貿易 2、製造 4、發電 3）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 2, 3, 'record'], ['power', 3, 3], ...FUNCTION_ROOMS] },
+  { id: '153', label: '153（貿易 1、製造 5、發電 3）', layout: [['control', 1, 5], ['trading', 1, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 3, 3], ...FUNCTION_ROOMS] },
+  { id: '252', label: '252（貿易 2、製造 5、發電 2）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 2, 3], ...FUNCTION_ROOMS] },
+];
+export function layoutFacilities(template: LayoutTemplate, idPrefix = template.id): Facility[] {
+  return template.layout.flatMap(([type, count, level, product], group) => Array.from({ length: count }, (_, index) => ({ id: `${idPrefix}-${group}-${index}`, type, level, ...(product ? { product } : {}) })));
+}
+
+export interface LayoutComparison {
+  template: LayoutTemplate; facilities: Facility[]; assignments: Record<string, string[]>;
+  objective: BaseObjective; gold: number; exp: number; lmd: number; goldConsumed: number; electricity: { produced: number; consumed: number }; issues: string[];
+}
+
+export function compareLayout(template: LayoutTemplate, catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { weights?: ObjectiveWeights; timeBudgetMs?: number } = {}): LayoutComparison {
+  const facilities = layoutFacilities(template);
+  const optimized = optimizeBase({ facilities, onlineSlots: [] }, catalog, roster, definitions, { weights: options.weights, timeBudgetMs: options.timeBudgetMs ?? 3000 });
+  const finalFacilities = facilities.map(f => optimized.products[f.id] ? { ...f, product: optimized.products[f.id] } : f);
+  const evaluation = evaluateBase({ facilities: finalFacilities, onlineSlots: [], assignments: optimized.assignments }, catalog, roster, definitions);
+  const stats = baseStatistics(evaluation, catalog);
+  return { template, facilities: finalFacilities, assignments: optimized.assignments, objective: optimized.objective, gold: stats.goldPerDay, exp: stats.expPerDay, lmd: stats.lmdPerDay, goldConsumed: stats.goldConsumedPerDay, electricity: evaluation.electricity, issues: evaluation.issues };
+}

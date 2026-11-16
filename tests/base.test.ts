@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseCatalog, plainGameText } from '../src/catalog/base.ts';
-import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, optimizeBase, baseObjective, unlockState, type Facility } from '../src/domain/base.ts';
+import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, optimizeBase, baseObjective, compareLayout, layoutFacilities, LAYOUTS, unlockState, type Facility } from '../src/domain/base.ts';
 import { createDemoBaseCatalog, createDemoDataset, createDemoImport } from '../src/demo.ts';
 import { createEmptyState, known, unknown, validateAppState, type OwnedOperator } from '../src/domain/model.ts';
 import { applyImport, previewImport } from '../src/domain/import.ts';
@@ -325,4 +325,17 @@ test('權重：整體效益依各產出權重加總，權重為 0 時不計該�
   assert.equal(equal.gold, 31); assert.equal(equal.record, 31); assert.equal(equal.total, 62);
   assert.equal(baseObjective(ev, catalog, { gold: 0, record: 2, trading: 1, power: 1 }).total, 62);
   assert.equal(baseObjective(ev, catalog, { gold: 3, record: 0, trading: 1, power: 1 }).total, 93);
+});
+
+test('布局比較：每種布局建立正確設施數量，並各自最佳化、回報電力', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const count = (id: string, type: string) => layoutFacilities(LAYOUTS.find(item => item.id === id)!).filter(f => f.type === type).length;
+  assert.deepEqual([count('243', 'trading'), count('243', 'manufacturing'), count('243', 'power')], [2, 4, 3]);
+  assert.deepEqual([count('153', 'trading'), count('153', 'manufacturing'), count('153', 'power')], [1, 5, 3]);
+  assert.deepEqual([count('252', 'trading'), count('252', 'manufacturing'), count('252', 'power')], [2, 5, 2]);
+  const result = compareLayout(LAYOUTS[0], catalog, state.roster, definitions, { timeBudgetMs: 1500 });
+  const all = Object.values(result.assignments).flat();
+  assert.equal(new Set(all).size, all.length);
+  assert.ok(result.electricity.produced > 0);
 });

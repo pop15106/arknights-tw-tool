@@ -830,3 +830,9 @@ h2 { font-weight: 800; }
 .weight-row input { width: 100%; accent-color: var(--accent); min-height: 28px; }
 .weight-row b { font-family: var(--font-mono); font-size: 13px; text-align: right; }
 .weight-panel .button { justify-self: start; }
+.layout-compare { display: grid; gap: 8px; }
+.layout-table-wrap { overflow-x: auto; }
+.layout-table td small { display: block; color: var(--muted); font-size: 11.5px; }
+.layout-table td .tag { margin-left: 6px; }
+.layout-table tr.is-best td { background: var(--amber-soft); }
+.layout-table tr.is-infeasible td { color: var(--muted); }
