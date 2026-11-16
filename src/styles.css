@@ -944,3 +944,4 @@ h2 { font-weight: 800; }
 .recruit-op small { font-weight: 400; color: var(--muted); }
 .recruit-op.r6 { color: var(--accent); } .recruit-op.r5 { color: var(--amber); } .recruit-op.r4 { color: #a77de0; } .recruit-op.r3 { color: #3d9be9; }
 .stats-table tr.best td { font-weight: 800; color: var(--accent); }
+.bar { display: inline-block; width: 80px; height: 8px; margin-right: 6px; border-radius: 999px; background: var(--surface); vertical-align: middle; overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); }

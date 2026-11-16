@@ -3,6 +3,7 @@ import type { RecruitCatalog } from '../catalog/recruit';
 import type { AppState } from '../domain/model';
 import { recruitCombos } from '../domain/recruit';
 import { planMastery } from '../domain/mastery';
+import { accountCheckup } from '../domain/checkup';
 import { currentState } from '../domain/growth';
 import { useBaseCatalog } from './BasePage';
 import { useGrowthCatalog } from './GrowthPage';
@@ -27,7 +28,7 @@ export function ToolsPage({ state, isDemo, extra }: { state: AppState; isDemo: b
   return <div className="team-page">
     {tab === 'recruit' && <RecruitTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'mastery' && <MasteryTab state={state} isDemo={isDemo} tabs={tabs}/>}
-    {tab === 'checkup' && (extra?.[tab]?.(tabs) ?? <section className="panel"><header className="recommend-head"><div><p className="eyebrow">工具</p><h2>帳號體檢</h2></div>{tabs}</header><p className="fine-print">施工中。</p></section>)}
+    {tab === 'checkup' && <CheckupTab state={state} isDemo={isDemo} tabs={tabs}/>}
   </div>;
 }
 
@@ -107,5 +108,46 @@ function MasteryTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean;
       </tbody></table></div>
       <p className="fine-print">表中是整條專精鏈都由同一位協助者陪同的時間。「精神鍛煉」這類「上一階段協助滿 5 小時、下次訓練時間減半」的技能，以連續專精同一名幹員估計；中途換協助者會讓效果消失。</p>
     </section>}
+  </>;
+}
+
+const TODO_LABEL = { sixNotE2: '六星尚未精二', e2Skill: '精二但技能未滿 7', moduleReady: '模組條件已達但未開' } as const;
+function CheckupTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; tabs: preact.JSX.Element }) {
+  const { catalog: growth } = useGrowthCatalog(isDemo);
+  const definitions = useMemo(() => new Map(state.dataset.operators.map(def => [def.id, def])), [state.dataset]);
+  const result = useMemo(() => accountCheckup(state.dataset.operators, state.roster, growth, state.settings.growth), [state, growth]);
+  const pct = (value: number, total: number) => total ? `${Math.round(value / total * 100)}%` : '—';
+  const name = (id: string) => definitions.get(id)?.displayName ?? id;
+  const unknownTotal = result.unknown.elite + result.unknown.level + result.unknown.skillLevel;
+  return <>
+    <section className="panel">
+      <header className="recommend-head"><div><p className="eyebrow">工具</p><h2>帳號體檢</h2></div>{tabs}</header>
+      <p className="fine-print">只統計幹員庫中已知的欄位；未知的欄位另外計數，不當作未完成。{unknownTotal + result.unknown.mastery + result.unknown.module ? `目前未知：精英階段 ${result.unknown.elite}、等級 ${result.unknown.level}、技能等級 ${result.unknown.skillLevel}、專精 ${result.unknown.mastery}、模組 ${result.unknown.module}。` : ''}</p>
+      <div className="stats-cards">
+        <div className="stats-card gold"><span>持有幹員</span><strong>{result.owned}</strong><small>六星 {result.byRarity[6]?.owned ?? 0}・五星 {result.byRarity[5]?.owned ?? 0}</small></div>
+        <div className="stats-card exp"><span>精英二</span><strong>{result.elite2}</strong><small>佔持有 {pct(result.elite2, result.owned)}</small></div>
+        <div className="stats-card lmd"><span>專精三技能</span><strong>{result.mastery3}</strong><small>技能 7 的幹員 {result.skill7} 名</small></div>
+        <div className="stats-card shift"><span>已開模組</span><strong>{result.unknown.module && !result.modules ? '—' : result.modules}</strong><small>{result.unknown.module ? `${result.unknown.module} 個模組等級未知` : '模組資料完整'}</small></div>
+      </div>
+    </section>
+    <section className="panel" aria-label="分布">
+      <h3>各職業養成分布</h3>
+      <div className="table-scroll"><table className="stats-table"><thead><tr><th>職業</th><th>持有</th><th>精二</th><th>滿級</th><th>精二比例</th></tr></thead><tbody>
+        {result.byProfession.map(item => <tr key={item.profession}><td>{item.profession}</td><td>{item.owned}</td><td>{item.elite2}</td><td>{item.maxed}</td><td><span className="bar"><i style={{ width: pct(item.elite2, item.owned) }}/></span>{pct(item.elite2, item.owned)}</td></tr>)}
+      </tbody></table></div>
+      <h3>各星級</h3>
+      <div className="table-scroll"><table className="stats-table"><thead><tr><th>星級</th><th>持有</th><th>精二</th></tr></thead><tbody>
+        {[6, 5, 4, 3, 2, 1].filter(rarity => result.byRarity[rarity]).map(rarity => <tr key={rarity}><td>{rarity}★</td><td>{result.byRarity[rarity].owned}</td><td>{result.byRarity[rarity].elite2}</td></tr>)}
+      </tbody></table></div>
+    </section>
+    {result.ready.length > 0 && <section className="panel" aria-label="可以直接升"><h3>材料已足夠、可以直接升（{result.ready.length}）</h3><p className="fine-print">依養成頁的計畫與手動庫存判斷；龍門幣需自行確認。</p>
+      <div className="synergy-beneficiaries">{result.ready.map(item => <span key={item.operatorId} className="op-chip">{name(item.operatorId)}<small>龍門幣 {item.lmd.toLocaleString('zh-TW')}</small></span>)}</div></section>}
+    <section className="panel" aria-label="待辦">
+      <h3>待辦清單</h3>
+      {(['moduleReady', 'e2Skill', 'sixNotE2'] as const).map(kind => { const list = result.todo.filter(item => item.kind === kind); return list.length ? <details key={kind} className="plain-details" open={kind === 'moduleReady'}><summary>{TODO_LABEL[kind]}（{list.length}）</summary>
+        <div className="synergy-beneficiaries">{list.map(item => <span key={`${item.operatorId}-${item.detail}`} className="op-chip">{name(item.operatorId)}<small>{item.detail}</small></span>)}</div></details> : null; })}
+      {!result.todo.length && <p className="fine-print">沒有待辦項目。</p>}
+      <p className="fine-print">「差一點就能解鎖的基建技能」請看基建頁的「練卡建議」。</p>
+    </section>
   </>;
 }
