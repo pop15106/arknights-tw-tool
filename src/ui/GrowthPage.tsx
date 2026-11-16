@@ -5,7 +5,7 @@ import { currentState, emptyTarget, expandRecipes, expToRecords, growthCost, LMD
 import { OperatorPortrait } from '../OperatorEncyclopedia';
 import { Icon } from './Icon';
 import { useStageData } from './gameData';
-import { materialSources, OCCURRENCE, sanityEstimate } from '../domain/stages';
+import { bestAcquire, materialSources, OCCURRENCE, type Acquire } from '../domain/stages';
 
 type Growth = NonNullable<Settings['growth']>;
 const fmt = (value: number) => value.toLocaleString('zh-TW');
@@ -77,18 +77,28 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
   const list = Object.entries(items).map(([id, count]) => ({ id, count, item: catalog.items[id], have: inventory[id] ?? 0 }))
     .sort((a, b) => (b.item?.rarity ?? 0) - (a.item?.rarity ?? 0) || (a.item?.sortId ?? 0) - (b.item?.sortId ?? 0));
   const short = list.filter(entry => entry.count > entry.have).length;
-  // 缺的材料去哪刷：取理智／件最低的關卡（沒有掉率時取機率等級最高者）。
-  const best = new Map(stageData ? list.filter(entry => entry.count > entry.have).map(entry => [entry.id, materialSources(entry.id, stageData.stages, stageData.events, now, stageData.drops)[0]] as const) : []);
+  // 缺的材料去哪刷：有掉率時比較「直接刷」與「合成」取理智較低者；沒有掉率時取機率等級最高的關卡。
+  const memo = new Map<string, Acquire | null>();
+  const missing = list.filter(entry => entry.count > entry.have);
+  const acquire = new Map(stageData?.drops ? missing.map(entry => [entry.id, bestAcquire(entry.id, stageData.stages, stageData.events, now, stageData.drops, catalog.recipes, memo)] as const) : []);
+  const best = new Map(stageData ? missing.map(entry => [entry.id, materialSources(entry.id, stageData.stages, stageData.events, now, stageData.drops)[0]] as const) : []);
+  const sanity = missing.reduce((sum, entry) => { const way = acquire.get(entry.id); return way ? sum + Math.ceil((entry.count - entry.have) * way.apPerItem) : sum; }, 0);
+  const noEstimate = missing.filter(entry => !acquire.get(entry.id)).length;
+  const one = (value: number) => fmt(Math.round(value * 10) / 10);
   const farmText = (entry: { id: string; count: number; have: number }) => {
+    if (entry.count <= entry.have) return '';
+    if (!stageData) return '…';
+    const way = acquire.get(entry.id);
+    if (way?.kind === 'stage') return `${way.source.stage.code}・${one(way.apPerItem)} 理智／件`;
+    if (way?.kind === 'craft') return `合成・約 ${one(way.apPerItem)} 理智／件`;
     const source = best.get(entry.id);
-    if (!source) return entry.count > entry.have ? (stageData ? (catalog.recipes[entry.id] ? '合成' : '無關卡掉落') : '…') : '';
+    if (!source) return catalog.recipes[entry.id] ? '合成' : '無關卡掉落';
     // 沒有掉率、且只有小概率／罕見掉落時，可合成的材料建議合成。
-    if (source.apPerItem === undefined && (OCCURRENCE[source.drop.occurrence]?.rank ?? 9) >= 3 && catalog.recipes[entry.id]) return `合成（或 ${source.stage.code}・${OCCURRENCE[source.drop.occurrence]?.label}）`;
-    return `${source.stage.code}${source.apPerItem !== undefined && Number.isFinite(source.apPerItem) ? `・${fmt(Math.round(source.apPerItem * 10) / 10)} 理智／件` : `・${OCCURRENCE[source.drop.occurrence]?.label ?? ''}`}`;
+    if ((OCCURRENCE[source.drop.occurrence]?.rank ?? 9) >= 3 && catalog.recipes[entry.id]) return `合成（或 ${source.stage.code}・${OCCURRENCE[source.drop.occurrence]?.label}）`;
+    return `${source.stage.code}・${OCCURRENCE[source.drop.occurrence]?.label ?? ''}`;
   };
-  const sanity = list.reduce((sum, entry) => { const value = entry.count > entry.have ? sanityEstimate(entry.count - entry.have, best.get(entry.id)) : 0; return value === undefined ? NaN : sum + value; }, 0);
-  const setHave = (id: string, value: string) => setDraft(current => { const next = { ...(current.inventory ?? {}) }; const count = Math.max(0, Math.min(10_000_000, Math.round(Number(value) || 0))); if (count) next[id] = count; else delete next[id]; return { ...current, inventory: next }; });
 
+  const setHave = (id: string, value: string) => setDraft(current => { const next = { ...(current.inventory ?? {}) }; const count = Math.max(0, Math.min(10_000_000, Math.round(Number(value) || 0))); if (count) next[id] = count; else delete next[id]; return { ...current, inventory: next }; });
   return <div className="growth-page">
     <section className="panel">
       <header className="recommend-head"><div><p className="eyebrow">養成計算</p><h2>精英化、技能、專精與模組需要多少材料</h2></div><span className="tag muted">遊戲資料 {catalog.version.slice(0, 7)}</span></header>
@@ -108,7 +118,7 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
         <div className="stats-card lmd"><span>龍門幣</span><strong>{fmt(lmd)}</strong><small>{expanded ? `含合成 ${fmt(expanded.lmd)}` : '不含加工合成'}</small></div>
         <div className="stats-card exp"><span>經驗</span><strong>{fmt(total.exp)}</strong><small>{records.map(record => `約 ${fmt(record.count)} 張${catalog.items[record.id]?.name ?? '作戰記錄'}`).join('')}</small></div>
         <div className="stats-card gold"><span>材料種類</span><strong>{list.length}</strong><small>{short ? `${short} 種庫存不足` : '庫存足夠'}</small></div>
-        <div className="stats-card shift"><span>預估理智</span><strong>{stageData?.drops && Number.isFinite(sanity) ? fmt(sanity) : '—'}</strong><small>{!stageData ? '讀取關卡中' : !stageData.drops ? '需企鵝物流掉率' : Number.isFinite(sanity) ? `缺口照最佳關卡刷・${costs.length} 名幹員` : '部分材料沒有可刷關卡'}</small></div>
+        <div className="stats-card shift"><span>預估理智</span><strong>{stageData?.drops ? fmt(sanity) : '—'}</strong><small>{!stageData ? '讀取關卡中' : !stageData.drops ? '需企鵝物流掉率' : `缺口以最省理智的方式取得${noEstimate ? `・${noEstimate} 種無法估算（不計入）` : ''}`}</small></div>
       </div>
       <div className="inline-actions">
         <label className="checkbox-line"><input type="checkbox" checked={!!draft.expand} disabled={busy} onChange={event => setDraft(current => ({ ...current, expand: event.currentTarget.checked || undefined }))}/><span>把精英材料展開成可合成的低階材料（加工站配方，不計副產品）</span></label>

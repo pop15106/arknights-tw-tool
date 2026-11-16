@@ -36,3 +36,16 @@ test('材料來源：常駐＋進行中活動；無掉率時依機率等級，�
   assert.equal(sanityEstimate(10, sources[0]), 60);
   assert.throws(() => parsePenguinMatrix({ matrix: [] }, 'CN', '2026-11-10T00:00:00Z'));
 });
+
+test('取得方式：直接刷與合成取理智較低者', async () => {
+  const { bestAcquire } = await import('../src/domain/stages.ts');
+  const drops = parsePenguinMatrix({ matrix: [
+    { stageId: 'main_01-07', itemId: '30012', quantity: 1000, times: 1000, end: null },
+    { stageId: 'main_04-06', itemId: '30013', quantity: 50, times: 1000, end: null },
+  ] }, 'CN', '2026-11-10T00:00:00Z');
+  const extra: Stage[] = [...stages, { id: 'main_04-06x', code: '4-6x', name: 'x', type: 'MAIN', zoneId: 'main_4', apCost: 18, drops: [drop('30013', 'SOMETIMES', 'ADDITIONAL')] }];
+  extra[1] = { ...extra[1], drops: [...extra[1].drops, drop('30013', 'SOMETIMES', 'ADDITIONAL')] };
+  // 直接刷 30013：18 ÷ 0.05 = 360；合成 30013 = 3 × 30012（每件 6 理智）= 18
+  const way = bestAcquire('30013', extra, events, now, drops, { '30013': { costs: [{ id: '30012', count: 3 }] } });
+  assert.equal(way?.kind, 'craft'); assert.equal(way?.apPerItem, 18);
+});

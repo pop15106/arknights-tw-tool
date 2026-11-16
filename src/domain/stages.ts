@@ -61,3 +61,25 @@ export function materialSources(itemId: string, stages: readonly Stage[], events
 export function sanityEstimate(shortage: number, best: MaterialSource | undefined): number | undefined {
   return best?.apPerItem !== undefined && Number.isFinite(best.apPerItem) ? Math.ceil(shortage * best.apPerItem) : undefined;
 }
+
+export type Acquire = { kind: 'stage'; source: MaterialSource; apPerItem: number } | { kind: 'craft'; apPerItem: number; parts: { id: string; count: number }[] };
+/**
+ * 取得一件材料最省理智的方式：直接刷（理智／件最低的關卡）或加工站合成（各材料取得成本加總，遞迴）。
+ * 只在有掉率時比較；合成的龍門幣與副產品不計入理智。
+ */
+export function bestAcquire(itemId: string, stages: readonly Stage[], events: readonly GameEvent[], now: number, drops: DropRates | null | undefined, recipes: Record<string, { costs: { id: string; count: number }[] }>, memo = new Map<string, Acquire | null>(), depth = 0): Acquire | null {
+  if (memo.has(itemId)) return memo.get(itemId)!;
+  memo.set(itemId, null);
+  const source = materialSources(itemId, stages, events, now, drops)[0];
+  let best: Acquire | null = source?.apPerItem !== undefined && Number.isFinite(source.apPerItem) ? { kind: 'stage', source, apPerItem: source.apPerItem } : null;
+  const recipe = recipes[itemId];
+  if (recipe && depth < 5) {
+    const parts = recipe.costs.map(part => ({ part, acquire: bestAcquire(part.id, stages, events, now, drops, recipes, memo, depth + 1) }));
+    if (parts.every(item => item.acquire)) {
+      const apPerItem = parts.reduce((sum, item) => sum + item.part.count * item.acquire!.apPerItem, 0);
+      if (!best || apPerItem < best.apPerItem) best = { kind: 'craft', apPerItem, parts: recipe.costs };
+    }
+  }
+  memo.set(itemId, best);
+  return best;
+}

@@ -23,7 +23,7 @@ export function parsePenguinMatrix(body: unknown, server: string, fetchedAt: str
     (stages[stageId] ??= {})[itemId] = { quantity: quantity as number, times: times as number };
   }
   if (!Object.keys(stages).length) throw new Error('掉落統計沒有有效資料。');
-  return { server, source: { name: '企鵝物流數據統計', url: 'https://penguin-stats.io/', fetchedAt, note: server === 'TW' ? '台服統計' : `企鵝物流沒有台服統計，使用${server === 'CN' ? '陸服' : server}數據作參考；活動關卡與台服開放時間可能不同` }, stages };
+  return { server, source: { name: '企鵝物流數據統計', url: 'https://penguin-stats.io/', fetchedAt, note: `企鵝物流只支援陸、美、日、韓服，沒有台服；使用${server === 'CN' ? '陸服' : server}數據作參考。常駐關卡掉落機制各服相同，活動關卡與台服開放時間可能不同` }, stages };
 }
 
 export function validateDropRates(value: unknown): DropRates {

@@ -96,14 +96,14 @@ export function createGameDataStore(options: {
     await writeFile(temporary, JSON.stringify(params), { flag: 'wx' }); await rename(temporary, tradingFile);
     return params;
   }
-  // 企鵝物流掉落統計另存一檔：先試台服，沒有資料時用陸服；失敗保留舊檔，不影響主資料。
+  // 企鵝物流掉落統計另存一檔：企鵝物流只支援 CN／US／JP／KR，沒有台服，使用樣本最多的陸服作參考；失敗保留舊檔，不影響主資料。
   const dropsFile = path.join(cache, 'penguin-drops.json');
   async function loadDrops(): Promise<DropRates | null> {
     try { return validateDropRates(JSON.parse(await readFile(dropsFile, 'utf8'))); } catch { return null; }
   }
   async function refreshDrops(): Promise<DropRates> {
     let drops: DropRates | undefined;
-    for (const server of ['TW', 'CN']) {
+    for (const server of ['CN']) {
       try { drops = parsePenguinMatrix(JSON.parse((await bytes(PENGUIN_MATRIX_API(server), 24 * 1024 * 1024)).toString('utf8')), server, new Date().toISOString()); break; } catch { /* 試下一個伺服器 */ }
     }
     if (!drops) throw new Error('企鵝物流掉落統計無法取得。');
