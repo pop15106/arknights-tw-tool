@@ -751,3 +751,37 @@ h2 { font-weight: 800; }
   .map-slot { width: 52px; }
 }
 @media (max-width: 480px) { .map-side { grid-template-columns: 1fr; } }
+
+/* ---------- 練卡建議 ---------- */
+.training-view { display: grid; gap: 14px; }
+.training-step { display: grid; gap: 12px; }
+.training-step > header { display: flex; align-items: center; gap: 10px; }
+.training-step h3 { font-size: 17px; font-weight: 900; }
+.step-badge { display: grid; place-items: center; min-width: 40px; height: 30px; padding: 0 8px; border: 2px solid var(--edge); border-radius: 999px; background: var(--card-yellow); color: var(--card-ink); font: 900 13px var(--font-mono); box-shadow: var(--pop-sm); }
+.domain-list { display: grid; gap: 8px; }
+.domain-row { display: grid; grid-template-columns: 90px minmax(80px, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-size: 13px; }
+.domain-bar { height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden; border: 1.5px solid var(--line-strong); }
+.domain-bar i { display: block; height: 100%; background: var(--accent); }
+.domain-values { font-family: var(--font-mono); color: var(--muted); font-size: 12px; }
+.training-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.training-queue { list-style: none; padding: 0; display: grid; gap: 8px; }
+.training-queue li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 10px 12px; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); }
+.queue-rank { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--surface-3); font: 900 13px var(--font-mono); }
+.training-queue li:nth-child(-n+3) .queue-rank { background: var(--accent); color: var(--accent-ink); }
+.queue-main { display: block; min-width: 0; }
+.queue-main p, .queue-main small { display: block; margin-top: 3px; }
+.queue-main > strong { display: inline; margin-right: 6px; font-size: 15px; }
+.queue-main .tag { margin-right: 4px; }
+.queue-main p { font-size: 13.5px; }
+.queue-main small { color: var(--muted); }
+.queue-side { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.queue-side .score { font: 900 20px var(--font-mono); color: var(--accent); }
+.queue-side small { font-size: 11.5px; }
+.training-manual { display: grid; gap: 8px; font-size: 13px; }
+@media (max-width: 860px) {
+  .domain-row { grid-template-columns: 1fr auto; }
+  .domain-bar { grid-column: 1 / -1; grid-row: 2; }
+  .domain-values { grid-column: 1 / -1; }
+  .training-queue li { grid-template-columns: 30px minmax(0, 1fr); }
+  .queue-side { grid-column: 2; justify-items: start; text-align: left; }
+}

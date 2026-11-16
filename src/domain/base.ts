@@ -282,3 +282,73 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
   });
   return { assignments, facilities, pool: owned.length, picked: used.size };
 }
+
+/* ------------------------------------------------------------------ */
+/* 練卡建議：哪些幹員練到下一階段，就能解鎖或升級基建技能。                 */
+/* 只計可解析的數值；條件型技能列出但不排名。                             */
+/* ------------------------------------------------------------------ */
+export interface TrainingEntry {
+  operatorId: string; name: string; owned: boolean;
+  room: BaseRoomType; roomLabel: string;
+  from?: BaseSkill; to: BaseSkill;
+  requirement: { elite: number; level: number };
+  current?: { elite?: number; level?: number };
+  /** 練成後此技能欄增加的可計算數值；undefined 表示無法計算。 */
+  gain?: number;
+  /** 需要跨幾個精英階段（越少越容易）。 */
+  step: number;
+}
+export interface DomainAnalysis { room: BaseRoomType; label: string; currentBest: number; potentialBest: number; owners: number }
+
+const ROOM_LABEL: Record<string, string> = { CONTROL: '控制中樞', POWER: '發電站', MANUFACTURE: '製造站', TRADING: '貿易站', DORMITORY: '宿舍', MEETING: '會客室', HIRE: '辦公室', TRAINING: '訓練室', WORKSHOP: '加工站' };
+function skillValue(skill: BaseSkill | undefined): number | undefined {
+  if (!skill) return 0;
+  const parsed = parseSkill(skill);
+  if (!parsed.supported) return undefined;
+  return parsed.effects.reduce((sum, effect) => sum + (['productivity', 'order', 'drone', 'moodRecoverAll', 'moodRecoverSelf'].includes(effect.kind) ? effect.value : 0), 0);
+}
+
+export function trainingAdvice(catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { ownedOnly: boolean; rooms?: ReadonlySet<BaseRoomType> }): { entries: TrainingEntry[]; domains: DomainAnalysis[] } {
+  const rows = new Map(roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false)).map(row => [row.operatorId, row]));
+  const entries: TrainingEntry[] = [];
+  const best = new Map<BaseRoomType, { current: number; potential: number; owners: Set<string> }>();
+  const touch = (room: BaseRoomType) => { if (!best.has(room)) best.set(room, { current: 0, potential: 0, owners: new Set() }); return best.get(room)!; };
+  for (const [operatorId, slots] of Object.entries(catalog.operators)) {
+    const row = rows.get(operatorId);
+    if (!row && (options.ownedOnly || !definitions.has(operatorId))) continue;
+    const name = definitions.get(operatorId)?.displayName ?? operatorId;
+    const elite = row ? (row.fields.elite?.status === 'known' ? Number(row.fields.elite.value) : undefined) : undefined;
+    const level = row ? (row.fields.level?.status === 'known' ? Number(row.fields.level.value) : undefined) : undefined;
+    for (const slot of slots) {
+      const versions = slot.map(version => ({ version, skill: catalog.skills[version.buffId] })).filter(item => item.skill);
+      if (!versions.length) continue;
+      const room = versions[0].skill.roomType as BaseRoomType;
+      if (options.rooms && !options.rooms.has(room)) continue;
+      const stats = touch(room);
+      const states = versions.map(item => row ? unlockState(item.version, row) : 'locked' as UnlockState);
+      const activeIndex = states.lastIndexOf('ready');
+      const active = activeIndex >= 0 ? versions[activeIndex].skill : undefined;
+      const activeValue = skillValue(active) ?? 0;
+      if (row && active) { stats.current = Math.max(stats.current, activeValue); stats.owners.add(operatorId); }
+      const top = skillValue(versions[versions.length - 1].skill);
+      if (top !== undefined) stats.potential = Math.max(stats.potential, top);
+      // 只列出「確定未解鎖」的下一個版本；未知狀態先請使用者補資料，不硬給建議。
+      const nextIndex = states.findIndex((state, index) => index > activeIndex && state === 'locked');
+      if (nextIndex < 0) continue;
+      const next = versions[nextIndex];
+      const nextValue = skillValue(next.skill);
+      entries.push({
+        operatorId, name, owned: !!row, room, roomLabel: ROOM_LABEL[room] ?? room, from: active, to: next.skill,
+        requirement: { elite: next.version.elite, level: next.version.level },
+        ...(row ? { current: { ...(elite !== undefined ? { elite } : {}), ...(level !== undefined ? { level } : {}) } } : {}),
+        ...(nextValue !== undefined ? { gain: round(nextValue - activeValue) } : {}),
+        step: Math.max(0, next.version.elite - (elite ?? 0)),
+      });
+    }
+  }
+  entries.sort((a, b) => Number(b.gain !== undefined) - Number(a.gain !== undefined) || (b.gain ?? 0) - (a.gain ?? 0) || Number(b.owned) - Number(a.owned) || a.step - b.step || a.name.localeCompare(b.name, 'zh-Hant'));
+  const domains = [...best.entries()].map(([room, value]) => ({ room, label: ROOM_LABEL[room] ?? room, currentBest: round(value.current), potentialBest: round(value.potential), owners: value.owners.size }))
+    .sort((a, b) => BASE_ORDER.indexOf(a.room) - BASE_ORDER.indexOf(b.room));
+  return { entries, domains };
+}
+const BASE_ORDER: BaseRoomType[] = ['MANUFACTURE', 'TRADING', 'POWER', 'DORMITORY', 'CONTROL', 'MEETING', 'HIRE', 'TRAINING', 'WORKSHOP'];

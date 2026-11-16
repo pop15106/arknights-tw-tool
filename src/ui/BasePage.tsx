@@ -6,6 +6,7 @@ import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
 import { BaseMap } from './BaseMap';
+import { BaseTraining } from './BaseTraining';
 
 type Base = Settings['base'];
 const TYPES: FacilityType[] = ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'];
@@ -183,7 +184,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
   const { catalog, error } = useBaseCatalog(isDemo, attempt);
   const [draft, setDraft] = useState<Base>(state.settings.base);
   const [addType, setAddType] = useState<FacilityType>('manufacturing');
-  const [view, setView] = useState<'map' | 'list'>(() => { try { return localStorage.getItem('arknights-tw-base-view') === 'list' ? 'list' : 'map'; } catch { return 'map'; } });
+  const [view, setView] = useState<'map' | 'list' | 'training'>(() => { try { const saved = localStorage.getItem('arknights-tw-base-view'); return saved === 'list' || saved === 'training' ? saved : 'map'; } catch { return 'map'; } });
   const [editing, setEditing] = useState<string | null>(null);
   useEffect(() => { try { localStorage.setItem('arknights-tw-base-view', view); } catch { /* 不影響使用 */ } }, [view]);
   const saved = JSON.stringify(state.settings.base);
@@ -231,8 +232,9 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
     {draft.facilities.length > 0 && <div className="segmented view-switch" role="tablist" aria-label="基建檢視方式">
       <button type="button" role="tab" aria-selected={view === 'map'} className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>一圖流布局</button>
       <button type="button" role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>列表式布局</button>
+      <button type="button" role="tab" aria-selected={view === 'training'} className={view === 'training' ? 'active' : ''} onClick={() => setView('training')}>練卡建議</button>
     </div>}
-    {view === 'map' ? <BaseMap facilities={evaluation.facilities} definitions={definitions} onOpen={setEditing}/> : <div className="facility-grid">
+    {view === 'training' ? <BaseTraining state={state} catalog={catalog} base={draft}/> : view === 'map' ? <BaseMap facilities={evaluation.facilities} definitions={definitions} onOpen={setEditing}/> : <div className="facility-grid">
       {evaluation.facilities.map(result => renderCard(result))}
     </div>}
     {editingResult && <Modal title={editingResult.label} eyebrow="設施設定與進駐" onClose={() => setEditing(null)} footer={<button type="button" className="button primary" onClick={() => setEditing(null)}>完成</button>}>

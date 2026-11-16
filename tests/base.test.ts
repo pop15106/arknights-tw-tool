@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseCatalog, plainGameText } from '../src/catalog/base.ts';
-import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, unlockState, type Facility } from '../src/domain/base.ts';
+import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, unlockState, type Facility } from '../src/domain/base.ts';
 import { createDemoBaseCatalog, createDemoDataset, createDemoImport } from '../src/demo.ts';
 import { createEmptyState, known, unknown, validateAppState, type OwnedOperator } from '../src/domain/model.ts';
 import { applyImport, previewImport } from '../src/domain/import.ts';
@@ -132,4 +132,19 @@ test('推薦配置：同一間宿舍只放一位「全宿舍恢復」技能（�
   const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
   const rec = recommendBase({ facilities: [{ id: 'd1', type: 'dormitory', level: 1 }, { id: 'd2', type: 'dormitory', level: 1 }], onlineSlots: [] }, catalog, state.roster, definitions);
   assert.deepEqual(rec.assignments.d1.length, 1); assert.deepEqual(rec.assignments.d2.length, 1);
+});
+
+test('練卡建議：列出確定未解鎖的下一版本與可計算增益，未知不硬給', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const { entries, domains } = trainingAdvice(catalog, state.roster, definitions, { ownedOnly: true });
+  for (const entry of entries) { assert.ok(entry.owned); assert.ok(entry.requirement.elite >= (entry.current?.elite ?? 0)); }
+  const sorted = entries.filter(e => e.gain !== undefined);
+  for (let i = 1; i < sorted.length; i++) assert.ok((sorted[i].gain ?? 0) <= (sorted[i - 1].gain ?? 0));
+  assert.ok(domains.some(d => d.room === 'MANUFACTURE'));
+  // 精英未知的幹員不出現在建議（避免硬推）
+  const row = state.roster.find(r => r.operatorId === 'demo-8')!;
+  const unknownRow = { ...row, fields: { ...row.fields, elite: unknown('t') } };
+  const result = trainingAdvice(catalog, [unknownRow], definitions, { ownedOnly: true });
+  assert.equal(result.entries.length, 0);
 });
