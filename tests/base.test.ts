@@ -164,7 +164,7 @@ test('基建統計：赤金與經驗依配方秒數與已計入生產力計算�
   assert.ok(stats.shifts.every(s => s.label.startsWith('製造站')));
   assert.equal(stats.shifts[0].hours, 24);
   // 心情可撐 24 小時，但赤金倉庫約 24.73 小時、記錄倉庫約 12.6 小時會滿 → 依倉庫取兩班制
-  assert.equal(stats.suggestion?.shifts, 2); assert.match(stats.suggestion!.text, /倉庫/);
+  assert.equal(stats.suggestion?.shifts, 2); assert.match(stats.suggestion!.text, /倉庫或訂單/);
   // 倉庫：容量 54 ÷ 重量 2 = 27 條；26.2 條／日 → 約 24.73 小時
   assert.equal(stats.manufacture.find(m => m.product === 'gold')?.storageItems, 27);
 });
@@ -178,4 +178,19 @@ test('換班建議：心情消耗越快，班數越多；技能的心情消耗�
   const stats = baseStatistics(evaluation, catalog);
   assert.equal(stats.shifts[0].hours, 12); assert.equal(stats.shifts[0].rate, 2);
   assert.match(stats.suggestion!.text, /^兩班制，每 12 小時換班；最先累的人約 12 小時/);
+});
+
+test('龍門幣：依訂單效率與各等級訂單期望值換算，並算出貿易站消耗的赤金', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const evaluation = evaluateBase({ facilities: [{ id: 't', type: 'trading', level: 3 }], onlineSlots: [], assignments: { t: ['demo-2'] } }, catalog, state.roster, definitions);
+  const stats = baseStatistics(evaluation, catalog);
+  // 3 級：期望時間 0.3×8640+0.5×12600+0.2×16560 = 12204 秒；期望 1450 龍門幣、2.9 赤金
+  // 效率 +1 基礎 +30 議價 = 31% → 86400×1.31÷12204 = 9.2742 筆／日
+  assert.equal(stats.trading[0].efficiency, 31);
+  assert.equal(stats.trading[0].ordersPerDay, 9.27);
+  assert.equal(stats.lmdPerDay, Math.round(86400 * 1.31 / 12204 * 1450));
+  assert.equal(stats.goldConsumedPerDay, Math.round(86400 * 1.31 / 12204 * 2.9 * 100) / 100);
+  // 常規訂單每條赤金固定換 500 龍門幣
+  assert.ok(Math.abs(stats.lmdPerDay - stats.goldConsumedPerDay * 500) < 5);
 });

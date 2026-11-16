@@ -1,5 +1,6 @@
 import type { BaseCatalog, BaseRoom, BaseRoomType, BaseSkill, BaseSkillSlot } from '../catalog/base.ts';
 import type { OperatorDefinition, OwnedOperator, Settings } from './model.ts';
+import { DEFAULT_TRADING, expectedOrder } from '../catalog/trading.ts';
 
 export type Facility = Settings['base']['facilities'][number];
 export type FacilityType = Facility['type'];
@@ -359,22 +360,25 @@ const BASE_ORDER: BaseRoomType[] = ['MANUFACTURE', 'TRADING', 'POWER', 'DORMITOR
 /* 換班＝心情上限 ÷（設施基礎消耗＋技能的自身消耗調整）。                   */
 /* ------------------------------------------------------------------ */
 export interface ManufactureStat { facilityId: string; label: string; product: 'gold' | 'record'; itemName: string; productivity: number; perDay: number; goldPerDay: number; expPerDay: number; storageItems: number; hoursToFull: number }
+export interface TradingStat { facilityId: string; label: string; efficiency: number; ordersPerDay: number; lmdPerDay: number; goldPerDay: number; hoursToFull: number; qualitySkills: number }
 export interface ShiftStat { facilityId: string; label: string; hours: number; operator: string; rate: number }
 export interface BaseStatistics {
   available: boolean;
   manufacture: ManufactureStat[];
   goldPerDay: number; expPerDay: number;
+  trading: TradingStat[]; lmdPerDay: number; goldConsumedPerDay: number;
   shifts: ShiftStat[];
   suggestion?: { hours: number; shifts: number; text: string };
   storageWarnings: string[];
 }
 
 export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog): BaseStatistics {
-  const empty: BaseStatistics = { available: false, manufacture: [], goldPerDay: 0, expPerDay: 0, shifts: [], storageWarnings: [] };
+  const empty: BaseStatistics = { available: false, manufacture: [], goldPerDay: 0, expPerDay: 0, trading: [], lmdPerDay: 0, goldConsumedPerDay: 0, shifts: [], storageWarnings: [] };
   if (!catalog.formulas || !catalog.mood) return empty;
   const { gold, records } = catalog.formulas;
   const manufacture: ManufactureStat[] = [];
   const shifts: ShiftStat[] = [];
+  const trading: TradingStat[] = [];
   for (const result of evaluation.facilities) {
     const { facility } = result;
     const roomType = ROOM_OF[facility.type];
@@ -389,6 +393,16 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
       manufacture.push({ facilityId: facility.id, label: result.label, product: facility.product, itemName: formula.name, productivity, perDay: round(perDay),
         goldPerDay: facility.product === 'gold' ? round(perDay) : 0, expPerDay: facility.product === 'record' ? Math.round(perDay * record.exp) : 0,
         storageItems, hoursToFull: perDay > 0 ? round(storageItems / (perDay / 24)) : 0 });
+    }
+    if (roomType === 'TRADING' && result.operators.length) {
+      // 訂單效率＝每名工作幹員 1%＋可解析技能；一筆訂單的期望時間與報酬依等級機率加權（PRTS 數據）。
+      const efficiency = round(result.totals.basic + result.totals.order);
+      const params = catalog.trading ?? DEFAULT_TRADING;
+      const order = expectedOrder(facility.level, params);
+      const ordersPerDay = 86400 * (1 + efficiency / 100) / order.seconds;
+      const qualitySkills = result.unsupported.filter(item => item.skill.description.includes('訂單的出現機率')).length;
+      trading.push({ facilityId: facility.id, label: result.label, efficiency, ordersPerDay: round(ordersPerDay), lmdPerDay: Math.round(ordersPerDay * order.lmd), goldPerDay: round(ordersPerDay * order.gold),
+        hoursToFull: round((params.limits[facility.level - 1] ?? params.limits[params.limits.length - 1]) / (ordersPerDay / 24)), qualitySkills });
     }
     const base = catalog.mood.costPerHour[roomType]?.[facility.level - 1] ?? 0;
     if (base <= 0 || !result.operators.length) continue;
@@ -405,7 +419,7 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
   const goldPerDay = round(manufacture.reduce((sum, item) => sum + item.goldPerDay, 0));
   const expPerDay = manufacture.reduce((sum, item) => sum + item.expPerDay, 0);
   const minHours = shifts.length ? Math.min(...shifts.map(item => item.hours)) : undefined;
-  const fullHours = manufacture.filter(item => item.hoursToFull > 0).map(item => item.hoursToFull);
+  const fullHours = [...manufacture, ...trading].filter(item => item.hoursToFull > 0).map(item => item.hoursToFull);
   const minStorage = fullHours.length ? Math.min(...fullHours) : undefined;
   let suggestion: BaseStatistics['suggestion'];
   const limit = minHours === undefined ? minStorage : minStorage === undefined ? minHours : Math.min(minHours, minStorage);
@@ -414,9 +428,11 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
     const count = [1, 2, 3, 4, 6, 8, 12, 24].find(n => 24 / n <= limit) ?? 24;
     const hours = 24 / count;
     const base = count === 1 ? '每 24 小時換班一次（兩組人隔日輪替）' : count <= 3 ? `${count === 2 ? '兩' : '三'}班制，每 ${hours} 小時換班` : `每 ${hours} 小時換班一次（一天 ${count} 班）`;
-    const reason = minStorage !== undefined && (minHours === undefined || minStorage < minHours) ? `；倉庫最快約 ${round(minStorage)} 小時滿，換班時一併收取` : `；最先累的人約 ${round(minHours!)} 小時心情耗盡`;
+    const reason = minStorage !== undefined && (minHours === undefined || minStorage < minHours) ? `；倉庫或訂單最快約 ${round(minStorage)} 小時滿，換班時一併收取` : `；最先累的人約 ${round(minHours!)} 小時心情耗盡`;
     suggestion = { hours, shifts: count, text: base + reason };
   }
   const storageWarnings: string[] = [];
-  return { available: true, manufacture, goldPerDay, expPerDay, shifts: shifts.sort((a, b) => a.hours - b.hours), suggestion, storageWarnings };
+  const lmdPerDay = trading.reduce((sum, item) => sum + item.lmdPerDay, 0);
+  const goldConsumedPerDay = round(trading.reduce((sum, item) => sum + item.goldPerDay, 0));
+  return { available: true, manufacture, goldPerDay, expPerDay, trading, lmdPerDay, goldConsumedPerDay, shifts: shifts.sort((a, b) => a.hours - b.hours), suggestion, storageWarnings };
 }

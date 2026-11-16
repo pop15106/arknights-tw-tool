@@ -2,6 +2,7 @@ import { createServer, type ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { GameDataSnapshot } from './game-data-sync.ts';
+import type { TradingParams } from '../src/catalog/trading.ts';
 
 const DEFAULT_PORT = 5188;
 // 只接受 127.0.0.1 的任意連接埠（例如 5173 被占用時改用 5174）；外部網域與 DNS 重新綁定仍會被擋下。
@@ -12,6 +13,7 @@ interface ServerOptions {
   port?: number;
   load?: () => Promise<GameDataSnapshot | null>;
   sync?: () => Promise<GameDataSnapshot>;
+  loadTrading?: () => Promise<TradingParams | null>;
 }
 class ApiError extends Error {
   status: number;
@@ -58,6 +60,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   // 延後載入正式服務，讓注入的測試不會讀取網路或本機快取。
   const load = options.load ?? (async () => (await import('./game-data-sync.ts')).loadGameData());
   const sync = options.sync ?? (async () => (await import('./game-data-sync.ts')).syncGameData());
+  const loadTrading = options.loadTrading ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadTradingData());
   let origin = '', host = '';
   const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
@@ -96,7 +99,8 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
       if (url.pathname === '/api/game-data/base') {
         if (!snapshot.base) throw new ApiError(503, 'BASE_UNAVAILABLE', '目前的遊戲資料沒有基建資料，請到設定按「更新遊戲資料」。');
-        json(res, 200, snapshot.base); return;
+        const trading = await loadTrading().catch(() => null);
+        json(res, 200, trading ? { ...snapshot.base, trading } : snapshot.base); return;
       }
       const rows = url.pathname === '/api/game-data/stages' ? snapshot.stages : snapshot.events;
       const filtered = q ? rows.filter(row => containsText(row, q)) : rows;

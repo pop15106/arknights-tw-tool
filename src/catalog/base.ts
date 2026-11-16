@@ -1,4 +1,5 @@
 // 由 building_data.json 投影出基建頁需要的欄位；不執行任何遊戲標記。
+import type { TradingParams } from './trading.ts';
 type Row = Record<string, any>;
 
 export type BaseRoomType = 'CONTROL' | 'POWER' | 'MANUFACTURE' | 'TRADING' | 'DORMITORY' | 'MEETING' | 'HIRE' | 'TRAINING' | 'WORKSHOP';
@@ -21,6 +22,8 @@ export interface BaseCatalog {
   /** 製造站各等級倉庫容量。 */
   outputCapacity?: number[];
   /** 心情：上限與各設施各等級的基礎每小時消耗（皆換算成遊戲顯示單位）。 */
+  /** 貿易站訂單參數（PRTS 同步結果）；未同步時由畫面使用內建值。 */
+  trading?: TradingParams;
   mood?: { max: number; costPerHour: Partial<Record<BaseRoomType, number[]>>; maxByOperator?: Record<string, number> };
 }
 export interface BaseFormula { itemId: string; name: string; seconds: number; weight: number }

@@ -16,7 +16,8 @@ test('更新失敗保留前版指標；並發同步共用同一工作',async()=>
   const dir=await mkdtemp(path.join(os.tmpdir(),'ark-catalog-'));
   let fail=false, requests=0;
   const version='a'.repeat(40);
-  const fetcher:typeof fetch=async()=>{requests++;if(fail)throw new Error('upstream private diagnostic');return new Response(JSON.stringify({sha:version,commit:{committer:{date}}}),{status:200});};
+  // PRTS 貿易站數據是額外的盡力同步，不計入主資料的請求次數。
+  const fetcher:typeof fetch=async input=>{if(!String(input).startsWith('https://prts.wiki/'))requests++;if(fail)throw new Error('upstream private diagnostic');return new Response(JSON.stringify({sha:version,commit:{committer:{date}}}),{status:200});};
   const store=createGameDataStore({cacheDirectory:dir,assetDirectory:path.join(dir,'assets'),fetcher,build:async()=>fixture(version)});
   try {
     await store.seed({} as never,{commit:version,sourceUpdatedAt:date,syncedAt:date});
