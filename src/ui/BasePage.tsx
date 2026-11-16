@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { AppState, Settings } from '../domain/model';
 import type { BaseCatalog } from '../catalog/base';
-import { candidatesFor, evaluateBase, recommendBase, type BaseRecommendation, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
+import { candidatesFor, evaluateBase, optimizeBase, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -120,6 +120,30 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
   </article>;
 }
 
+/** 整體最佳化結果與警語。 */
+function OptimizedView({ result, base, catalog, state }: { result: OptimizeResult; base: Base; catalog: BaseCatalog; state: AppState }) {
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const evaluation = evaluateBase({ ...base, assignments: result.assignments }, catalog, state.roster, definitions);
+  const gain = Math.round((result.objective.total - result.start.total) * 10) / 10;
+  return <div className="recommend-result optimized">
+    <div className="callout warning optimize-warning" role="note">
+      <strong>警語：這是近似最佳，不是保證最佳</strong>
+      <ul>
+        <li>從單人推薦出發，逐格替換或交換幹員，只要整體效益變高就採用，直到無法再提升（局部搜尋）；不同起點可能得到不同結果。</li>
+        <li>整體效益＝製造站生產力％＋貿易站龍門幣提升％（赤金不足時按供應比例打折）＋發電站無人機％；赤金、作戰記錄、龍門幣視為同等重要。</li>
+        <li>不模擬心情與換班；訂單品質技能以累積工作達峰值計；PRTS 為陸服資料；說明文字無法解析的技能不計入。</li>
+        <li>宿舍沿用單人推薦，不參與最佳化。</li>
+      </ul>
+    </div>
+    <p className="recommend-verdict"><strong>整體效益 {result.start.total} → {result.objective.total}（{gain >= 0 ? '+' : ''}{gain}）</strong>：製造 {result.objective.manufacture}%、貿易 {result.objective.trading}%、發電 {result.objective.power}%{result.objective.goldFactor < 1 ? `；赤金只夠 ${Math.round(result.objective.goldFactor * 100)}% 的訂單` : '；赤金足夠交付訂單'}。共替換 {result.moves} 次、評估 {result.evaluations.toLocaleString()} 種配置{result.timedOut ? '（達到時間上限而停止，可再按一次繼續）' : ''}。</p>
+    <div className="recommend-grid">{evaluation.facilities.filter(item => item.operators.length).map(item => <article key={item.facility.id} className="recommend-card">
+      <h3>{item.label}</h3>
+      <ol className="recommend-picks">{item.operators.map(op => <li key={op.operatorId}><strong>{op.name}</strong><small>{op.skills.filter(skill => skill.applies && skill.active).map(skill => skill.active!.name).join('、') || '基礎加成'}</small></li>)}</ol>
+      {item.remote.length > 0 && <p className="fine-print">{item.remote.map(r => `${r.from}「${r.skill}」${r.value >= 0 ? '+' : ''}${r.value}%`).join('；')}</p>}
+    </article>)}</div>
+  </div>;
+}
+
 interface DataStatus { version: string; sourceUpdatedAt: string; syncedAt: string; counts: { operators: number } }
 
 /** 推薦前先確認目前的繁中服資料版本與可用幹員，再用已持有幹員產生配置。 */
@@ -130,6 +154,14 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefresh
   const [message, setMessage] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<BaseRecommendation | null>(null);
+  const [optimized, setOptimized] = useState<OptimizeResult | null>(null);
+  const [running, setRunning] = useState(false);
+  const generate = () => {
+    const recommendation = recommendBase(base, catalog, state.roster, definitions);
+    setResult(recommendation); setOptimized(null); setRunning(true);
+    // 讓畫面先顯示「計算中」，再進行整體最佳化（約數秒）。
+    window.setTimeout(() => { try { setOptimized(optimizeBase(base, catalog, state.roster, definitions, { start: recommendation.assignments, timeBudgetMs: 6000 })); } finally { setRunning(false); } }, 30);
+  };
   const loadStatus = async (sync = false) => {
     if (isDemo) return;
     setMessage(sync ? '正在向公開來源檢查繁中服最新資料，可能需要幾分鐘…' : '');
@@ -166,11 +198,13 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefresh
     {ageDays !== undefined && ageDays > 30 && <p className="callout warning">資料來源已 {ageDays} 天未更新，新幹員或技能調整可能尚未反映。建議先按「檢查繁中服更新」。</p>}
     {message && <p className="fine-print" role="status">{message}</p>}
     <div className="inline-actions">
-      <button type="button" className="button primary" disabled={busy || syncing || !base.facilities.length} onClick={() => setResult(recommendBase(base, catalog, state.roster, definitions))}>{result ? '重新產生推薦' : '產生推薦'}</button>
-      {result && <button type="button" className="button secondary" disabled={busy} onClick={() => onApply(result.assignments)}>套用到配置草稿</button>}
+      <button type="button" className="button primary" disabled={busy || syncing || !base.facilities.length} onClick={generate}>{running ? '最佳化計算中…' : result ? '重新產生推薦' : '產生推薦'}</button>
+      {result && <button type="button" className="button secondary" disabled={busy || running} onClick={() => onApply(optimized?.assignments ?? result.assignments)}>套用到配置草稿</button>}
       {!base.facilities.length && <span className="fine-print">請先在下方選一個常見布局或新增設施。</span>}
     </div>
+    {optimized && <OptimizedView result={optimized} base={base} catalog={catalog} state={state}/>}
     {result && <div className="recommend-result">
+      {optimized && <h3 className="recommend-subhead">第一階段：單人分數推薦（最佳化的起點）</h3>}
       <p className="recommend-verdict"><strong>從 {result.pool} 名持有幹員中選出 {result.picked} 名。</strong>只比較已解鎖且數值可追溯的技能；套用後仍可逐格調整，保存前不會寫入。</p>
       <div className="recommend-grid">{result.facilities.map(item => <article key={item.facilityId} className="recommend-card">
         <h3>{item.label}</h3>

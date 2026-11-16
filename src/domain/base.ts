@@ -663,3 +663,89 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
   const goldConsumedPerDay = round(trading.reduce((sum, item) => sum + item.goldPerDay, 0));
   return { available: true, manufacture, goldPerDay, expPerDay, trading, lmdPerDay, goldConsumedPerDay, shifts: shifts.sort((a, b) => a.hours - b.hours), suggestion, storageWarnings };
 }
+
+/* ------------------------------------------------------------------ */
+/* 整體最佳化：以完整評估（陣營、控制中樞、搭配、人間煙火、訂單技能、       */
+/* 赤金收支）計算整體效益，從推薦配置出發逐格替換／交換，直到無法再提升。    */
+/* 屬於局部搜尋，不保證全域最佳；不模擬心情與換班。                         */
+/* ------------------------------------------------------------------ */
+export interface BaseObjective { total: number; manufacture: number; trading: number; power: number; goldFactor: number }
+
+export function baseObjective(evaluation: BaseEvaluation, catalog: BaseCatalog): BaseObjective {
+  const stats = baseStatistics(evaluation, catalog);
+  const params = catalog.trading ?? DEFAULT_TRADING;
+  let manufacture = 0, power = 0;
+  for (const result of evaluation.facilities) {
+    if (!result.operators.length) continue;
+    if (result.facility.type === 'manufacturing') manufacture += result.totals.basic + result.totals.productivity;
+    if (result.facility.type === 'power') power += result.totals.drone;
+  }
+  // 貿易站：龍門幣相對「常規訂單、效率 0」的提升；赤金不足時按供應比例打折（佩佩等不耗赤金的訂單不受影響）。
+  const goldFactor = stats.goldConsumedPerDay > 0 ? Math.min(1, stats.goldPerDay / stats.goldConsumedPerDay) : 1;
+  let trading = 0;
+  for (const item of stats.trading) {
+    const facility = evaluation.facilities.find(result => result.facility.id === item.facilityId)!.facility;
+    const normal = orderModel(facility.level, NO_MODS, params);
+    const baseline = 86400 / normal.seconds * normal.lmd;
+    const goldShare = item.goldPerDay > 0 ? goldFactor : 1;
+    trading += (item.lmdPerDay * goldShare / baseline - 1) * 100;
+  }
+  const total = round(manufacture + trading + power);
+  return { total, manufacture: round(manufacture), trading: round(trading), power: round(power), goldFactor: round(goldFactor) };
+}
+
+export interface OptimizeResult { assignments: Record<string, string[]>; objective: BaseObjective; start: BaseObjective; moves: number; evaluations: number; timedOut: boolean }
+
+export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { timeBudgetMs?: number; start?: Record<string, string[]> } = {}): OptimizeResult {
+  const deadline = Date.now() + (options.timeBudgetMs ?? 4000);
+  const owned = roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false));
+  const rooms = new Map(catalog.rooms.map(room => [room.id, room]));
+  const capacity = (facility: Facility) => rooms.get(ROOM_OF[facility.type])?.phases[facility.level - 1]?.maxStationedNum ?? 0;
+  const characterOf = (id: string) => catalog.meta?.[id]?.character ?? id;
+  // 宿舍維持推薦結果（恢復效果不在整體效益內），其餘設施參與搜尋。
+  const searchable = base.facilities.filter(facility => facility.type !== 'dormitory' && capacity(facility) > 0);
+  const start = options.start ?? recommendBase(base, catalog, owned, definitions).assignments;
+  let current: Record<string, string[]> = Object.fromEntries(base.facilities.map(facility => [facility.id, [...(start[facility.id] ?? [])].slice(0, capacity(facility))]));
+  let evaluations = 0;
+  const score = (assignments: Record<string, string[]>) => { evaluations++; return baseObjective(evaluateBase({ ...base, assignments }, catalog, owned, definitions), catalog); };
+  // 候選池：有該設施（含控制中樞）已解鎖技能者，加上任何技能提到的陣營成員；產出設施另外允許任何人（基礎加成）。
+  const referencedGroups = new Set<string>();
+  for (const skill of Object.values(catalog.skills)) for (const effect of parseSkill(skill).effects) {
+    if (effect.kind === 'perGroup' || effect.kind === 'remote') referencedGroups.add(effect.group);
+    if (effect.kind === 'resource' && effect.group) referencedGroups.add(effect.group);
+  }
+  const groupMembers = owned.filter(row => (catalog.meta?.[row.operatorId]?.groups ?? []).some(group => referencedGroups.has(group))).map(row => row.operatorId);
+  const pools = new Map(searchable.map(facility => {
+    const skilled = candidatesFor(facility, catalog, owned, definitions, new Set()).filter(item => item.state === 'ready').map(item => item.operatorId);
+    return [facility.id, [...new Set([...skilled, ...groupMembers])]];
+  }));
+  let best = score(current);
+  const startObjective = best;
+  let moves = 0, timedOut = false, improved = true;
+  const usedCharacters = (assignments: Record<string, string[]>) => new Set(Object.values(assignments).flat().map(characterOf));
+  while (improved && !timedOut) {
+    improved = false;
+    for (const facility of searchable) {
+      const slots = capacity(facility);
+      for (let slot = 0; slot < slots && !timedOut; slot++) {
+        const occupant = current[facility.id][slot];
+        const used = usedCharacters(current);
+        for (const candidate of pools.get(facility.id) ?? []) {
+          if (Date.now() > deadline) { timedOut = true; break; }
+          if (candidate === occupant) continue;
+          const next: Record<string, string[]> = Object.fromEntries(Object.entries(current).map(([id, list]) => [id, [...list]]));
+          if (used.has(characterOf(candidate))) {
+            // 已在其他位置：嘗試與目前格子的人交換。
+            const [otherId, otherIndex] = Object.entries(next).flatMap(([id, list]) => list.map((op, index) => [id, index] as const)).find(([id, index]) => characterOf(next[id][index]) === characterOf(candidate)) ?? [];
+            if (otherId === undefined || otherIndex === undefined || otherId === facility.id) continue;
+            if (occupant) next[otherId][otherIndex] = occupant; else next[otherId].splice(otherIndex, 1);
+          }
+          if (slot < next[facility.id].length) next[facility.id][slot] = candidate; else next[facility.id].push(candidate);
+          const value = score(next);
+          if (value.total > best.total + 0.001) { best = value; current = next; moves++; improved = true; break; }
+        }
+      }
+    }
+  }
+  return { assignments: current, objective: best, start: startObjective, moves, evaluations, timedOut };
+}

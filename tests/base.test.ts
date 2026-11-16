@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseCatalog, plainGameText } from '../src/catalog/base.ts';
-import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, unlockState, type Facility } from '../src/domain/base.ts';
+import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, optimizeBase, baseObjective, unlockState, type Facility } from '../src/domain/base.ts';
 import { createDemoBaseCatalog, createDemoDataset, createDemoImport } from '../src/demo.ts';
 import { createEmptyState, known, unknown, validateAppState, type OwnedOperator } from '../src/domain/model.ts';
 import { applyImport, previewImport } from '../src/domain/import.ts';
@@ -300,4 +300,19 @@ test('人間煙火：依產生來源加總（分心情高低），再套用到�
   assert.equal(manu.totals.productivity, 4, '黍：floor(12/3)×1%');
   assert.equal(trade.totals.order, 12, '烏有：12 點 ×1%');
   assert.equal(parseSkill(catalog.skills['s-ling']).ignoredCondition, '心情 12 以下時的感知資訊');
+});
+
+test('整體最佳化：結果不比起點差、不重複排人、不超過容量；赤金不足時龍門幣按供應打折', async () => {
+  const state = await demoState(), catalog = comboCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 't', type: 'trading', level: 3 }, { id: 'm', type: 'manufacturing', level: 2, product: 'gold' }, { id: 'p', type: 'power', level: 1 }];
+  const result = optimizeBase({ facilities, onlineSlots: [] }, catalog, state.roster, definitions, { timeBudgetMs: 3000 });
+  assert.ok(result.objective.total >= result.start.total);
+  const all = Object.values(result.assignments).flat();
+  assert.equal(new Set(all).size, all.length);
+  assert.ok(result.assignments.m.length <= 2 && result.assignments.p.length <= 1 && result.assignments.t.length <= 3);
+  // 只有貿易站、沒有赤金來源 → 赤金供應 0，耗赤金的訂單收益歸零
+  const noGold = evaluateBase({ facilities: [{ id: 't', type: 'trading', level: 3 }], onlineSlots: [], assignments: { t: ['demo-2', 'demo-7'] } }, catalog, state.roster, definitions);
+  const objective = baseObjective(noGold, catalog);
+  assert.equal(objective.goldFactor, 0); assert.equal(objective.trading, -100);
 });
