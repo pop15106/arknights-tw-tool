@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { AppState, Settings } from '../domain/model';
 import type { BaseCatalog } from '../catalog/base';
-import { candidatesFor, evaluateBase, recommendBase, type BaseRecommendation, FACILITY_LABEL, parseSkill, productMatches, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
+import { candidatesFor, evaluateBase, recommendBase, type BaseRecommendation, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -86,11 +86,14 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
           const shown = skill.active ?? skill.maybeUpgraded ?? skill.next?.skill;
           if (!shown) return null;
           const parsed = skill.active ? parseSkill(skill.active) : undefined;
-          const offProduct = !!parsed?.supported && !parsed.effects.some(effect => productMatches(effect, facility));
-          const tone = skill.state === 'locked' ? 'muted' : skill.state === 'unknown' ? 'amber' : offProduct ? 'muted' : parsed?.supported ? 'ok' : 'info';
+          const comboMissing = !!skill.combo && !skill.combo.active;
+          const offProduct = !!parsed?.supported && !comboMissing && !(skill.applied ?? []).length;
+          const tone = skill.state === 'locked' ? 'muted' : skill.state === 'unknown' ? 'amber' : comboMissing ? 'amber' : offProduct ? 'muted' : parsed?.supported ? 'ok' : 'info';
+          const effectLabel = (skill.applied ?? []).map(effectText).join('、');
           return <details key={index} className={`skill-chip ${tone}`}>
-            <summary><span>{shown.name}</span><em>{skill.state === 'locked' ? `未解鎖（精英 ${skill.next?.elite}・等級 ${skill.next?.level}）` : skill.state === 'unknown' ? '解鎖待核對' : offProduct ? '不適用目前產品' : parsed?.supported ? parsed.effects.map(effectText).join('、') : '未計入'}</em></summary>
+            <summary><span>{shown.name}</span><em>{skill.state === 'locked' ? `未解鎖（精英 ${skill.next?.elite}・等級 ${skill.next?.level}）` : skill.state === 'unknown' ? '解鎖待核對' : comboMissing ? `需與${skill.combo!.partner}同房` : offProduct ? '不適用目前產品' : parsed?.supported ? `${skill.combo?.active ? '搭配成立：' : ''}${effectLabel}` : '未計入'}</em></summary>
             <p>{shown.description}</p>
+            {parsed?.ignoredCondition && <p className="fine-print">{parsed.ignoredCondition}尚未支援，未計入。</p>}
             {skill.maybeUpgraded && skill.active && <p className="fine-print">可能已升級為「{skill.maybeUpgraded.name}」：養成數值未知，暫以已確認版本計算。</p>}
           </details>;
         })}{!op.skills.some(skill => skill.applies) && <span className="fine-print">沒有{FACILITY_LABEL[facility.type]}技能{roomType === 'MANUFACTURE' || roomType === 'TRADING' ? '，只計基礎加成' : ''}</span>}</div>

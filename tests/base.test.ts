@@ -194,3 +194,42 @@ test('龍門幣：依訂單效率與各等級訂單期望值換算，並算出�
   // 常規訂單每條赤金固定換 500 龍門幣
   assert.ok(Math.abs(stats.lmdPerDay - stats.goldConsumedPerDay * 500) < 5);
 });
+
+test('搭配技能：解析四種寫法；陣營條件保留無條件部分', () => {
+  assert.deepEqual(parseSkill({ roomType: 'TRADING', description: '當與德克薩斯在同一個貿易站時，心情每小時消耗-0.1，訂單上限+4' }),
+    { supported: true, effects: [], conditional: { partner: '德克薩斯', effects: [{ kind: 'moodCost', value: -0.1 }, { kind: 'orderLimit', value: 4 }] } });
+  assert.deepEqual(parseSkill({ roomType: 'TRADING', description: '進駐貿易站時，訂單獲得效率+20%；當與能天使在同一個貿易站時，訂單獲得效率額外+25%' }),
+    { supported: true, effects: [{ kind: 'order', value: 20 }], conditional: { partner: '能天使', effects: [{ kind: 'order', value: 25 }] } });
+  assert.equal(parseSkill({ roomType: 'MANUFACTURE', description: '進駐製造站時，當與溫米在同一個製造站時，貴金屬類配方的生產力+15%' }).conditional?.partner, '溫米');
+  const faction = parseSkill({ roomType: 'MANUFACTURE', description: '進駐製造站時，作戰記錄類配方的生產力+30%，當與烏薩斯學生自治團幹員在同一個製造站時，作戰記錄類配方的生產力額外+10%' });
+  assert.deepEqual(faction.effects, [{ kind: 'productivity', value: 30, product: 'record' }]); assert.equal(faction.conditional, undefined); assert.match(faction.ignoredCondition!, /烏薩斯/);
+});
+
+function comboCatalog() {
+  const catalog = createDemoBaseCatalog();
+  catalog.skills['c-a'] = { id: 'c-a', name: '示範・恩怨', roomType: 'TRADING', description: '當與示範・青禾在同一個貿易站時，心情每小時消耗+0.3，訂單獲取效率+65%' };
+  catalog.skills['c-b'] = { id: 'c-b', name: '示範・醉翁', roomType: 'TRADING', description: '當與示範・霧航在同一個貿易站時，心情每小時消耗-0.1，訂單上限+4' };
+  catalog.operators['demo-2'] = [[{ buffId: 'c-a', elite: 0, level: 1 }]];
+  catalog.operators['demo-7'] = [[{ buffId: 'c-b', elite: 0, level: 1 }]];
+  catalog.operators['demo-8'] = [[{ buffId: 'demo-trade', elite: 0, level: 1 }]];
+  return catalog;
+}
+
+test('搭配技能：搭檔同房才計入，否則列為搭配未成立；心情調整進入換班計算', async () => {
+  const state = await demoState(), catalog = comboCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const facilities: Facility[] = [{ id: 't', type: 'trading', level: 3 }];
+  const alone = evaluateBase({ facilities, onlineSlots: [], assignments: { t: ['demo-2'] } }, catalog, state.roster, definitions).facilities[0];
+  assert.equal(alone.totals.order, 0); assert.equal(alone.comboMissing[0]?.partner, '示範・青禾');
+  const together = evaluateBase({ facilities, onlineSlots: [], assignments: { t: ['demo-2', 'demo-7'] } }, catalog, state.roster, definitions);
+  assert.equal(together.facilities[0].totals.order, 65); assert.equal(together.facilities[0].comboMissing.length, 0);
+  const stats = baseStatistics(together, catalog);
+  assert.equal(stats.shifts[0].rate, 1.3, '恩怨的心情消耗 +0.3 計入');
+});
+
+test('推薦配置：搭檔組合整組排進同一座設施', async () => {
+  const state = await demoState(), catalog = comboCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const rec = recommendBase({ facilities: [{ id: 't', type: 'trading', level: 3 }, { id: 't2', type: 'trading', level: 1 }], onlineSlots: [] }, catalog, state.roster, definitions);
+  assert.ok(rec.assignments.t.includes('demo-2') && rec.assignments.t.includes('demo-7'), JSON.stringify(rec.assignments));
+});

@@ -25,7 +25,7 @@ function RoomTile({ result, definitions, onOpen }: { result: FacilityResult; def
   const pips = result.room?.phases.length ?? facility.level;
   const value = metric(result);
   const problems = result.issues.length;
-  const incomplete = result.unsupported.length + result.uncertain.length;
+  const incomplete = result.unsupported.length + result.uncertain.length + result.comboMissing.length;
   return <button type="button" className={`map-room room-${facility.type} ${WIDE.has(facility.type) ? 'wide' : ''}`} onClick={onOpen} aria-label={`編輯${result.label}，進駐 ${result.operators.length}／${capacity}`}>
     <span className="map-room-bg" aria-hidden="true"><Icon name={ICON[facility.type]} size={120}/></span>
     <span className="map-room-head">

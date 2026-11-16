@@ -20,7 +20,15 @@ export type SkillEffect =
   | { kind: 'drone'; value: number }
   | { kind: 'moodRecoverSelf'; value: number }
   | { kind: 'moodRecoverAll'; value: number };
-export interface ParsedSkill { supported: boolean; effects: SkillEffect[] }
+export interface ParsedSkill {
+  supported: boolean;
+  /** 無條件生效的效果。 */
+  effects: SkillEffect[];
+  /** 「當與某幹員在同一個設施時」才生效的效果；partner 為說明文字中的幹員名稱。 */
+  conditional?: { partner: string; effects: SkillEffect[] };
+  /** 無法計算而略過的條件（例如陣營人數），只顯示說明。 */
+  ignoredCondition?: string;
+}
 
 const ROOM_PREFIX: Record<string, string> = { MANUFACTURE: '製造站', TRADING: '貿易站', POWER: '發電站', DORMITORY: '宿舍', CONTROL: '控制中樞' };
 const NUM = String.raw`([+-]?\d+(?:\.\d+)?)`;
@@ -29,24 +37,46 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^(作戰記錄|貴金屬|源石)類配方的生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'productivity', value: Number(m[2]), product: m[1] === '作戰記錄' ? 'record' : m[1] === '貴金屬' ? 'gold' : 'originium' }) },
   { pattern: new RegExp(`^倉庫容量上限${NUM}$`, 'u'), effect: m => ({ kind: 'capacity', value: Number(m[1]) }) },
   { pattern: new RegExp(`^心情每小時消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodCost', value: Number(m[1]) }) },
-  { pattern: new RegExp(`^訂單獲取效率${NUM}%$`, 'u'), effect: m => ({ kind: 'order', value: Number(m[1]) }) },
-  { pattern: new RegExp(`^且訂單上限${NUM}$`, 'u'), effect: m => ({ kind: 'orderLimit', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^訂單(?:獲取|獲得)效率${NUM}%$`, 'u'), effect: m => ({ kind: 'order', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^且?訂單上限${NUM}$`, 'u'), effect: m => ({ kind: 'orderLimit', value: Number(m[1]) }) },
   { pattern: new RegExp(`^無人機充能速度${NUM}%$`, 'u'), effect: m => ({ kind: 'drone', value: Number(m[1]) }) },
   { pattern: new RegExp(`^自身心情每小時恢復${NUM}$`, 'u'), effect: m => ({ kind: 'moodRecoverSelf', value: Number(m[1]) }) },
   { pattern: new RegExp(`^該宿舍內所有幹員的心情每小時恢復${NUM}（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'moodRecoverAll', value: Number(m[1]) }) },
 ];
 
-export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): ParsedSkill {
-  const prefix = ROOM_PREFIX[skill.roomType];
-  const head = prefix && `進駐${prefix}時，`;
-  if (!head || !skill.description.startsWith(head)) return { supported: false, effects: [] };
+function parseClauses(text: string): SkillEffect[] | null {
   const effects: SkillEffect[] = [];
-  for (const clause of skill.description.slice(head.length).split('，')) {
-    const rule = CLAUSES.map(item => ({ item, match: clause.trim().match(item.pattern) })).find(entry => entry.match);
-    if (!rule?.match) return { supported: false, effects: [] };
+  for (const raw of text.split('，')) {
+    // 搭配條件中的「額外」只是語氣，數值與一般句型相同。
+    const clause = raw.trim().replace(/額外(?=[+-])/u, '');
+    if (!clause) continue;
+    const rule = CLAUSES.map(item => ({ item, match: clause.match(item.pattern) })).find(entry => entry.match);
+    if (!rule?.match) return null;
     effects.push(rule.item.effect(rule.match));
   }
-  return { supported: effects.length > 0, effects };
+  return effects;
+}
+
+export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): ParsedSkill {
+  const prefix = ROOM_PREFIX[skill.roomType];
+  const unsupported = { supported: false, effects: [] };
+  if (!prefix) return unsupported;
+  const head = `進駐${prefix}時，`;
+  // 搭配條件：「當與【單一幹員名稱】在同一個（本設施）時，……」。陣營或多人條件不支援。
+  const combo = skill.description.match(new RegExp(`[，；]?當與([^，；、或和]+?)在同一個${prefix}時，(.+)$`, 'u'));
+  const before = combo ? skill.description.slice(0, combo.index) : skill.description;
+  let unconditional: SkillEffect[] = [];
+  if (before.startsWith(head)) {
+    const parsed = parseClauses(before.slice(head.length));
+    if (!parsed) return unsupported;
+    unconditional = parsed;
+  } else if (before !== '' && before !== head.slice(0, -1)) return unsupported;
+  if (!combo) return { supported: unconditional.length > 0, effects: unconditional };
+  // 陣營條件（「……幹員」）無法對應單一幹員：保留無條件部分，條件加成標為未計入。
+  if (/幹員$/u.test(combo[1])) return unconditional.length ? { supported: true, effects: unconditional, ignoredCondition: `與${combo[1]}同房時的加成` } : unsupported;
+  const conditional = parseClauses(combo[2]);
+  if (!conditional?.length) return unsupported;
+  return { supported: true, effects: unconditional, conditional: { partner: combo[1].trim(), effects: conditional } };
 }
 
 /* ------------------------------------------------------------------ */
@@ -95,7 +125,8 @@ export function slotResult(slot: BaseSkillSlot[], row: OwnedOperator, catalog: B
 export interface OperatorInRoom {
   operatorId: string;
   name: string;
-  skills: (SlotResult & { parsed?: ParsedSkill; applies: boolean })[];
+  /** applied：實際計入的效果（已依產品與搭配條件過濾）；combo：搭配條件與是否成立。 */
+  skills: (SlotResult & { parsed?: ParsedSkill; applies: boolean; applied?: SkillEffect[]; combo?: { partner: string; active: boolean } })[];
 }
 export interface FacilityResult {
   facility: Facility;
@@ -107,6 +138,8 @@ export interface FacilityResult {
   totals: { basic: number; productivity: number; order: number; drone: number; moodRecoverAll: number; moodCost: number[] };
   /** 已生效但句型未支援、因此沒有計入的技能。 */
   unsupported: { operatorId: string; skill: BaseSkill }[];
+  /** 搭配技能的搭檔不在同一設施，條件效果沒有計入。 */
+  comboMissing: { operatorId: string; skill: BaseSkill; partner: string }[];
   /** 解鎖狀態未知的技能。 */
   uncertain: { operatorId: string; skill: BaseSkill }[];
   /** 生效但不適用目前產品的技能（例如生產作戰記錄時的赤金技能）。 */
@@ -131,7 +164,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     const roomType = ROOM_OF[facility.type], room = rooms.get(roomType);
     const label = `${FACILITY_LABEL[facility.type]} ${base.facilities.slice(0, index + 1).filter(item => item.type === facility.type).length}`;
     counts.set(roomType, (counts.get(roomType) ?? 0) + 1);
-    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [] }, unsupported: [], uncertain: [], notApplicable: [], issues: [] };
+    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [] }, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], issues: [] };
     if (!room) { result.issues.push('資料包沒有此設施的資料。'); return result; }
     const phase = room.phases[facility.level - 1];
     if (!phase) { result.issues.push(`等級超過資料上限（最高 ${room.phases.length} 級）。`); }
@@ -141,6 +174,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     }
     if (facility.type === 'manufacturing' && facility.product !== 'gold' && facility.product !== 'record') result.issues.push('請選擇製造產品（赤金或作戰記錄）。');
     const assigned = base.assignments?.[facility.id] ?? [];
+    const roomNames = new Set(assigned.map(id => definitions.get(id)?.displayName).filter((value): value is string => !!value));
     if (result.capacity && assigned.length > result.capacity) result.issues.push(`進駐 ${assigned.length} 人，超過此等級上限 ${result.capacity} 人。`);
     for (const operatorId of assigned) {
       const row = rows.get(operatorId), definition = definitions.get(operatorId);
@@ -149,7 +183,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
       const previous = seen.get(operatorId);
       if (previous) issues.push(`${name} 同時被安排在「${previous}」與「${label}」。`); else seen.set(operatorId, label);
       const slots = catalog.operators[operatorId] ?? [];
-      const skills = slots.map(slot => {
+      const skills: OperatorInRoom['skills'] = slots.map(slot => {
         const resolved = slotResult(slot, row, catalog);
         const skill = resolved.active ?? resolved.maybeUpgraded ?? resolved.next?.skill;
         const applies = !!skill && roomSkillApplies(skill, roomType);
@@ -160,9 +194,13 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
         if (skill.maybeUpgraded) result.uncertain.push({ operatorId, skill: skill.maybeUpgraded });
         if (!skill.active || !skill.parsed) continue;
         if (!skill.parsed.supported) { result.unsupported.push({ operatorId, skill: skill.active }); continue; }
+        const partner = skill.parsed.conditional?.partner;
+        const comboActive = !!partner && partner !== name && roomNames.has(partner);
+        if (partner) skill.combo = { partner, active: comboActive };
+        const candidates = [...skill.parsed.effects, ...(comboActive ? skill.parsed.conditional!.effects : [])];
+        skill.applied = candidates.filter(effect => productMatches(effect, facility));
         let applied = false;
-        for (const effect of skill.parsed.effects) {
-          if (!productMatches(effect, facility)) continue;
+        for (const effect of skill.applied) {
           applied = true;
           if (effect.kind === 'productivity') result.totals.productivity += effect.value;
           else if (effect.kind === 'order') result.totals.order += effect.value;
@@ -170,7 +208,8 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           else if (effect.kind === 'moodRecoverAll') result.totals.moodRecoverAll = Math.max(result.totals.moodRecoverAll, effect.value);
           else if (effect.kind === 'moodCost') result.totals.moodCost.push(effect.value);
         }
-        if (!applied) result.notApplicable.push({ operatorId, skill: skill.active });
+        if (!applied && !(partner && !comboActive)) result.notApplicable.push({ operatorId, skill: skill.active });
+        if (partner && !comboActive) result.comboMissing.push({ operatorId, skill: skill.active, partner });
       }
       result.operators.push({ operatorId, name, skills });
     }
@@ -243,15 +282,45 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
   const capacity = (facility: Facility) => rooms.get(ROOM_OF[facility.type])?.phases[facility.level - 1]?.maxStationedNum ?? 0;
   const owned = roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false));
   // 每座可推薦設施的完整候選（含分數），之後全域依分數由高到低分配，避免先處理的設施搶走更適合別處的人。
-  const options: (RecommendationPick & { order: number })[] = [];
+  type Option = RecommendationPick & { order: number; perSeat: number; partner?: RecommendationPick };
+  const options: Option[] = [];
   const candidateLists = new Map<string, Candidate[]>();
+  const nameOf = (id: string) => definitions.get(id)?.displayName ?? id;
+  const idByName = new Map(owned.map(row => [nameOf(row.operatorId), row.operatorId]));
+  // 某幹員在設施中的可計算數值；partnerName 存在時一併計入「與該幹員同房」的條件效果。
+  const value = (row: OwnedOperator, facility: Facility, partnerName?: string) => {
+    let total = 0;
+    for (const slot of catalog.operators[row.operatorId] ?? []) {
+      const active = slotResult(slot, row, catalog).active;
+      if (!active || active.roomType !== ROOM_OF[facility.type]) continue;
+      const parsed = parseSkill(active);
+      const effects = [...parsed.effects, ...(parsed.conditional && partnerName && parsed.conditional.partner === partnerName ? parsed.conditional.effects : [])];
+      for (const effect of effects) if (productMatches(effect, facility) && ['productivity', 'order', 'drone', 'moodRecoverAll', 'moodRecoverSelf'].includes(effect.kind)) total += effect.value;
+    }
+    return round(total);
+  };
   base.facilities.forEach((facility, order) => {
     if (!RECOMMENDABLE.has(ROOM_OF[facility.type])) return;
     const list = candidatesFor(facility, catalog, owned, definitions, new Set());
     candidateLists.set(facility.id, list);
-    for (const item of list) if (item.state === 'ready' && item.score > 0) options.push({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, summary: item.summary, order });
+    for (const item of list) if (item.state === 'ready' && item.score > 0) options.push({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, perSeat: item.score, summary: item.summary, order });
+    // 搭檔組合：兩人同房的總分換算成每個位置的分數，與單人候選一起排序。
+    for (const row of owned) {
+      for (const slot of catalog.operators[row.operatorId] ?? []) {
+        const active = slotResult(slot, row, catalog).active;
+        const partnerName = active && active.roomType === ROOM_OF[facility.type] ? parseSkill(active).conditional?.partner : undefined;
+        const partnerId = partnerName ? idByName.get(partnerName) : undefined;
+        if (!partnerId || partnerId === row.operatorId) continue;
+        const partnerRow = owned.find(item => item.operatorId === partnerId)!;
+        const self = value(row, facility, partnerName), mate = value(partnerRow, facility, nameOf(row.operatorId));
+        const total = round(self + mate);
+        if (total <= Math.max(value(row, facility), value(partnerRow, facility))) continue;
+        options.push({ facilityId: facility.id, operatorId: row.operatorId, name: nameOf(row.operatorId), score: self, perSeat: total / 2, summary: `${active!.name}（與${partnerName}同房）`, order,
+          partner: { facilityId: facility.id, operatorId: partnerId, name: partnerName!, score: mate, summary: `搭配${nameOf(row.operatorId)}` } });
+      }
+    }
   });
-  options.sort((a, b) => b.score - a.score || a.order - b.order || a.name.localeCompare(b.name, 'zh-Hant'));
+  options.sort((a, b) => b.perSeat - a.perSeat || b.score - a.score || a.order - b.order || a.name.localeCompare(b.name, 'zh-Hant'));
   const assignments: Record<string, string[]> = Object.fromEntries(base.facilities.map(facility => [facility.id, []]));
   const used = new Set<string>();
   const picks = new Map<string, RecommendationPick[]>();
@@ -264,6 +333,12 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
   for (const option of options) {
     const facility = base.facilities.find(item => item.id === option.facilityId)!;
     if (used.has(option.operatorId) || assignments[facility.id].length >= capacity(facility)) continue;
+    if (option.partner) {
+      if (used.has(option.partner.operatorId) || assignments[facility.id].length + 2 > capacity(facility)) continue;
+      assignments[facility.id].push(option.operatorId, option.partner.operatorId); used.add(option.operatorId); used.add(option.partner.operatorId);
+      picks.set(facility.id, [...(picks.get(facility.id) ?? []), option, option.partner]);
+      continue;
+    }
     if (facility.type === 'dormitory' && allDorm(option.operatorId)) { if (dormWithAll.has(facility.id)) continue; dormWithAll.add(facility.id); }
     assignments[facility.id].push(option.operatorId); used.add(option.operatorId);
     picks.set(facility.id, [...(picks.get(facility.id) ?? []), option]);
@@ -387,7 +462,7 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
       const formula = facility.product === 'gold' ? gold : record;
       const productivity = round(result.totals.basic + result.totals.productivity);
       const perDay = 86400 * (1 + productivity / 100) / formula.seconds;
-      const capacityBonus = result.operators.reduce((sum, op) => sum + op.skills.reduce((inner, skill) => inner + (skill.applies && skill.parsed?.supported ? skill.parsed.effects.filter(effect => effect.kind === 'capacity').reduce((a, effect) => a + effect.value, 0) : 0), 0), 0);
+      const capacityBonus = result.operators.reduce((sum, op) => sum + op.skills.reduce((inner, skill) => inner + (skill.applies ? (skill.applied ?? []).filter(effect => effect.kind === 'capacity').reduce((a, effect) => a + effect.value, 0) : 0), 0), 0);
       const capacity = (catalog.outputCapacity?.[facility.level - 1] ?? 0) + capacityBonus;
       const storageItems = Math.floor(capacity / formula.weight);
       manufacture.push({ facilityId: facility.id, label: result.label, product: facility.product, itemName: formula.name, productivity, perDay: round(perDay),
@@ -408,7 +483,7 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
     if (base <= 0 || !result.operators.length) continue;
     let worst: ShiftStat | undefined;
     for (const op of result.operators) {
-      const delta = op.skills.reduce((sum, skill) => sum + (skill.applies && skill.parsed?.supported ? skill.parsed.effects.filter(effect => effect.kind === 'moodCost').reduce((a, effect) => a + effect.value, 0) : 0), 0);
+      const delta = op.skills.reduce((sum, skill) => sum + (skill.applies ? (skill.applied ?? []).filter(effect => effect.kind === 'moodCost').reduce((a, effect) => a + effect.value, 0) : 0), 0);
       const rate = Math.max(0.05, base + delta);
       const max = catalog.mood.maxByOperator?.[op.operatorId] ?? catalog.mood.max;
       const hours = round(max / rate);
