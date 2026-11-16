@@ -109,6 +109,8 @@ export interface Settings {
     clueExchange?: boolean;
     /** 無人機上限（巡線框架用）；未設定時視為滿等已達技能上限。 */
     droneCap?: number;
+    /** 遊戲內實際顯示的設施數值（生產力％、訂單效率％、無人機充能％），用來和計算值比對。 */
+    observed?: Record<string, number>;
     /** 加工站要加工的配方（workshopFormulas 的 formulaId）。 */
     workshopFormula?: string;
   };
@@ -357,7 +359,7 @@ function validateSettings(value: unknown): void {
     if (growth.expand !== undefined && typeof growth.expand !== 'boolean') throw new Error('展開合成設定必須是是／否。');
     if (growth.inventory !== undefined) for (const [key, count] of Object.entries(object(growth.inventory, Object.keys(growth.inventory as object), []))) { id(key); integer(count, 0, 10_000_000, '庫存數量'); }
   }
-  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments', 'training', 'workshop', 'recruitSlots', 'clueExchange', 'workshopFormula', 'droneCap'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
+  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments', 'training', 'workshop', 'recruitSlots', 'clueExchange', 'workshopFormula', 'droneCap', 'observed'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
   for (const item of base.facilities) {
     const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
     if (facility.product !== undefined) choice(facility.product, ['gold', 'record', 'lmd'], '產品'); if (facility.atmosphere !== undefined) integer(facility.atmosphere, 0, 10000, '氛圍');
@@ -371,6 +373,7 @@ function validateSettings(value: unknown): void {
   if (base.workshop !== undefined) choice(base.workshop, ['elite', 'skill', 'base', 'any'], '加工類別');
   if (base.recruitSlots !== undefined) integer(base.recruitSlots, 0, 3, '額外招募位');
   if (base.droneCap !== undefined) integer(base.droneCap, 0, 999, '無人機上限');
+  if (base.observed !== undefined) for (const [key, value] of Object.entries(object(base.observed, Object.keys(base.observed as object), []))) { id(key); if (typeof value !== 'number' || !Number.isFinite(value) || value < -100 || value > 2000) throw new Error('實測數值必須介於 -100 與 2000。'); }
   if (base.clueExchange !== undefined && typeof base.clueExchange !== 'boolean') throw new Error('線索交流設定必須是是／否。');
   if (base.workshopFormula !== undefined && (typeof base.workshopFormula !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/u.test(base.workshopFormula))) throw new Error('加工配方代碼格式不正確。');
   if (base.assignments !== undefined) {

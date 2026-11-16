@@ -140,6 +140,17 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
       {facility.type === 'meeting' && <label className="checkbox-line"><input type="checkbox" checked={!!base.clueExchange} disabled={busy} onChange={event => onSettings({ clueExchange: event.currentTarget.checked || undefined })}/><span>線索交流中</span></label>}
       {facility.type === 'manufacturing' && <label><span>產品</span><select className="filter" value={facility.product ?? ''} disabled={busy} onChange={event => onChange({ product: event.currentTarget.value as Facility['product'] })}><option value="" disabled>選擇產品</option><option value="gold">{PRODUCT_LABEL.gold}</option><option value="record">{PRODUCT_LABEL.record}</option></select></label>}
     </div>
+    {(roomType === 'MANUFACTURE' || roomType === 'TRADING' || roomType === 'POWER') && result.operators.length > 0 && (() => {
+      const computed = roomType === 'POWER' ? result.totals.drone : result.totals.basic + (roomType === 'MANUFACTURE' ? result.totals.productivity : result.totals.order);
+      const observed = base.observed?.[facility.id];
+      const diff = observed === undefined ? undefined : Math.round((observed - computed) * 100) / 100;
+      const suspects = [...result.unsupported.map(item => `「${item.skill.name}」未計入`), ...result.uncertain.map(item => `「${item.skill.name}」升級待核對`), ...result.operators.flatMap(op => op.skills.filter(skill => skill.active && parseSkill(skill.active).estimate).map(skill => `「${skill.active!.name}」為估計`))];
+      return <div className={`calibration ${diff === undefined ? '' : Math.abs(diff) <= 1 ? 'ok' : 'off'}`}>
+        <label><span>遊戲內顯示{roomType === 'POWER' ? '充能' : roomType === 'MANUFACTURE' ? '生產力' : '訂單效率'}（%）</span><input className="text-input" type="number" step="0.1" placeholder={`計算值 ${computed}`} title="填遊戲畫面上顯示的加成（不含基本 100%）；時間爬升的技能請在班次中段比對" value={observed ?? ''} disabled={busy} onInput={event => { const value = event.currentTarget.value; const next = { ...(base.observed ?? {}) }; if (value === '') delete next[facility.id]; else next[facility.id] = Math.max(-100, Math.min(2000, Number(value))); onSettings({ observed: Object.keys(next).length ? next : undefined }); }}/></label>
+        {diff !== undefined && diff > 90 && <small>差距約 100%：遊戲若顯示含基本 100% 的總值，請先減去 100 再輸入。</small>}
+        {diff !== undefined && <small>{Math.abs(diff) <= 1 ? `與計算值相符（差 ${diff}%）。` : `與計算值差 ${diff > 0 ? '+' : ''}${diff}%${suspects.length ? `：可能原因 ${suspects.join('、')}` : '：這裡的技能都已計入，可能是時間爬升、心情條件或解析有誤，歡迎回報給我。'}`}</small>}
+      </div>;
+    })()}
     {metrics.length > 0 && <dl className="facility-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}{(roomType === 'MANUFACTURE' || roomType === 'TRADING') && <div><dt>其中基礎</dt><dd>{signed(result.totals.basic)}</dd></div>}</dl>}
     {result.workshop && <p className="facility-remote">{result.workshop.name}：每次心情 {result.workshop.baseMood} → {result.workshop.mood}、副產品機率 {Math.round(result.workshop.baseRate * 1000) / 10}% → {Math.round(result.workshop.rate * 1000) / 10}%、每點心情產出 {signed(result.workshop.efficiency)}{result.workshop.gold ? `、每次 ${result.workshop.gold} 龍門幣` : ''}{result.workshop.notes.length ? `（${result.workshop.notes.join('；')}）` : ''}</p>}
     {result.remote.length > 0 && <p className="facility-remote">控制中樞加成：{result.remote.map(item => `${item.from}「${item.skill}」${item.text} ${item.value >= 0 ? '+' : ''}${item.value}%`).join('；')}</p>}
