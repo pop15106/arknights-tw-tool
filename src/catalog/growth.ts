@@ -10,6 +10,9 @@ export interface GrowthOperator {
   skillUp: Cost[][];
   /** 技能 ID → 專精 1～3 的材料與所需秒數。 */
   masteries: Record<string, { cost: Cost[]; seconds: number }[]>;
+  /** 公開招募標籤（輸出、治療、防護、費用回復…）與站位（近戰／遠程）。 */
+  tags?: string[];
+  position?: 'MELEE' | 'RANGED' | 'ALL';
 }
 export interface GrowthItem { name: string; rarity: number; sortId: number; type: string }
 export interface GrowthCatalog {
@@ -51,6 +54,8 @@ export function buildGrowthCatalog(tables: { characters: Row; skills?: Row; cons
       phases: char.phases.map((phase: Row) => ({ maxLevel: Number(phase.maxLevel) || 0, evolveCost: use(costs(phase.evolveCost)) })),
       skillUp: (Array.isArray(char.allSkillLvlup) ? char.allSkillLvlup : []).map((step: Row) => use(costs(step.lvlUpCost))),
       masteries,
+      ...(Array.isArray(char.tagList) && char.tagList.length ? { tags: char.tagList.filter((tag: unknown): tag is string => typeof tag === 'string' && tag.length > 0) } : {}),
+      ...(['MELEE', 'RANGED', 'ALL'].includes(char.position) ? { position: char.position } : {}),
     };
   }
   const itemRows = (tables.items?.items ?? {}) as Row;

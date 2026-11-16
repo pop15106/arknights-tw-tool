@@ -2,6 +2,8 @@ import { useMemo, useState } from 'preact/hooks';
 import type { AppState, OperatorDefinition } from '../domain/model';
 import { analyzeSynergies, DEBUFF_PARTNER, type SynergyLink } from '../domain/synergy';
 import { useBaseCatalog } from './BasePage';
+import { useGrowthCatalog } from './GrowthPage';
+import { buildSquad, operatorInfo, TEMPLATES } from '../domain/squad';
 
 const TRIGGER_LABEL: Record<SynergyLink['trigger'], string> = { squad: '編入隊伍', deployed: '在場時', skill: '技能期間', always: '說明未寫條件' };
 const KIND_ORDER: SynergyLink['target']['kind'][] = ['operator', 'group', 'profession', 'branch', 'rarity', 'position'];
@@ -12,7 +14,8 @@ export function TeamPage({ state, isDemo }: { state: AppState; isDemo: boolean }
   const tabs = <div className="segmented" role="tablist">{([['synergy', '幹員相性'], ['squad', '編隊建議'], ['stage', '依關卡推薦']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
   return <div className="team-page">
     {tab === 'synergy' && <SynergyTab state={state} isDemo={isDemo} tabs={tabs}/>}
-    {tab !== 'synergy' && <section className="panel"><header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>{tab === 'squad' ? '編隊建議' : '依關卡推薦'}</h2></div>{tabs}</header><p className="fine-print">施工中。</p></section>}
+    {tab === 'squad' && <SquadTab state={state} isDemo={isDemo} tabs={tabs}/>}
+    {tab === 'stage' && <section className="panel"><header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>依關卡推薦</h2></div>{tabs}</header><p className="fine-print">施工中。</p></section>}
   </div>;
 }
 
@@ -60,6 +63,61 @@ function SynergyTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean;
         <header><strong>{status}</strong><span className="tag muted">適合搭配{DEBUFF_PARTNER[status] ?? '輸出'}</span></header>
         {debuffs.filter(item => item.status === status).map(item => <details key={item.providerId} className="plain-details"><summary>{chip(item.providerId)} {item.source.kind}「{item.source.name}」</summary><p className="synergy-text">{item.source.description}</p></details>)}
       </article>)}</div>
+    </section>
+  </>;
+}
+
+function SquadTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; tabs: preact.JSX.Element }) {
+  const { catalog: growth, error } = useGrowthCatalog(isDemo);
+  const { catalog: base } = useBaseCatalog(isDemo, 0);
+  const [template, setTemplate] = useState<keyof typeof TEMPLATES>('general');
+  const [locked, setLocked] = useState<string[]>([]);
+  const [excluded, setExcluded] = useState<string[]>([]);
+  const [query, setQuery] = useState('');
+  const byId = useMemo(() => new Map(state.dataset.operators.map(def => [def.id, def])), [state.dataset]);
+  const rows = useMemo(() => new Map(state.roster.map(row => [row.operatorId, row])), [state.roster]);
+  const infos = useMemo(() => growth ? state.roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false) && byId.get(row.operatorId) && growth.operators[row.operatorId])
+    .map(row => operatorInfo(byId.get(row.operatorId)!, rows.get(row.operatorId), growth)) : [], [growth, state.roster, byId, rows]);
+  if (error) return <section className="panel"><header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>編隊建議</h2></div>{tabs}</header><p className="callout warning">{error}</p></section>;
+  if (!growth) return <section className="panel"><header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>編隊建議</h2></div>{tabs}</header><p className="fine-print">讀取遊戲資料中…</p></section>;
+  const roles = TEMPLATES[template].roles;
+  const result = buildSquad(infos, roles, { locked, exclude: new Set(excluded) });
+  const squad = new Set(result.picks.map(pick => pick.id));
+  const synergy = analyzeSynergies(state.dataset.operators.filter(def => squad.has(def.id)), id => base?.meta?.[id]?.groups ?? [], squad);
+  const active = synergy.links.filter(link => link.beneficiaries.length && (!link.minCount || link.beneficiaries.length + 1 >= link.minCount));
+  const info = new Map(infos.map(item => [item.id, item]));
+  const matches = query.trim() ? infos.filter(item => !squad.has(item.id) && item.definition.displayName.includes(query.trim())).slice(0, 8) : [];
+  const unknownCount = result.picks.filter(pick => info.get(pick.id)?.unknown).length;
+  return <>
+    <section className="panel">
+      <header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>編隊建議</h2></div>{tabs}</header>
+      <p className="fine-print">依官方招募標籤（費用回復、防護、治療、輸出、群攻、控場…）分配職責，再從你持有的幹員中挑養成度最高者。養成度＝星級、精英階段、等級、技能等級、專精與模組（都來自幹員庫）；不使用主觀強度排行。同一職業最多 4 名；養成度相同時依名稱排序，可按「換掉」看下一位。</p>
+      <div className="inline-actions">
+        <label><span className="sr-only">模板</span><select className="filter" value={template} onChange={event => setTemplate(event.currentTarget.value as keyof typeof TEMPLATES)}>{Object.entries(TEMPLATES).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}</select></label>
+        <span className="fine-print">{TEMPLATES[template].note}職責：{roles.map(role => `${role.label}×${role.count}`).join('、')}，其餘為彈性位。</span>
+      </div>
+      <div className="inline-actions">
+        <input className="text-input" placeholder="指定必帶的幹員…" value={query} onInput={event => setQuery(event.currentTarget.value)}/>
+        {matches.map(item => <button key={item.id} type="button" className="button secondary small" onClick={() => { setLocked(list => [...list, item.id]); setExcluded(list => list.filter(id => id !== item.id)); setQuery(''); }}>{item.definition.displayName}</button>)}
+        {excluded.length > 0 && <button type="button" className="button ghost small" onClick={() => setExcluded([])}>還原排除（{excluded.length}）</button>}
+      </div>
+    </section>
+    <section className="panel" aria-label="建議隊伍">
+      <h3>建議隊伍（{result.picks.length}／12）</h3>
+      {result.missing.length > 0 && <p className="callout warning">職責不足：{result.missing.map(item => `${item.role}（需要 ${item.need}，只有 ${item.got}）`).join('、')}。持有的幹員中沒有更多符合標籤的人選。</p>}
+      {unknownCount > 0 && <p className="fine-print amber">{unknownCount} 名的精英階段或等級在幹員庫中是未知，以最低值計算養成度。</p>}
+      <div className="squad-grid">{result.picks.map(pick => { const item = info.get(pick.id)!; const isLocked = locked.includes(pick.id); return <article key={pick.id} className={`squad-card ${isLocked ? 'locked' : ''}`}>
+        <header><strong>{item.definition.displayName}</strong><span className="tag">{pick.role}</span></header>
+        <p className="fine-print">{item.definition.profession}・{item.definition.branch}</p>
+        <p className="squad-reason">{pick.reason}</p>
+        <div className="inline-actions">{isLocked ? <button type="button" className="button ghost small" onClick={() => setLocked(list => list.filter(id => id !== pick.id))}>取消必帶</button>
+          : <button type="button" className="button ghost small" onClick={() => setExcluded(list => [...list, pick.id])}>換掉</button>}</div>
+      </article>; })}</div>
+    </section>
+    <section className="panel" aria-label="隊伍內相性">
+      <h3>隊伍內生效的相性（{active.length}）</h3>
+      {active.length ? <ul className="gap-list">{active.map(link => <li key={`${link.providerId}-${link.target.value}`}><strong>{byId.get(link.providerId)?.displayName}</strong> → {link.target.label}（{link.beneficiaries.map(id => byId.get(id)?.displayName).join('、')}）：{link.source.description}</li>)}</ul>
+        : <p className="fine-print">這支隊伍裡沒有天賦或技能明寫的陣營／職業加成。</p>}
     </section>
   </>;
 }

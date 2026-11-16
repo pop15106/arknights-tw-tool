@@ -26,3 +26,19 @@ test('相性：陣營／職業光環、需求人數、模式限定、敵人類�
   assert.ok(!links.some(link => link.providerId === 'd'), '只寫模式名稱、沒有我方對象的不算相性');
   assert.deepEqual(debuffs.map(item => [item.providerId, item.status]), [['d', '防禦力降低']], '作用在自身的減益不算');
 });
+
+test('編隊建議：依職責補位、職業上限、指定必帶、缺口回報', async () => {
+  const { buildSquad, TEMPLATES } = await import('../src/domain/squad.ts');
+  const info = (id: string, profession: string, tags: string[], progress: number, position = 'RANGED') => ({ id, definition: { id, profession } as never, tags, position, progress, summary: id, unknown: false });
+  const infos = [
+    info('v1', '先鋒', ['費用回復'], 300, 'MELEE'), info('v2', '先鋒', ['費用回復'], 200, 'MELEE'),
+    info('t1', '重裝', ['防護'], 250, 'MELEE'), info('h1', '醫療', ['治療'], 280),
+    info('s1', '狙擊', ['輸出'], 400), info('s2', '狙擊', ['輸出', '群攻'], 350), info('s3', '狙擊', ['輸出'], 390), info('s4', '狙擊', ['輸出'], 380), info('s5', '狙擊', ['輸出'], 370),
+    info('c1', '術師', ['輸出', '減速'], 100),
+  ];
+  const result = buildSquad(infos, TEMPLATES.general.roles, { locked: ['c1'] });
+  assert.equal(result.picks[0].id, 'c1');
+  assert.ok(result.picks.some(pick => pick.id === 'v1') && result.picks.some(pick => pick.id === 'v2'));
+  assert.ok(result.picks.filter(pick => pick.id.startsWith('s')).length <= 4, '同職業最多 4 名');
+  assert.deepEqual(result.missing.map(item => [item.role, item.got]), [['防護（阻擋）', 1], ['治療', 1]]);
+});
