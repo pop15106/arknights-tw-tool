@@ -66,7 +66,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const stageEnemies = options.stageEnemies ?? (options.load ? async () => null : async (stageId: string) => (await import('./game-data-sync.ts')).stageEnemiesData(stageId));
   const loadDrops = options.loadDrops ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadDropsData());
   let origin = '', host = '';
-  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'sync'].map(name => `/api/game-data/${name}`));
+  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'recruit', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     try {
       if (req.headers.host !== host && !isLoopbackHost(req.headers.host)) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
@@ -101,6 +101,10 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (!snapshot) throw new ApiError(503, 'DATA_UNAVAILABLE', '尚未同步公開遊戲資料。');
       if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
+      if (url.pathname === '/api/game-data/recruit') {
+        if (!snapshot.recruit) throw new ApiError(503, 'RECRUIT_UNAVAILABLE', '目前的遊戲資料沒有公開招募資料，請到設定按「更新遊戲資料」。');
+        json(res, 200, snapshot.recruit); return;
+      }
       if (url.pathname === '/api/game-data/enemies') {
         if (!snapshot.enemies) throw new ApiError(503, 'ENEMIES_UNAVAILABLE', '目前的遊戲資料沒有敵人資料，請到設定按「更新遊戲資料」。');
         json(res, 200, snapshot.enemies); return;

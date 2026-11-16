@@ -3,20 +3,21 @@ import { renderGameText } from './game-text.ts';
 import { buildBaseCatalog, type BaseCatalog } from './base.ts';
 import { buildGrowthCatalog, type GrowthCatalog } from './growth.ts';
 import { buildEnemyCatalog, type EnemyCatalog } from './enemies.ts';
+import { buildRecruitCatalog, type RecruitCatalog } from './recruit.ts';
 export { renderGameText } from './game-text.ts';
 import { sealDataset, type Dataset, type OperatorDefinition } from '../domain/model.ts';
 
 // 上游資料只作欄位投影；不執行遊戲標記、HTML 或動態程式。
 type Row = Record<string, any>;
-export interface GameDataTables { characters: Row; patches: Row; skills: Row; modules: Row; stages: Row; activities: Row; battleEquip?: Row; items?: Row; favor?: Row; building?: Row; teams?: Row; constants?: Row; enemyHandbook?: Row; enemyDatabase?: Row }
+export interface GameDataTables { characters: Row; patches: Row; skills: Row; modules: Row; stages: Row; activities: Row; battleEquip?: Row; items?: Row; favor?: Row; building?: Row; teams?: Row; constants?: Row; gacha?: Row; enemyHandbook?: Row; enemyDatabase?: Row }
 export interface GameDataStatus {
   version: string; sourceUpdatedAt: string; syncedAt: string;
   counts: { operators: number; stages: number; events: number };
   sourceKind: 'public-mirror'; sourceUrl: string; lastError?: string; catalogRevision?: number; moduleSource?: { version: string; sourceUrl: string; sourceUpdatedAt: string };
 }
-export interface GameDataSnapshot { dataset: Dataset; stages: Row[]; events: Row[]; status: GameDataStatus; base?: BaseCatalog; growth?: GrowthCatalog; enemies?: EnemyCatalog }
+export interface GameDataSnapshot { dataset: Dataset; stages: Row[]; events: Row[]; status: GameDataStatus; base?: BaseCatalog; growth?: GrowthCatalog; enemies?: EnemyCatalog; recruit?: RecruitCatalog }
 export const DATA_REPO = 'arkntools/arknights-data-tw-for-maa';
-export const CATALOG_REVISION = 11;
+export const CATALOG_REVISION = 12;
 export const MODULE_DATA_REPO = 'ArknightsAssets/ArknightsGamedata';
 export const MODULE_DATA_COMMIT = '624d3fa212dabc40bdbc2a873d87d0c7dbdf4fe5';
 export const MODULE_DATA_DATE = '2026-11-02T09:23:25Z';
@@ -82,6 +83,7 @@ export async function buildGameData(tables: GameDataTables, source: { commit: st
   const base = tables.building ? buildBaseCatalog(tables.building, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} building_data.json`, tables.items, operatorMeta, tables.constants) : undefined;
   const dropItems = [...new Set(stages.flatMap(stage => stage.drops.filter((drop: Row) => drop.type === 'MATERIAL' || drop.type === 'CARD_EXP').map((drop: Row) => String(drop.id))))];
   const growth = buildGrowthCatalog(tables, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} character_table／gamedata_const／item_table`, dropItems);
+  const recruit = tables.gacha ? buildRecruitCatalog(tables.gacha, tables.characters) : undefined;
   const enemies = tables.enemyHandbook && tables.enemyDatabase ? buildEnemyCatalog(tables.enemyHandbook, tables.enemyDatabase) : undefined;
-  return { dataset, stages, events, ...(base ? { base } : {}), ...(growth ? { growth } : {}), ...(enemies ? { enemies } : {}), status: { catalogRevision: CATALOG_REVISION, ...(tables.battleEquip ? { moduleSource: { version: MODULE_DATA_COMMIT, sourceUrl: `https://github.com/${MODULE_DATA_REPO}/tree/${MODULE_DATA_COMMIT}/tw/gamedata/excel`, sourceUpdatedAt: MODULE_DATA_DATE } } : {}), version: source.commit, sourceUpdatedAt: source.sourceUpdatedAt, syncedAt: source.syncedAt, counts: { operators: operators.length, stages: stages.length, events: events.length }, sourceKind: 'public-mirror', sourceUrl: `https://github.com/${DATA_REPO}/tree/${source.commit}` } };
+  return { dataset, stages, events, ...(base ? { base } : {}), ...(growth ? { growth } : {}), ...(enemies ? { enemies } : {}), ...(recruit ? { recruit } : {}), status: { catalogRevision: CATALOG_REVISION, ...(tables.battleEquip ? { moduleSource: { version: MODULE_DATA_COMMIT, sourceUrl: `https://github.com/${MODULE_DATA_REPO}/tree/${MODULE_DATA_COMMIT}/tw/gamedata/excel`, sourceUpdatedAt: MODULE_DATA_DATE } } : {}), version: source.commit, sourceUpdatedAt: source.sourceUpdatedAt, syncedAt: source.syncedAt, counts: { operators: operators.length, stages: stages.length, events: events.length }, sourceKind: 'public-mirror', sourceUrl: `https://github.com/${DATA_REPO}/tree/${source.commit}` } };
 }

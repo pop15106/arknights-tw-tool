@@ -926,3 +926,20 @@ h2 { font-weight: 800; }
 .rotation-table { min-width: 720px; font-size: 12px; }
 .rotation-table td:first-child { white-space: nowrap; font-weight: 700; }
 .rotation-summary td { font-weight: 800; }
+
+/* 工具：公招 */
+.recruit-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.recruit-tags > .fine-print { width: 3.5em; }
+.tag-toggle { padding: 6px 12px; border: 2px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer; }
+.tag-toggle.on { background: var(--card-yellow); color: var(--card-ink); border-color: var(--edge); box-shadow: var(--pop-sm); }
+.recruit-list { display: grid; gap: 10px; margin-top: 10px; }
+.recruit-row { display: grid; gap: 8px; padding: 12px; border: 2px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.recruit-row.min-4, .recruit-row.min-5, .recruit-row.min-6 { border-color: var(--edge); box-shadow: var(--pop-sm); }
+.recruit-row header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.recruit-badge { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; background: var(--surface); }
+.recruit-badge.r4 { background: #a77de0; color: #fff; } .recruit-badge.r5 { background: var(--card-yellow); color: var(--card-ink); } .recruit-badge.r6 { background: var(--accent); color: var(--accent-ink); }
+.recruit-ops { display: flex; flex-wrap: wrap; gap: 4px; }
+.recruit-op { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1.5px dashed var(--line-strong); border-radius: 999px; font-size: 12px; font-weight: 700; }
+.recruit-op.owned { border-style: solid; }
+.recruit-op small { font-weight: 400; color: var(--muted); }
+.recruit-op.r6 { color: var(--accent); } .recruit-op.r5 { color: var(--amber); } .recruit-op.r4 { color: #a77de0; } .recruit-op.r3 { color: #3d9be9; }
