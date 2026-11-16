@@ -22,9 +22,9 @@ test('白名單句型解析；任一子句不支援即整個技能不計入', ()
   assert.deepEqual(parseSkill({ roomType: 'DORMITORY', description: '進駐宿舍時，該宿舍內所有幹員的心情每小時恢復+0.2（同種效果取最高）' }).effects, [{ kind: 'moodRecoverAll', value: 0.2 }]);
   for (const description of [
     '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每有1個標準化類技能為當前製造站+5%的生產力',
-    '進駐製造站時，當前製造站內每個標準化類技能為自身+5%的生產力',
+    '進駐製造站時，每10架無人機上限+1%無人機充能速度（最多+25%）',
     '進駐製造站時，如果有2台以上作業平台進駐在發電站，則生產力+2%',
-    '進駐控制中樞時，較容易獲得線索板上尚未擁有的線索，但控制中樞內除自身以外的其餘幹員心情每小時消耗+0.25',
+    '進駐控制中樞時，提升線索板上某條線索的價值',
   ]) assert.equal(parseSkill({ roomType: description.includes('控制中樞') ? 'CONTROL' : 'MANUFACTURE', description }).supported, false, description);
   // 房間不符也不計入
   assert.equal(parseSkill({ roomType: 'TRADING', description: '進駐製造站時，生產力+15%' }).supported, false);
@@ -370,7 +370,7 @@ test('功能設施：會客室（含只有自己時）、辦公室（含宿舍�
   add('h1', 'HIRE', '進駐人力辦公室時，人脈資源的聯絡速度+20%，每間宿舍每級額外+1%人脈資源的聯絡速度', 'demo-3');
   add('t1', 'TRAINING', '進駐訓練室協助位時，重裝幹員的專精技能訓練速度+30%，如果本次訓練專精技能至3級，則訓練速度額外+45%', 'demo-4');
   add('w1', 'WORKSHOP', '進駐加工站加工精英材料時，副產品的產出機率提升70%', 'demo-5');
-  assert.match(parseSkill(catalog.skills.m1).ignoredCondition!, /黑鋼/);
+  assert.deepEqual(parseSkill(catalog.skills.m1).effects.at(-1), { kind: 'qualitative', text: '更容易獲得黑鋼國際線索' });
   assert.equal(parseSkill(catalog.skills.w1).effects[0].kind === 'byproduct' && (parseSkill(catalog.skills.w1).effects[0] as { category: string }).category, 'elite');
   const facilities: Facility[] = [{ id: 'me', type: 'meeting', level: 3 }, { id: 'of', type: 'office', level: 3 }, { id: 'tr', type: 'training', level: 3 }, { id: 'ws', type: 'workshop', level: 3 }, { id: 'd1', type: 'dormitory', level: 5 }, { id: 'd2', type: 'dormitory', level: 3 }];
   const run = (extra: Partial<{ training: { profession?: string; mastery?: 1 | 2 | 3 }; workshop: 'elite' | 'skill' | 'base' | 'any' }>, meeting = ['demo-1', 'demo-2']) =>
@@ -505,8 +505,10 @@ test('消除心情消耗、訂單上限與赤金生產線句型', () => {
   assert.deepEqual(p('TRADING', '進駐貿易站時，當前貿易站內幹員提升的每5個訂單上限，提供25%訂單取得效率，最多提供100%效率').effects, [{ kind: 'perOrderLimit', per: 5, value: 25, max: 100 }]);
   assert.deepEqual(p('TRADING', '進駐貿易站時，每有1條赤金生產線，則當前貿易站訂單獲取效率+5%').effects, [{ kind: 'perGoldLines', per: 1, effect: { kind: 'order', value: 5 } }]);
   assert.deepEqual(p('TRADING', '進駐貿易站時，訂單獲取效率+5%，每有2條赤金生產線，則為當前貿易站額外提供2條赤金生產線').effects, [{ kind: 'order', value: 5 }, { kind: 'perGoldLines', per: 2, effect: { kind: 'goldLine', value: 2 } }]);
-  // 依當下訂單數變動的技能仍不計入
-  assert.equal(p('TRADING', '進駐貿易站時，當前訂單數與訂單上限每差1筆訂單，則訂單獲取效率+4%').supported, false);
+  // 依當下訂單數變動：可計算但標示估計
+  const gap = p('TRADING', '進駐貿易站時，當前訂單數與訂單上限每差1筆訂單，則訂單獲取效率+4%');
+  assert.deepEqual(gap.effects, [{ kind: 'orderCount', mode: 'perGap', value: 4 }]);
+  assert.ok(gap.estimate);
 });
 
 test('中樞同伴條件、訓練陣營、宿舍目標條件與疊加型加成', () => {
@@ -523,4 +525,45 @@ test('中樞同伴條件、訓練陣營、宿舍目標條件與疊加型加成',
   assert.deepEqual(p('TRADING', '進駐貿易站時，當前貿易站內幹員提供的每5%訂單獲取效率，額外提供5%效率，最多提供25%效率').effects, [{ kind: 'perRoomStat', stat: 'order', per: 5, value: 5, max: 25, others: false }]);
   assert.deepEqual(p('TRAINING', '進駐訓練室協助近衛幹員訓練專精技能至3級時，心情每小時消耗+1').effects, [{ kind: 'whenTraining', professions: ['近衛'], atMastery: 3, effect: { kind: 'moodCost', value: 1 } }]);
   assert.deepEqual(p('HIRE', '進駐人力辦公室時，每個招募位（不包含初始招募位）+10%人脈資源的聯絡速度').effects, [{ kind: 'scaleBy', by: 'recruitSlots', per: 1, effect: { kind: 'contact', value: 10 } }]);
+});
+
+test('名詞表：技能類別、作業平台、深海獵人特殊加成、指定幹員所在設施', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.meta = { 'demo-3': { groups: ['作業平台'] }, 'demo-4': { groups: ['深海獵人'] }, 'demo-6': { groups: ['深海獵人'] } };
+  catalog.skillCategories = { 標準化類: ['標準化·α'], 萊茵科技類: ['萊茵科技·α'] };
+  catalog.terms = { 'cc.c.abyssal2_1': { name: '特殊加成', description: '每有1個深海獵人幹員進駐製造站，則控制中樞給每個進駐深海獵人的製造站提供5%生產力，最多給單個製造站提供45%生產力' } };
+  const add = (id: string, name: string, roomType: string, description: string, operator: string, terms?: string[]) => { catalog.skills[id] = { id, name, roomType, description, ...(terms ? { terms } : {}) }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('std', '標準化·α', 'MANUFACTURE', '進駐製造站時，生產力+15%', 'demo-1');
+  add('rhine', '萊茵科技·α', 'MANUFACTURE', '進駐製造站時，生產力+15%', 'demo-2');
+  add('cat', '意識協議', 'MANUFACTURE', '進駐製造站時，當前製造站內每個標準化類技能為自身+5%的生產力', 'demo-5');
+  add('plat', '機械精通', 'MANUFACTURE', '進駐製造站時，每有1台作業平台進駐發電站，貴金屬類配方的生產力+10%', 'demo-7');
+  add('abyss', '集群狩獵·α', 'CONTROL', '進駐控制中樞時，控制中樞內所有幹員的心情每小時恢復+0.05；基建內（不包含副手及活動室使用者）深海獵人幹員獲得特殊加成（與部分技能有特殊疊加規則）', 'demo-8', ['cc.c.abyssal2_1']);
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 'm1', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'm2', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'p', type: 'power', level: 3 }];
+  const ev = evaluateBase({ facilities, onlineSlots: [], assignments: { c: ['demo-8'], m1: ['demo-1', 'demo-2', 'demo-5'], m2: ['demo-4', 'demo-6', 'demo-7'], p: ['demo-3'] } }, catalog, state.roster, definitions);
+  const [, m1, m2] = ev.facilities;
+  assert.equal(m1.totals.productivity, 15 + 15 + 5, '只有 1 個標準化類技能');
+  // 意識相容：萊茵科技類也算作標準化類
+  add('alias', '意識相容', 'MANUFACTURE', '進駐製造站時，當前製造站內所有萊茵科技類、紅松騎士團類技能也全都視作標準化類技能', 'demo-3');
+  const ev2 = evaluateBase({ facilities, onlineSlots: [], assignments: { c: ['demo-8'], m1: ['demo-1', 'demo-2', 'demo-5', 'demo-3'], m2: [], p: [] } }, catalog, state.roster, definitions);
+  assert.equal(ev2.facilities[1].totals.productivity, 15 + 15 + 10);
+  // 作業平台 1 台在發電站 +10；深海獵人 2 名進駐製造站 → 有深海獵人的製造站 +10
+  assert.equal(m2.totals.productivity, 10 + 10);
+  assert.ok(m2.remote.some(item => item.value === 10 && /深海獵人 2 名/.test(item.text)));
+});
+
+test('加工站：依選定配方計算心情與副產品', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.workshop = [{ id: 'w1', itemId: 'x', name: '異鐵組', type: 'F_EVOLVE', mood: 2, gold: 200, byproductRate: 0.1, level: 1 }, { id: 'w2', itemId: 'y', name: '提純源岩', type: 'F_EVOLVE', mood: 4, gold: 300, byproductRate: 0.1, level: 1 }];
+  catalog.skills.ws = { id: 'ws', name: 'ws', roomType: 'WORKSHOP', description: '進駐加工站加工精英材料時，副產品的產出機率提升60%，同時心情消耗為4以上的配方全部-2心情消耗' };
+  catalog.operators['demo-1'] = [[{ buffId: 'ws', elite: 0, level: 1 }]];
+  const run = (workshopFormula: string) => evaluateBase({ facilities: [{ id: 'w', type: 'workshop', level: 3 }], onlineSlots: [], assignments: { w: ['demo-1'] }, workshopFormula }, catalog, state.roster, definitions).facilities[0].workshop!;
+  const iron = run('w1'), rock = run('w2');
+  assert.equal(iron.mood, 2, '心情 2 的配方不符合「4 以上」');
+  assert.equal(iron.rate, 0.16);
+  assert.equal(rock.mood, 2);
+  assert.equal(rock.efficiency, Math.round(((1.16 / 2) / (1.1 / 4) - 1) * 10000) / 100);
+  assert.deepEqual(parseSkill({ roomType: 'WORKSHOP', description: '進駐加工站加工異鐵組材料時，副產品的產出機率提升90%' }).effects, [{ kind: 'byproduct', value: 90, category: 'other', target: { equals: '異鐵組' } }]);
+  assert.equal(parseSkill({ roomType: 'WORKSHOP', description: '進駐加工站加工任意類材料時，每2次加工沒有產出副產品，則恢復自身一次心情，恢復量為對應配方所需消耗的心情（加工結束後統一結算）' }).effects[0].kind, 'refundOnMiss');
 });

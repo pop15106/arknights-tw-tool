@@ -8,7 +8,7 @@ import { parseTradingWikitext, PRTS_TRADING_API, validateTradingParams, type Tra
 export type { GameDataSnapshot } from '../src/catalog/build.ts';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TABLES = { characters: 'character_table.json', patches: 'char_patch_table.json', skills: 'skill_table.json', modules: 'uniequip_table.json', stages: 'stage_table.json', activities: 'activity_table.json', items: 'item_table.json', building: 'building_data.json' } as const;
+const TABLES = { characters: 'character_table.json', patches: 'char_patch_table.json', skills: 'skill_table.json', modules: 'uniequip_table.json', stages: 'stage_table.json', activities: 'activity_table.json', items: 'item_table.json', building: 'building_data.json', constants: 'gamedata_const.json' } as const;
 const PNG = Buffer.from([137,80,78,71,13,10,26,10]);
 const validVersion = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/u.test(value);
 type Source = { commit: string; sourceUpdatedAt: string; syncedAt: string };

@@ -6,7 +6,7 @@ import { sealDataset, type Dataset, type OperatorDefinition } from '../domain/mo
 
 // 上游資料只作欄位投影；不執行遊戲標記、HTML 或動態程式。
 type Row = Record<string, any>;
-export interface GameDataTables { characters: Row; patches: Row; skills: Row; modules: Row; stages: Row; activities: Row; battleEquip?: Row; items?: Row; favor?: Row; building?: Row; teams?: Row }
+export interface GameDataTables { characters: Row; patches: Row; skills: Row; modules: Row; stages: Row; activities: Row; battleEquip?: Row; items?: Row; favor?: Row; building?: Row; teams?: Row; constants?: Row }
 export interface GameDataStatus {
   version: string; sourceUpdatedAt: string; syncedAt: string;
   counts: { operators: number; stages: number; events: number };
@@ -14,7 +14,7 @@ export interface GameDataStatus {
 }
 export interface GameDataSnapshot { dataset: Dataset; stages: Row[]; events: Row[]; status: GameDataStatus; base?: BaseCatalog }
 export const DATA_REPO = 'arkntools/arknights-data-tw-for-maa';
-export const CATALOG_REVISION = 7;
+export const CATALOG_REVISION = 8;
 export const MODULE_DATA_REPO = 'ArknightsAssets/ArknightsGamedata';
 export const MODULE_DATA_COMMIT = '624d3fa212dabc40bdbc2a873d87d0c7dbdf4fe5';
 export const MODULE_DATA_DATE = '2026-11-02T09:23:25Z';
@@ -75,8 +75,8 @@ export async function buildGameData(tables: GameDataTables, source: { commit: st
   const operatorMeta = Object.fromEntries(operators.map(op => {
     const char = characters[op.id] ?? {};
     const ids = [char.nationId, char.groupId, char.teamId].filter((value): value is string => typeof value === 'string');
-    return [op.id, { ids, groups: ids.map(teamName).filter((value): value is string => typeof value === 'string'), ...(char.isSpChar ? { alter: true } : {}), ...(patchOwner.get(op.id) ? { character: patchOwner.get(op.id) } : {}) }];
+    return [op.id, { name: op.displayName, ids, groups: ids.map(teamName).filter((value): value is string => typeof value === 'string'), ...(char.isSpChar ? { alter: true } : {}), ...(patchOwner.get(op.id) ? { character: patchOwner.get(op.id) } : {}) }];
   }));
-  const base = tables.building ? buildBaseCatalog(tables.building, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} building_data.json`, tables.items, operatorMeta) : undefined;
+  const base = tables.building ? buildBaseCatalog(tables.building, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} building_data.json`, tables.items, operatorMeta, tables.constants) : undefined;
   return { dataset, stages, events, ...(base ? { base } : {}), status: { catalogRevision: CATALOG_REVISION, ...(tables.battleEquip ? { moduleSource: { version: MODULE_DATA_COMMIT, sourceUrl: `https://github.com/${MODULE_DATA_REPO}/tree/${MODULE_DATA_COMMIT}/tw/gamedata/excel`, sourceUpdatedAt: MODULE_DATA_DATE } } : {}), version: source.commit, sourceUpdatedAt: source.sourceUpdatedAt, syncedAt: source.syncedAt, counts: { operators: operators.length, stages: stages.length, events: events.length }, sourceKind: 'public-mirror', sourceUrl: `https://github.com/${DATA_REPO}/tree/${source.commit}` } };
 }

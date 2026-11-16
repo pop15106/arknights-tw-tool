@@ -21,16 +21,24 @@ export type SkillEffect =
   | { kind: 'moodRecoverSelf'; value: number }
   | { kind: 'moodRecoverAll'; value: number }
   /** 依陣營人數倍增：scope=room 為同一設施、base 為整個基建（可有上限）。 */
-  | { kind: 'perGroup'; scope: 'room' | 'base'; group: string; max?: number; per: SkillEffect }
+  | { kind: 'perGroup'; scope: 'room' | 'base'; group: string; max?: number; per: SkillEffect; excludeSelf?: boolean }
   /** 控制中樞對其他設施中某陣營幹員的加成：每名符合者在其所在設施各給一次。 */
-  | { kind: 'remote'; target: 'MANUFACTURE' | 'TRADING'; group: string; effects: SkillEffect[] }
+  | { kind: 'remote'; target: 'MANUFACTURE' | 'TRADING' | 'MEETING'; group: string; effects: SkillEffect[] }
   /** 功能設施：線索蒐集速度（alone＝會客室只有自身工作時才生效）、聯絡速度（perDormLevel＝每間宿舍每級）、專精訓練速度、加工副產品機率。 */
   | { kind: 'clue'; value: number; alone?: boolean }
   | { kind: 'contact'; value: number; perDormLevel?: boolean }
   | { kind: 'training'; value: number; professions?: string[]; atMastery?: number }
-  | { kind: 'byproduct'; value: number; category: 'elite' | 'skill' | 'base' | 'any' }
+  | { kind: 'byproduct'; value: number; category: 'elite' | 'skill' | 'base' | 'any' | 'other'; target?: WorkshopTarget }
+  /** 加工站配方心情消耗調整：符合 cost（gte＝以上）的配方 add／divide，或恆定為 set。 */
+  | { kind: 'workshopMood'; target?: WorkshopTarget; cost?: number; gte?: boolean; add?: number; divide?: number; set?: number }
+  /** 宿舍內每 per 名心情 threshold 以下的幹員給一次 effect。 */
+  | { kind: 'perDormLow'; per: number; threshold: number; effect: SkillEffect }
+  /** 因果／業報：未產出副產品時累積點數，累積 per 點必定產出一次（累積條件見名詞表）。 */
+  | { kind: 'karma'; per: number; resource: string; target?: WorkshopTarget }
+  /** 每 every 次加工沒有產出副產品，退回一次該配方的心情。 */
+  | { kind: 'refundOnMiss'; every: number; target?: WorkshopTarget }
   /** 控制中樞對所有製造站／貿易站的加成；maxOnly 為「同種效果取最高」。 */
-  | { kind: 'global'; target: 'MANUFACTURE' | 'TRADING' | 'MEETING' | 'HIRE'; value: number; product?: 'gold'; maxOnly: boolean }
+  | { kind: 'global'; target: 'MANUFACTURE' | 'TRADING' | 'MEETING' | 'HIRE' | 'TRAINING'; value: number; product?: 'gold'; maxOnly: boolean }
   /** 依自身心情生效：high＝心情大於 12、low＝心情 12 以下（落差大於 12）。 */
   | { kind: 'whenMood'; cond: 'high' | 'low'; effect: SkillEffect }
   /** 每 per 點心情落差（上限－目前心情），effect 乘上倍數。 */
@@ -41,6 +49,46 @@ export type SkillEffect =
   | { kind: 'dormSingle'; value: number }
   /** 依招募位、發電站數、本設施等級、宿舍總等級、貿易站數、會客室／訓練室等級倍增 effect；max 為加成上限。 */
   | { kind: 'scaleBy'; by: 'recruitSlots' | 'powerPlants' | 'roomLevel' | 'dormLevels' | 'tradingPosts' | 'meetingLevel' | 'trainingLevel' | 'roomOccupants' | 'productTypes'; per: number; effect: SkillEffect; max?: number }
+  /** 同站每個某類技能（標準化類等）給一次 effect。 */
+  | { kind: 'perCategory'; category: string; effect: SkillEffect }
+  /** 同站的某些類別技能也視作另一類（意識相容）。 */
+  | { kind: 'categoryAlias'; from: string[]; to: string }
+  /** 某設施（例如發電站）內每名某陣營幹員給一次 effect；others＝不含自身。 */
+  | { kind: 'perGroupIn'; group: string; where: BaseRoomType; effect: SkillEffect; others?: boolean; max?: number }
+  /** 某設施內的某陣營幹員達 min 名以上時 effect 生效；others＝不含自身。 */
+  | { kind: 'ifGroupCount'; group: string; where: BaseRoomType; min: number; effect: SkillEffect; others?: boolean }
+  /** 增加發電站數量（只影響依發電站數的技能）；ifName＝該幹員在發電站時、unlessGroup＝其他發電站沒有該陣營時。 */
+  | { kind: 'powerCount'; value: number; ifName?: string; unlessGroup?: string }
+  /** 對指定幹員所在的設施給 effect（例如野鬃所在的製造站、赫德雷所在的貿易站）。 */
+  | { kind: 'remoteTo'; name: string; target: BaseRoomType; effect: SkillEffect }
+  /** 控制中樞：存在至少 min 名某陣營幹員的設施各給一次 effect。 */
+  | { kind: 'remoteGroupMin'; target: BaseRoomType; group: string; min: number; effect: SkillEffect }
+  /** 望：外勢（貿易站＋發電站數）≥ 實地（製造站數）時 outer 生效，否則 ground 生效。 */
+  | { kind: 'outerGround'; outer: SkillEffect; ground: SkillEffect }
+  /** 集群狩獵：深海獵人進駐製造站時的特殊加成（tier 對應名詞表數值）。 */
+  | { kind: 'abyssalBoost'; tier: 1 | 2 }
+  /** 潮汐守望：依深海獵人在宿舍內外的人數調整自身心情。 */
+  | { kind: 'abyssalMood'; outside: number; inside: number; full: number }
+  /** 指定幹員（同設施）的心情消耗調整；others＝同設施除自身以外所有幹員。 */
+  | { kind: 'moodFor'; name?: string; others?: boolean; value: number }
+  /** 感染力：辦公室聯絡速度（含基礎 5%）低於 below 時，額外 +value（全域唯一）。 */
+  | { kind: 'contactFloor'; below: number; value: number }
+  /** 依訂單數變動：perOrder＝每筆訂單、perGap＝與上限每差一筆；limitPer＝其他幹員每 limitPer% 效率使上限 -1。 */
+  | { kind: 'orderCount'; mode: 'perOrder' | 'perGap'; value: number; limitPer?: number }
+  /** 基建內每有一間進駐某陣營幹員的設施給一次 effect（最多 max 間）。 */
+  | { kind: 'perFacilityWith'; group: string; max: number; effect: SkillEffect }
+  /** 宿舍：總計 value 平均分給心情未滿的成員。 */
+  | { kind: 'dormSplit'; value: number }
+  /** 宿舍：心情 threshold 以下的幹員額外恢復 value（同種效果取最高）。 */
+  | { kind: 'dormBelow'; threshold: number; value: number }
+  /** 宿舍：name 在同宿舍時，對某陣營幹員額外恢復 value。 */
+  | { kind: 'dormGroupBonus'; name: string; group: string; value: number }
+  /** 會客室：處於線索交流期間才生效。 */
+  | { kind: 'whenExchange'; effect: SkillEffect }
+  /** 沒有公開數值的效果（線索傾向、必定獲得某線索、指定副產品種類等）：會辨識並顯示，但不影響數字。 */
+  | { kind: 'qualitative'; text: string }
+  /** 同站幹員提升的倉庫容量換算成生產力；tiers 依提升格數分段，perOperator＝各幹員分開計算；priority 高者生效、不與其他同類疊加。 */
+  | { kind: 'perRoomCapacity'; tiers: { upTo: number; value: number }[]; priority: number; perOperator?: boolean }
   /** 同站幹員提供的生產力／訂單效率每 per% 再額外提供 value%（天道酬勤、配合意識）。 */
   | { kind: 'perRoomStat'; stat: 'productivity' | 'order'; per: number; value: number; max: number; others: boolean }
   /** 訓練室協助特定職業／專精等級時才生效。 */
@@ -62,11 +110,11 @@ export type SkillEffect =
   /** 同設施內有其他某陣營幹員時才生效。 */
   | { kind: 'ifGroupInRoom'; group: string; effect: SkillEffect }
   /** 控制中樞：所有宿舍內所有幹員心情恢復（同種效果取最高）。 */
-  | { kind: 'globalDorm'; value: number }
+  | { kind: 'globalDorm'; value: number; group?: string }
   /** 隨進駐時間爬升：首小時 first，此後每小時 +perHour，最多 max。 */
-  | { kind: 'ramp'; stat: 'productivity' | 'drone'; first: number; perHour: number; max: number }
+  | { kind: 'ramp'; stat: 'productivity' | 'drone' | 'clue'; first: number; perHour: number; max: number }
   /** 控制中樞：其他設施內處於工作狀態的幹員心情每小時調整（負值＝恢復）。 */
-  | { kind: 'workingMood'; value: number }
+  | { kind: 'workingMood'; value: number; rooms?: BaseRoomType[] }
   /** 同設施內所有幹員的心情消耗調整（負值＝恢復）。 */
   | { kind: 'moodRoom'; value: number }
   /** 改變貿易站訂單內容的技能（品質、特殊訂單、違約、投資），數值依 PRTS 同步的訂單參數計算。 */
@@ -80,6 +128,8 @@ export type SkillEffect =
   | { kind: 'resourceThreshold'; resource: string; min: number; effect: SkillEffect }
   | { kind: 'orderMod'; mod: 'qualityAlpha' | 'qualityBeta' | 'pepe' | 'closure' | 'twoGold' | 'breach' | 'breachBonus' | 'invest'; amount?: number };
 /** 單純數值效果的值；倍增與跨設施效果需另依配置計算，這裡回傳 0。 */
+/** 加工站配方條件：types＝配方類別、includes／equals＝成品名稱、mood＝原始心情消耗。 */
+export interface WorkshopTarget { types?: string[]; includes?: string; equals?: string; mood?: number }
 export const scalar = (effect: SkillEffect): number => 'value' in effect ? effect.value : 0;
 export type ResourceSource = 'flat' | 'perGroupOutsideDorm' | 'perDormOccupant' | 'perRoomOccupant' | 'perGroupInRoom' | 'perRoomLevel' | 'perFacilityLevel' | 'perRecruitSlot';
 /** 已知的基建資源名稱；只有這些名稱會被當成資源解析，避免把一般數值誤判成資源。 */
@@ -110,16 +160,89 @@ export interface ParsedSkill {
   effects: SkillEffect[];
   /** 「當與某幹員在同一個設施時」才生效的效果；partner 為說明文字中的幹員名稱。 */
   conditional?: { partner: string; effects: SkillEffect[] };
+  /** 依假設估計的部分（畫面會標示）。 */
+  estimate?: string;
   /** 無法計算而略過的條件（例如陣營人數），只顯示說明。 */
   ignoredCondition?: string;
 }
 
 const ROOM_PREFIX: Record<string, string> = { MANUFACTURE: '製造站', TRADING: '貿易站', POWER: '發電站', DORMITORY: '宿舍', CONTROL: '控制中樞', MEETING: '會客室', HIRE: '人力辦公室', TRAINING: '訓練室協助位' };
 // 不影響可計算數值的尾句：保留前面的數值，尾句列為未計入。
-const IGNORABLE_TAILS: RegExp[] = [/，當魔王進駐中樞時額外\+[\d.]+（與控制中樞加成有特殊比較規則）$/u, /[，；]?（與控制中樞加成有特殊比較規則）$/u, /[，；]且更容易獲得.+?線索$/u, /[，；]同時每個招募位(?:（不包含初始招募位）)?額外\+\d+%會客室線索蒐集速度$/u, /[，；]每產生\d+次聯絡次數，增加.+?線索的機率(?:（工作時長和招募位影響機率）)?$/u, /，如果訓練位幹員分支為.+?，則訓練速度額外\+\d+%$/u];
+const IGNORABLE_TAILS: RegExp[] = [/，當魔王進駐中樞時額外\+[\d.]+（與控制中樞加成有特殊比較規則）$/u, /[，；]?（與控制中樞加成有特殊比較規則）$/u, /[，；]同時每個招募位(?:（不包含初始招募位）)?額外\+\d+%會客室線索蒐集速度$/u, /，心情耗盡時清空所有.+$/u, /，如果訓練位幹員分支為.+?，則訓練速度額外\+\d+%$/u];
 /** 去掉後仍需保留尾註的條件加成（例如宿舍「如果目標是某人」只計基礎值）。 */
 const STRIPPED_CONDITIONS: [RegExp, string][] = [[/，如果目標是[^，]+?，則恢復效果額外\+[\d.]+(（同種效果取最高）)?$/u, '$1'], [/；同時該宿舍每有1名心情未滿的幹員，則恢復效果額外\+[\d.]+（同種效果只套用最高效果）$/u, '（同種效果取最高）']];
-const WORKSHOP_CATEGORY: Record<string, 'elite' | 'skill' | 'base' | 'any'> = { 精英材料: 'elite', 技巧概要: 'skill', 基建材料: 'base', 任意類材料: 'any' };
+const WORKSHOP_CATEGORY: Record<string, 'elite' | 'skill' | 'base' | 'any'> = { 精英材料: 'elite', 技巧概要: 'skill', 基建材料: 'base', 任意類材料: 'any', 任一類材料: 'any' };
+const WORKSHOP_TYPE: Record<string, string> = { 精英材料: 'F_EVOLVE', 技巧概要: 'F_SKILL', 基建材料: 'F_BUILDING', 晶片: 'F_ASC' };
+const CATEGORY_TYPE: Record<string, string> = { elite: 'F_EVOLVE', skill: 'F_SKILL', base: 'F_BUILDING' };
+/** 「加工○○時」的○○ → 配方條件與舊版類別。 */
+function workshopTarget(spec: string): { target?: WorkshopTarget; category: 'elite' | 'skill' | 'base' | 'any' | 'other' } | null {
+  let m: RegExpMatchArray | null;
+  if ((m = spec.match(/^原始心情消耗為(\d+)的(.+)$/u))) { const inner = workshopTarget(m[2]); return inner ? { target: { ...inner.target, mood: Number(m[1]) }, category: 'other' } : null; }
+  if (WORKSHOP_CATEGORY[spec] === 'any') return { category: 'any' };
+  if (WORKSHOP_TYPE[spec]) return { target: { types: [WORKSHOP_TYPE[spec]] }, category: WORKSHOP_CATEGORY[spec] ?? 'other' };
+  if ((m = spec.match(/^(.+?)類材料$/u))) return { target: { includes: m[1] }, category: 'other' };
+  if ((m = spec.match(/^(.+?)材料$/u))) return { target: { equals: m[1] }, category: 'other' };
+  return null;
+}
+export function workshopMatches(target: WorkshopTarget | undefined, formula: { type: string; name: string; mood: number }): boolean {
+  if (!target) return true;
+  return (!target.types || target.types.includes(formula.type)) && (!target.includes || formula.name.includes(target.includes)) && (!target.equals || formula.name === target.equals) && (target.mood === undefined || formula.mood === target.mood);
+}
+const WORKSHOP_CLAUSES: { pattern: RegExp; effect: (m: RegExpMatchArray) => SkillEffect }[] = [
+  { pattern: /^心情消耗為(\d+)(以上)?的配方(?:心情消耗)?全部([+-]\d+)心情消耗$/u, effect: m => ({ kind: 'workshopMood', cost: Number(m[1]), ...(m[2] ? { gte: true } : {}), add: Number(m[3]) }) },
+  { pattern: /^心情消耗為(\d+)(以上)?的配方心情消耗全部([+-]\d+)$/u, effect: m => ({ kind: 'workshopMood', cost: Number(m[1]), ...(m[2] ? { gte: true } : {}), add: Number(m[3]) }) },
+  { pattern: /^心情消耗為(\d+)(以上)?的配方全部除以(\d+)心情消耗$/u, effect: m => ({ kind: 'workshopMood', cost: Number(m[1]), ...(m[2] ? { gte: true } : {}), divide: Number(m[3]) }) },
+  { pattern: /^相應配方的心情消耗恒定為(\d+)$/u, effect: m => ({ kind: 'workshopMood', set: Number(m[1]) }) },
+  { pattern: /^(?:相應配方)?全部([+-]\d+)心情消耗$/u, effect: m => ({ kind: 'workshopMood', add: Number(m[1]) }) },
+  { pattern: /^全部心情消耗([+-]\d+)$/u, effect: m => ({ kind: 'workshopMood', add: Number(m[1]) }) },
+  { pattern: /^累積(\d+)點(.+?)必定產出一次副產品$/u, effect: m => ({ kind: 'karma', per: Number(m[1]), resource: m[2] }) },
+  { pattern: /^每(\d+)次加工沒有產出副產品，則恢復自身一次心情，恢復量為對應配方所需消耗的心情（加工結束後統一結算）$/u, effect: m => ({ kind: 'refundOnMiss', every: Number(m[1]) }) },
+  { pattern: /^(減免龍門幣消耗)$/u, effect: m => ({ kind: 'qualitative', text: `${m[1]}（說明沒有寫減免多少）` }) },
+  { pattern: /^(副產品必定為.+)$/u, effect: m => ({ kind: 'qualitative', text: m[1] }) },
+];
+function parseWorkshop(description: string): ParsedSkill {
+  const head = description.match(/^進駐加工站(?:加工(.+?))?時，(.+)$/u);
+  if (!head) return { supported: false, effects: [] };
+  let spec = head[1] ?? '任意類材料';
+  const t3 = spec.match(/^(.+?)產出T3品質的副產品$/u);
+  if (t3) spec = t3[1];
+  const scope = workshopTarget(spec);
+  if (!scope) return { supported: false, effects: [] };
+  const parts = head[2].split(/[，；]/u).map(item => item.trim()).filter(Boolean);
+  const one = (raw: string): SkillEffect | null => {
+    const text = raw.replace(/^同時/u, '').replace(/額外(?=提升)/u, '');
+    for (const rule of WORKSHOP_CLAUSES) { const m = text.match(rule.pattern); if (m) return rule.effect(m); }
+    return parseClause(text);
+  };
+  let effects: SkillEffect[] = [];
+  const whole = one(head[2]);
+  if (whole) parts.length = 0, effects.push(whole);
+  let failed = false;
+  for (let index = 0; index < parts.length; index++) {
+    const part = parts[index];
+    const low = part.match(/^宿舍內每有(\d+)名心情(\d+)以下的幹員時?$/u);
+    const present = part.match(/^如果(.+?)進駐宿舍$/u);
+    if (low || present) {
+      const next = parts[index + 1]?.replace(/^則/u, '').replace(/^額外提升(\d+)%$/u, '副產品的產出機率提升$1%');
+      const effect = next ? one(next) : null;
+      if (!effect) { failed = true; break; }
+      effects.push(low ? { kind: 'perDormLow', per: Number(low[1]), threshold: Number(low[2]), effect } : { kind: 'ifPresent', name: present![1], where: 'DORMITORY', effect });
+      index++; continue;
+    }
+    const effect = one(part);
+    if (!effect) { failed = true; break; }
+    effects.push(effect);
+  }
+  // 含基建資源的句子交給一般子句解析（例如情報儲備、烏薩斯特飲）。
+  if (failed) { const general = parseClauses(head[2]); if (!general?.length) return { supported: false, effects: [] }; effects = general; }
+  const scoped = (effect: SkillEffect): SkillEffect => {
+    if (effect.kind === 'byproduct') return { ...effect, category: scope.category, ...(scope.target ? { target: scope.target } : {}) };
+    if (effect.kind === 'workshopMood' || effect.kind === 'karma' || effect.kind === 'refundOnMiss') return scope.target ? { ...effect, target: scope.target } : effect;
+    if (effect.kind === 'perDormLow' || effect.kind === 'ifPresent') return { ...effect, effect: scoped(effect.effect) };
+    return effect;
+  };
+  return effects.length ? { supported: true, effects: effects.map(scoped) } : { supported: false, effects: [] };
+}
 const NUM = String.raw`([+-]?\d+(?:\.\d+)?)`;
 const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffect }[] = [
   { pattern: new RegExp(`^生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'productivity', value: Number(m[1]) }) },
@@ -384,7 +507,106 @@ function parseSpecial(text: string): SkillEffect[] | null {
   return null;
 }
 
-export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): ParsedSkill {
+/* ------------------------------------------------------------------ */
+/* 名詞表、跨設施條件、依訂單數與定性效果的技能（整句比對）。            */
+/* ------------------------------------------------------------------ */
+type ExtraRule = { room: string; pattern: RegExp; parse: (m: RegExpMatchArray, skill: Pick<BaseSkill, 'terms'>) => (Omit<ParsedSkill, 'supported'> | SkillEffect[] | null) };
+const G = (group: string) => group.replace(/族$/u, '');
+const EXTRA_RULES: ExtraRule[] = [
+  // 製造站：技能類別、陣營、作業平台、倉庫容量換算生產力
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，(?:當前|目前)製造站內每個(.+?類)技能為自身\+(\d+)(%的生產力|的倉庫上限容量)$/u, parse: m => [{ kind: 'perCategory', category: m[1], effect: m[3] === '%的生產力' ? { kind: 'productivity', value: Number(m[2]) } : { kind: 'capacity', value: Number(m[2]) } }] },
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，當前製造站內所有(.+?類)、(.+?類)技能也全都視作(.+?類)技能$/u, parse: m => [{ kind: 'categoryAlias', from: [m[1], m[2]], to: m[3] }] },
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，當前製造站內每個(.+?)幹員為自身\+(\d+)%的生產力$/u, parse: m => [{ kind: 'perGroup', scope: 'room', group: G(m[1]), per: { kind: 'productivity', value: Number(m[2]) } }] },
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，每有1台(.+?)進駐發電站，貴金屬類配方的生產力\+(\d+)%$/u, parse: m => [{ kind: 'perGroupIn', group: m[1], where: 'POWER', effect: { kind: 'productivity', value: Number(m[2]), product: 'gold' } }] },
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，當前製造站內幹員提升的每格倉庫容量，提供(\d+)%生產力$/u, parse: m => [{ kind: 'perRoomCapacity', tiers: [{ upTo: Infinity, value: Number(m[1]) }], priority: 1 }] },
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，當前製造站內幹員根據自身提升的倉庫容量提供一定的生產力。提升(\d+)格以下的，每格倉庫容量提供(\d+)%生產力；提升大於\d+格的，每格倉庫容量提供(\d+)%生產力（無法與.+?疊加，且優先生效）$/u, parse: m => [{ kind: 'perRoomCapacity', tiers: [{ upTo: Number(m[1]), value: Number(m[2]) }, { upTo: Infinity, value: Number(m[3]) }], priority: 2, perOperator: true }] },
+  // 發電站
+  { room: 'POWER', pattern: /^進駐發電站時，如果其他發電站內沒有進駐(.+?)，則發電站額外\+(\d+)\(僅影響設施數量\)$/u, parse: m => [{ kind: 'powerCount', value: Number(m[2]), unlessGroup: m[1] }] },
+  { room: 'POWER', pattern: /^進駐發電站時，如果其他(.+?)(?:幹員)?進駐在發電站，則無人機充能速度\+(\d+)%$/u, parse: m => [{ kind: 'ifGroupCount', group: m[1], where: 'POWER', min: 1, others: true, effect: { kind: 'drone', value: Number(m[2]) } }] },
+  { room: 'POWER', pattern: /^進駐發電站時，無人機充能速度\+(\d+)%，基建內（不包含副手及活動室使用者）每有1名除自身以外的(.+?)幹員（最多(\d+)名），充能速度額外\+(\d+)%$/u, parse: m => [{ kind: 'drone', value: Number(m[1]) }, { kind: 'perGroup', scope: 'base', group: m[2], max: Number(m[3]), excludeSelf: true, per: { kind: 'drone', value: Number(m[4]) } }] },
+  { room: 'POWER', pattern: /^進駐發電站時，(.+?)所在的製造站生產力\+(\d+)%$/u, parse: m => [{ kind: 'remoteTo', name: m[1], target: 'MANUFACTURE', effect: { kind: 'productivity', value: Number(m[2]) } }] },
+  // 控制中樞
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，如果有(\d+)台以上(.+?)進駐在發電站，則所有製造站生產力\+(\d+)%（同種效果取最高）$/u, parse: m => [{ kind: 'ifGroupCount', group: m[2], where: 'POWER', min: Number(m[1]), effect: { kind: 'global', target: 'MANUFACTURE', value: Number(m[3]), maxOnly: true } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，如果(.+?)進駐在發電站，發電站額外\+(\d+)（僅影響設施數量）$/u, parse: m => [{ kind: 'powerCount', value: Number(m[2]), ifName: m[1] }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，若外勢大於等於實地，所有貿易站訂單效率\+(\d+)%；若實地大於外勢，所有製造站生產力\+(\d+)%（同種效果取最高）$/u, parse: m => [{ kind: 'outerGround', outer: { kind: 'global', target: 'TRADING', value: Number(m[1]), maxOnly: true }, ground: { kind: 'global', target: 'MANUFACTURE', value: Number(m[2]), maxOnly: true } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，每個存在(\d+)名(.+?)幹員的貿易站，訂單獲得效率\+(\d+)%$/u, parse: m => [{ kind: 'remoteGroupMin', target: 'TRADING', group: m[2], min: Number(m[1]), effect: { kind: 'order', value: Number(m[3]) } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，控制中樞內所有幹員的心情每小時恢復\+([\d.]+)；基建內（不包含副手及活動室使用者）深海獵人幹員獲得特殊加成（與部分技能有特殊疊加規則）$/u, parse: (m, skill) => { const tier = skill.terms?.includes('cc.c.abyssal2_2') ? 2 : skill.terms?.includes('cc.c.abyssal2_1') ? 1 : 0; return tier ? [{ kind: 'moodRoom', value: -Number(m[1]) }, { kind: 'abyssalBoost', tier }] : null; } },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，每有1個深海獵人幹員進駐在宿舍以外的設施，則自身心情每小時消耗\+([\d.]+)；反之則自身心情每小時恢復\+([\d.]+)，如果進駐在宿舍內的深海獵人幹員為滿心情，則額外\+([\d.]+)$/u, parse: m => [{ kind: 'abyssalMood', outside: Number(m[1]), inside: Number(m[2]), full: Number(m[3]) }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，控制中樞內每個(.+?)幹員可使該派系幹員額外恢復心情，同時每人可使控制中樞內所有幹員的心情每小時恢復\+([\d.]+)$/u, parse: m => ({ effects: [{ kind: 'perGroup', scope: 'room', group: m[1], per: { kind: 'moodRoom', value: -Number(m[2]) } }], ignoredCondition: '「該派系幹員額外恢復心情」（說明沒有寫數值）' }) },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，部分設施內處於工作狀態的幹員心情每小時恢復\+([\d.]+)；同時控制中樞內部分技能可以為其他設施內處於工作狀態的幹員額外提供心情恢復$/u, parse: m => ({ effects: [{ kind: 'workingMood', value: -Number(m[1]), rooms: ['POWER', 'HIRE', 'MEETING'] }], ignoredCondition: '「部分技能額外提供心情恢復」（說明沒有寫數值）' }) },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，如訓練室有幹員在進行技能專精，則該幹員的專精技能訓練速度\+(\d+)%（同種效果取最高）$/u, parse: m => [{ kind: 'global', target: 'TRAINING', value: Number(m[1]), maxOnly: true }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，人力辦公室聯絡速度小於(\d+)%時（其中包含基礎聯絡速度5%），則聯絡速度額外\+(\d+)%（該加成全局效果唯一，不受其它加成影響）$/u, parse: m => [{ kind: 'contactFloor', below: Number(m[1]), value: Number(m[2]) }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，基建內（不包含副手及活動室使用者）每有1名(.+?)幹員，會客室線索蒐集速度\+(\d+)%（最多\+(\d+)%，同種效果取最高）；當與(.+?)幹員進駐控制中樞一起工作時，自身心情每小時消耗\+([\d.]+)$/u, parse: m => [{ kind: 'perGroup', scope: 'base', group: m[1], max: Math.floor(Number(m[3]) / Number(m[2])), per: { kind: 'global', target: 'MEETING', value: Number(m[2]), maxOnly: true } }, { kind: 'ifGroupInRoom', group: m[4], effect: { kind: 'moodCost', value: Number(m[5]) } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，當(.+?)入駐會客室時，會客室線索蒐集速度\+(\d+)%；當(.+?)入駐貿易站時，\3所在貿易站訂單上限\+(\d+)$/u, parse: m => [{ kind: 'remoteTo', name: m[1], target: 'MEETING', effect: { kind: 'clue', value: Number(m[2]) } }, { kind: 'remoteTo', name: m[3], target: 'TRADING', effect: { kind: 'orderLimit', value: Number(m[4]) } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，自身心情每小時消耗\+([\d.]+)，每個進駐在會客室的(.+?)幹員，線索搜集速度\+(\d+)%$/u, parse: m => [{ kind: 'moodCost', value: Number(m[1]) }, { kind: 'remote', target: 'MEETING', group: m[2], effects: [{ kind: 'clue', value: Number(m[3]) }] }] },
+  { room: 'CONTROL', pattern: /^(?:進駐控制中樞時，)?當與(.+?)一起進駐控制中樞時，\1心情每小時消耗\+([\d.]+)，會客室線索蒐集速度額外提升\+(\d+)%（同種效果取最高）$/u, parse: m => [{ kind: 'ifPresent', name: m[1], where: 'CONTROL', effect: { kind: 'moodFor', name: m[1], value: Number(m[2]) } }, { kind: 'ifPresent', name: m[1], where: 'CONTROL', effect: { kind: 'global', target: 'MEETING', value: Number(m[3]), maxOnly: true } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，所有宿舍內所有幹員的心情每小時恢復\+([\d.]+)（同種效果取最高）；當與(.+?)一起進駐控制中樞時，\2的心情每小時恢復\+([\d.]+)$/u, parse: m => [{ kind: 'globalDorm', value: Number(m[1]) }, { kind: 'ifPresent', name: m[2], where: 'CONTROL', effect: { kind: 'moodFor', name: m[2], value: -Number(m[3]) } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，所有宿舍內(?!所有)(.+?)幹員的心情每小時恢復\+([\d.]+)（同種效果取最高）$/u, parse: m => [{ kind: 'globalDorm', value: Number(m[2]), group: m[1] }] },
+  { room: 'CONTROL', pattern: /^(?:進駐控制中樞時，)?當與(.+?)一起進駐控制中樞時，自身和\1心情每小時恢復\+([\d.]+)$/u, parse: m => [{ kind: 'ifPresent', name: m[1], where: 'CONTROL', effect: { kind: 'moodCost', value: -Number(m[2]) } }, { kind: 'ifPresent', name: m[1], where: 'CONTROL', effect: { kind: 'moodFor', name: m[1], value: -Number(m[2]) } }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，較容易獲得線索板上尚未擁有的線索，但控制中樞內除自身以外的其餘幹員心情每小時消耗\+([\d.]+)$/u, parse: m => [{ kind: 'qualitative', text: '較容易獲得線索板上尚未擁有的線索' }, { kind: 'moodFor', others: true, value: Number(m[1]) }] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，((?:小幅)?提升會客室內幹員所屬派系的線索傾向效果)(?:，但控制中樞內所有幹員的心情每小時消耗\+([\d.]+))?$/u, parse: m => [{ kind: 'qualitative', text: m[1] }, ...(m[2] ? [{ kind: 'moodRoom', value: Number(m[2]) } as SkillEffect] : [])] },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，(會客室更容易獲得.+?線索)（工作時長影響機率）$/u, parse: m => [{ kind: 'qualitative', text: m[1] }] },
+  // 貿易站
+  { room: 'TRADING', pattern: /^進駐貿易站時，當前貿易站內其他幹員提供的每(\d+)%訂單獲取效率使訂單上限-1（訂單最少為1），同時每有1筆訂單就\+(\d+)%訂單獲取效率（與部分技能有特殊疊加規則）$/u, parse: m => ({ effects: [{ kind: 'orderCount', mode: 'perOrder', value: Number(m[2]), limitPer: Number(m[1]) }], estimate: '依當下訂單數變動：班次模擬逐步追蹤訂單數，單點評估以訂單上限的一半估計' }) },
+  { room: 'TRADING', pattern: /^進駐貿易站時，當前訂單數與訂單上限每差1筆訂單，則訂單獲取效率\+(\d+)%$/u, parse: m => ({ effects: [{ kind: 'orderCount', mode: 'perGap', value: Number(m[1]) }], estimate: '依當下訂單數變動：班次模擬逐步追蹤訂單數，單點評估以訂單上限的一半估計' }) },
+  { room: 'TRADING', pattern: /^進駐貿易站時，訂單獲取效率\+(\d+)%；當(.+?)、(.+?)入駐工作場所時（不包含副手），訂單獲取效率分別額外\+(\d+)%$/u, parse: m => [{ kind: 'order', value: Number(m[1]) }, { kind: 'ifPresent', name: m[2], where: 'work', effect: { kind: 'order', value: Number(m[4]) } }, { kind: 'ifPresent', name: m[3], where: 'work', effect: { kind: 'order', value: Number(m[4]) } }] },
+  { room: 'TRADING', pattern: /^進駐貿易站時，(?:訂單獲得效率\+(\d+)%，)?基建內（不包含副手及活動室）每有一間進駐(.+?)幹員的設施，訂單獲得效率(?:額外)?\+(\d+)%（最多(\d+)間）$/u, parse: m => [...(m[1] ? [{ kind: 'order', value: Number(m[1]) } as SkillEffect] : []), { kind: 'perFacilityWith', group: m[2], max: Number(m[4]), effect: { kind: 'order', value: Number(m[3]) } }] },
+  { room: 'HIRE', pattern: /^進駐人力辦公室時，人脈資源的聯絡速度\+(\d+)%，基建內（不包含副手及活動室）每有一間進駐(.+?)幹員的設施，聯絡速度額外\+(\d+)%（最多(\d+)間）$/u, parse: m => [{ kind: 'contact', value: Number(m[1]) }, { kind: 'perFacilityWith', group: m[2], max: Number(m[4]), effect: { kind: 'contact', value: Number(m[3]) } }] },
+  // 宿舍
+  { room: 'DORMITORY', pattern: /^進駐宿舍時，自身心情每小時恢復\+([\d.]+)，同時無法獲得其他來源提供的心情恢復效果$/u, parse: m => ({ effects: [{ kind: 'moodRecoverSelf', value: Number(m[1]) }], ignoredCondition: '「無法獲得其他來源的恢復」只影響自身' }) },
+  { room: 'DORMITORY', pattern: /^進駐宿舍時，使心情未滿的宿舍成員，平均分配到總計每小時心情恢復\+([\d.]+)的加成（該技能對單名幹員和多名幹員生效時，同種效果分別取最高）$/u, parse: m => ({ effects: [{ kind: 'dormSplit', value: Number(m[1]) }], estimate: '假設同宿舍其他成員心情都未滿而平均分配' }) },
+  { room: 'DORMITORY', pattern: /^進駐宿舍時，(?:該宿舍內所有幹員心情每小時恢復\+([\d.]+)，同時)?該宿舍內心情(\d+)以下的幹員恢復效果額外\+([\d.]+)（同種效果取最高）$/u, parse: m => [...(m[1] ? [{ kind: 'moodRecoverAll', value: Number(m[1]) } as SkillEffect] : []), { kind: 'dormBelow', threshold: Number(m[2]), value: Number(m[3]) }] },
+  { room: 'DORMITORY', pattern: /^進駐宿舍時，使該宿舍內心情未滿的某個幹員每小時恢復\+([\d.]+)（同種效果取最高）$/u, parse: m => [{ kind: 'dormSingle', value: Number(m[1]) }] },
+  { room: 'DORMITORY', pattern: /^進駐宿舍時，(.+?)對該宿舍中(.+?)幹員恢復效果額外\+([\d.]+)$/u, parse: m => [{ kind: 'dormGroupBonus', name: m[1], group: m[2], value: Number(m[3]) }] },
+  { room: 'DORMITORY', pattern: /^進駐宿舍時，(如果自身為滿心情，則與當前宿舍前一位進駐的幹員互換心情)$/u, parse: m => [{ kind: 'qualitative', text: m[1] }] },
+  // 訓練室
+  { room: 'TRAINING', pattern: /^進駐訓練室協助位時，每完整協助完成1次專精訓練，累計一定武道。武道達到上限時，下次開始協助(.+?)幹員訓練專精技能至1級將會立即完成，並消耗已有武道$/u, parse: m => ({ effects: [{ kind: 'whenTraining', professions: [m[1]], atMastery: 1, effect: { kind: 'training', value: 33.33 } }], estimate: '連續協助同職業專精 1 級時，每 3 次累滿武道、第 4 次立即完成，約等於訓練速度 +33%' }) },
+  { room: 'TRAINING', pattern: /^進駐訓練室單次協助一名幹員訓練時長達5小時，則該名幹員下次訓練所需時間-50%（任意一方離開訓練室時，效果消失）$/u, parse: () => ({ effects: [{ kind: 'whenTraining', atMastery: 2, effect: { kind: 'training', value: 100 } }, { kind: 'whenTraining', atMastery: 3, effect: { kind: 'training', value: 100 } }], estimate: '假設同一名幹員連續專精（1→2→3 級）、上一階段訓練達 5 小時：專精 2、3 級所需時間減半，約等於訓練速度 +100%' }) },
+  // 會客室
+  { room: 'MEETING', pattern: /^進駐會客室時，每個招募位（不包含初始招募位）提升(\d+)%線索蒐集速度$/u, parse: m => [{ kind: 'scaleBy', by: 'recruitSlots', per: 1, effect: { kind: 'clue', value: Number(m[1]) } }] },
+  { room: 'MEETING', pattern: /^進駐會客室時，處於線索交流時線索蒐集速度提升(\d+)%$/u, parse: m => [{ kind: 'whenExchange', effect: { kind: 'clue', value: Number(m[1]) } }] },
+  { room: 'MEETING', pattern: /^進駐會客室時，線索蒐集速度提升(\d+)%，此後每小時提升(\d+)%，最終達到(\d+)%$/u, parse: m => [{ kind: 'ramp', stat: 'clue', first: Number(m[1]), perHour: Number(m[2]), max: Number(m[3]) }] },
+  { room: 'MEETING', pattern: /^(?:進駐會客室時，)?當與(.+?)一起進駐會客室工作時，線索蒐集速度額外提升(\d+)%$/u, parse: m => [{ kind: 'ifPresent', name: m[1], where: 'MEETING', effect: { kind: 'clue', value: Number(m[2]) } }] },
+  { room: 'MEETING', pattern: /^進駐會客室時，線索蒐集速度提升(\d+)%，(?:當與(.+?)進駐會客室一起工作時|與其他(.+?)幹員進駐會客室一起工作時)，線索蒐集速度額外提升(\d+)%(?:，自身心情每小時消耗\+([\d.]+))?$/u, parse: m => [{ kind: 'clue', value: Number(m[1]) }, m[2] ? { kind: 'ifPresent', name: m[2], where: 'MEETING', effect: { kind: 'clue', value: Number(m[4]) } } : { kind: 'ifGroupInRoom', group: m[3], effect: { kind: 'clue', value: Number(m[4]) } }, ...(m[5] ? [{ kind: 'moodCost', value: Number(m[5]) } as SkillEffect] : [])] },
+  { room: 'MEETING', pattern: /^進駐會客室時，如果(.+?)進駐在宿舍，則線索蒐集速度額外提升(\d+)%$/u, parse: m => [{ kind: 'ifPresent', name: m[1], where: 'DORMITORY', effect: { kind: 'clue', value: Number(m[2]) } }] },
+  { room: 'MEETING', pattern: /^進駐會客室(?:時|後)，((?:處於線索交流時)?(?:更|較)容易獲得線索板上(?:尚未|已經)擁有的線索|更容易獲得.+?線索（工作時長影響機率）|每當新蒐集到的線索不是.+?時，則額外增加.+?線索的出現機率（工作時長影響機率）|提升會客室內另一幹員所屬派系的線索傾向效果（如會客室沒有另一幹員則不提升）|如果會客室內只有自身處於工作狀態時，連續消耗超過\d+點心情下一次必定獲得.+?的線索)$/u, parse: m => [{ kind: 'qualitative', text: m[1].replace(/（工作時長影響機率）$/u, '') }] },
+];
+
+function parseExtra(skill: Pick<BaseSkill, 'roomType' | 'description' | 'terms'>): ParsedSkill | null {
+  for (const rule of EXTRA_RULES) {
+    if (rule.room !== skill.roomType) continue;
+    const m = skill.description.match(rule.pattern);
+    if (!m) continue;
+    const result = rule.parse(m, skill);
+    if (!result) return { supported: false, effects: [] };
+    return Array.isArray(result) ? { supported: true, effects: result } : { supported: true, ...result };
+  }
+  return null;
+}
+
+/** 沒有公開數值的尾句（線索傾向、聯絡時的線索機率）：辨識為定性效果，不影響數字。 */
+const QUALITATIVE_TAILS: RegExp[] = [/[，；]且?(?:更|較)容易獲得(.+?線索)(?:（工作時長影響機率）)?$/u, /[，；]每產生\d+次聯絡次數，(增加.+?線索的機率)(?:（工作時長和招募位影響機率）)?$/u];
+
+const parseCache = new Map<string, ParsedSkill>();
+/** 解析結果只取決於設施種類、說明文字與名詞代碼，可安全快取（回傳值視為唯讀）。 */
+export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'> & { terms?: string[] }): ParsedSkill {
+  const key = `${skill.roomType}\u0000${skill.description}\u0000${skill.terms?.join(',') ?? ''}`;
+  const cached = parseCache.get(key);
+  if (cached) return cached;
+  const parsed = parseSkillUncached(skill);
+  if (parseCache.size > 5000) parseCache.clear();
+  parseCache.set(key, parsed);
+  return parsed;
+}
+function parseSkillUncached(skill: Pick<BaseSkill, 'roomType' | 'description'> & { terms?: string[] }): ParsedSkill {
+  for (const tail of QUALITATIVE_TAILS) {
+    const match = skill.description.match(tail);
+    if (!match || /^進駐[^，]+?(?:時|後)$/u.test(skill.description.slice(0, match.index))) continue;
+    const parsed = parseSkill({ ...skill, description: skill.description.slice(0, match.index) });
+    return parsed.supported ? { ...parsed, effects: [...parsed.effects, { kind: 'qualitative', text: match[0].replace(/^[，；]且?/u, '').replace(/（[^）]*影響機率）$/u, '').replace(/^較/u, '更') }] } : parsed;
+  }
+  const extra = parseExtra(skill);
+  if (extra) return extra;
   for (const [pattern, keep] of STRIPPED_CONDITIONS) {
     const match = skill.description.match(pattern);
     if (match) { const parsed = parseSkill({ ...skill, description: skill.description.replace(pattern, keep) }); return parsed.supported ? { ...parsed, ignoredCondition: match[0].replace(/^[，；]/u, '').replace(/（同種效果[^）]*）$/u, '') } : parsed; }
@@ -395,11 +617,7 @@ export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): 
     const match = skill.description.match(tail);
     if (match) { const parsed = parseSkill({ ...skill, description: skill.description.slice(0, match.index) }); return parsed.supported ? { ...parsed, ignoredCondition: match[0].replace(/^[，；]/u, '') } : parsed; }
   }
-  if (skill.roomType === 'WORKSHOP') {
-    const match = skill.description.match(/^進駐加工站加工(精英材料|技巧概要|基建材料|任意類材料)時，(.+)$/u);
-    const effects = match ? parseClauses(match[2]) : null;
-    return effects?.length ? { supported: true, effects: effects.map(effect => effect.kind === 'byproduct' ? { ...effect, category: WORKSHOP_CATEGORY[match![1]] } : effect) } : { supported: false, effects: [] };
-  }
+  if (skill.roomType === 'WORKSHOP') return parseWorkshop(skill.description);
   if (skill.roomType === 'MEETING') {
     const match = skill.description.match(/^進駐會客室時，如果會客室內只有自身處於工作狀態時，(.+)$/u);
     if (match) { const effects = parseClauses(match[1]); return effects?.length ? { supported: true, effects: effects.map(effect => effect.kind === 'clue' ? { ...effect, alone: true } : effect) } : { supported: false, effects: [] }; }
@@ -511,6 +729,12 @@ export interface FacilityResult {
   issues: string[];
   /** 說明性的計算註記（例如加成歸零、心情消耗被消除），不是配置問題。 */
   notes: string[];
+  /** 其他技能對個別幹員的心情消耗調整（例如中樞「其餘幹員 +0.25」、指定某人恢復）。 */
+  moodAdjust: Record<string, number>;
+  /** 加工站：選定配方後的每次加工心情、副產品機率與「每點心情產出」相對無技能的提升（%）。 */
+  workshop?: { formulaId: string; name: string; baseMood: number; mood: number; baseRate: number; rate: number; gold: number; efficiency: number; notes: string[] };
+  /** 此設施有「其他幹員加成歸零」技能（深海獵人特殊加成不生效）。 */
+  zeroed?: boolean;
 }
 export interface BaseEvaluation { facilities: FacilityResult[]; electricity: { produced: number; consumed: number }; issues: string[]; resources: { name: string; high: number; low: number; used: number; sources: string[] }[] }
 
@@ -521,7 +745,7 @@ export function productMatches(effect: SkillEffect, facility: Pick<Facility, 'pr
 
 /** moods：各幹員目前心情（模擬用）。省略時視為班次開始、心情全滿；心情 0 者視為停工。 */
 /** elapsed：班次已經過的小時數（模擬用，影響隨時間爬升的技能）；省略時以 12 小時班的平均值計。 */
-export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, moods?: Readonly<Record<string, number>>, elapsed?: number): BaseEvaluation {
+export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, moods?: Readonly<Record<string, number>>, elapsed?: number, orderCounts?: Readonly<Record<string, number>>): BaseEvaluation {
   const rampValue = (effect: Extract<SkillEffect, { kind: 'ramp' }>, hours: number) => Math.min(effect.max, effect.first + effect.perHour * Math.max(0, Math.floor(hours)));
   const rampAverage = (effect: Extract<SkillEffect, { kind: 'ramp' }>) => { let sum = 0; for (let h = 0; h < 12; h++) sum += rampValue(effect, h); return round(sum / 12); };
   const nameOf = (id: string) => definitions.get(id)?.displayName ?? id;
@@ -542,11 +766,32 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
   const dormLevels = base.facilities.filter(facility => facility.type === 'dormitory').reduce((sum, facility) => sum + facility.level, 0);
   const baseMembers = (group: string) => new Set(allAssigned.filter(id => groupsOf(id).includes(group)).map(characterOf)).size;
   const counts = new Map<BaseRoomType, number>();
+  const working = (facility: Facility) => (base.assignments?.[facility.id] ?? []).filter(id => facility.type === 'dormitory' || moodOf(id) > 0);
+  const inRoom = (roomType: BaseRoomType) => base.facilities.filter(facility => ROOM_OF[facility.type] === roomType);
+  /** 某設施種類內的某陣營幹員人數（同一角色只算一次）；exclude 為不計入的幹員。 */
+  const membersIn = (group: string, roomType: BaseRoomType, exclude?: string) => new Set(inRoom(roomType).flatMap(working).filter(id => id !== exclude && groupsOf(id).includes(group)).map(characterOf)).size;
+  const tradingParams = catalog.trading ?? DEFAULT_TRADING;
+  // 預先處理「發電站數量」加成（晨曦、我尋思能行）：只影響依發電站數計算的技能。
+  const activeEffects = (operatorId: string, roomType: BaseRoomType) => {
+    const row = rows.get(operatorId);
+    if (!row) return [];
+    return (catalog.operators[operatorId] ?? []).flatMap(slot => { const active = slotResult(slot, row, catalog).active; return active && roomSkillApplies(active, roomType) ? parseSkill(active).effects : []; });
+  };
+  let extraPower = 0;
+  for (const facility of base.facilities.filter(item => item.type === 'power' || item.type === 'control')) for (const operatorId of working(facility)) for (const effect of activeEffects(operatorId, ROOM_OF[facility.type])) {
+    if (effect.kind !== 'powerCount') continue;
+    if (effect.ifName && !inRoom('POWER').some(item => working(item).some(id => nameOf(id) === effect.ifName))) continue;
+    if (effect.unlessGroup && inRoom('POWER').some(item => item.id !== facility.id && working(item).some(id => groupsOf(id).includes(effect.unlessGroup!)))) continue;
+    extraPower += effect.value;
+  }
+  const outer = inRoom('TRADING').length + inRoom('POWER').length, ground = inRoom('MANUFACTURE').length;
+  const formula = base.workshopFormula ? catalog.workshop?.find(item => item.id === base.workshopFormula) : undefined;
+  const dormIds = base.facilities.filter(item => item.type === 'dormitory').flatMap(item => base.assignments?.[item.id] ?? []);
   const facilities = base.facilities.map((facility, index): FacilityResult => {
     const roomType = ROOM_OF[facility.type], room = rooms.get(roomType);
     const label = `${FACILITY_LABEL[facility.type]} ${base.facilities.slice(0, index + 1).filter(item => item.type === facility.type).length}`;
     counts.set(roomType, (counts.get(roomType) ?? 0) + 1);
-    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [], clue: 0, contact: 0, training: 0, byproduct: 0, dormSingle: 0, orderLimit: 0 }, allByOp: {}, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], remote: [], issues: [], notes: [] };
+    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [], clue: 0, contact: 0, training: 0, byproduct: 0, dormSingle: 0, orderLimit: 0 }, allByOp: {}, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], remote: [], issues: [], notes: [], moodAdjust: {} };
     if (!room) { result.issues.push('資料包沒有此設施的資料。'); return result; }
     const phase = room.phases[facility.level - 1];
     if (!phase) { result.issues.push(`等級超過資料上限（最高 ${room.phases.length} 級）。`); }
@@ -563,6 +808,10 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     const deferred: { operatorId: string; effect: Extract<SkillEffect, { kind: 'perOrderLimit' | 'perGoldLines' }> }[] = [];
     const stacked: { operatorId: string; effect: Extract<SkillEffect, { kind: 'perRoomStat' }> }[] = [];
     let raisedLimit = 0, extraLines = 0;
+    const later: { operatorId: string; effect: Extract<SkillEffect, { kind: 'perCategory' | 'perRoomCapacity' | 'orderCount' }> }[] = [];
+    const aliases: Extract<SkillEffect, { kind: 'categoryAlias' }>[] = [];
+    const capByOp = new Map<string, number>();
+    const noStack = new Set<object>();
     if (result.capacity && assigned.length > result.capacity) result.issues.push(`進駐 ${assigned.length} 人，超過此等級上限 ${result.capacity} 人。`);
     for (const operatorId of assigned) {
       const row = rows.get(operatorId), definition = definitions.get(operatorId);
@@ -588,7 +837,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
         const comboActive = !!partner && partner !== name && roomNames.has(partner);
         if (partner) skill.combo = { partner, active: comboActive };
         const candidates = [...skill.parsed.effects, ...(comboActive ? skill.parsed.conditional!.effects : [])];
-        if (candidates.some(effect => (effect.kind === 'perGroup' || effect.kind === 'remote' || effect.kind === 'ifGroupInRoom' || (effect.kind === 'moodNeutral' && !!effect.group)) && !knownGroups.has(effect.group!))) { result.unsupported.push({ operatorId, skill: skill.active }); skill.applied = []; continue; }
+        if (candidates.some(effect => effectGroups(effect).some(group => !knownGroups.has(group)))) { result.unsupported.push({ operatorId, skill: skill.active }); skill.applied = []; continue; }
         // 陣營倍增換算成目前配置下的實際數值。
         skill.applied = candidates.map(effect => {
           // 心情條件：依目前心情決定是否生效或倍數。
@@ -596,7 +845,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           if (effect.kind === 'perMoodDrop') { const count = Math.floor((maxMood(operatorId) - moodOf(operatorId)) / effect.per); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
           if (effect.kind === 'scaleBy') {
             const levelOf = (type: FacilityType) => Math.max(0, ...base.facilities.filter(item => item.type === type).map(item => item.level));
-            const source = { recruitSlots: base.recruitSlots ?? 0, powerPlants: base.facilities.filter(item => item.type === 'power').length, roomLevel: facility.level, dormLevels, tradingPosts: base.facilities.filter(item => item.type === 'trading').length, meetingLevel: levelOf('meeting'), trainingLevel: levelOf('training'), roomOccupants: assigned.length, productTypes: new Set(base.facilities.filter(item => item.type === 'manufacturing' && item.product && (base.assignments?.[item.id]?.length ?? 0) > 0).map(item => item.product)).size }[effect.by];
+            const source = { recruitSlots: base.recruitSlots ?? 0, powerPlants: base.facilities.filter(item => item.type === 'power').length + extraPower, roomLevel: facility.level, dormLevels, tradingPosts: base.facilities.filter(item => item.type === 'trading').length, meetingLevel: levelOf('meeting'), trainingLevel: levelOf('training'), roomOccupants: assigned.length, productTypes: new Set(base.facilities.filter(item => item.type === 'manufacturing' && item.product && (base.assignments?.[item.id]?.length ?? 0) > 0).map(item => item.product)).size }[effect.by];
             const count = Math.floor(source / effect.per);
             if (!count || !('value' in effect.effect)) return null;
             const scaled = { ...effect.effect, value: round(Math.min(effect.max ?? Infinity, effect.effect.value * count)) } as SkillEffect;
@@ -605,6 +854,26 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
             return scaled;
           }
           if (effect.kind === 'whenProduct') return facility.product === effect.product ? effect.effect : null;
+          if (effect.kind === 'perGroupIn') { const count = Math.min(effect.max ?? Infinity, membersIn(effect.group, effect.where, effect.others ? operatorId : undefined)); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
+          if (effect.kind === 'ifGroupCount') return membersIn(effect.group, effect.where, effect.others ? operatorId : undefined) >= effect.min ? effect.effect : null;
+          if (effect.kind === 'outerGround') return outer >= ground ? effect.outer : effect.ground;
+          if (effect.kind === 'perFacilityWith') { const count = Math.min(effect.max, base.facilities.filter(item => working(item).some(id => groupsOf(id).includes(effect.group))).length); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
+          if (effect.kind === 'dormSplit') return { kind: 'dormSingle', value: round(effect.value / Math.max(1, assigned.length - 1)) };
+          if (effect.kind === 'whenExchange') return base.clueExchange ? effect.effect : null;
+          if (effect.kind === 'perDormLow') {
+            // 宿舍成員心情只有模擬時才知道；單點評估視為 0 名（保守）。
+            const count = moods ? Math.floor(dormIds.filter(id => moods[id] !== undefined && moods[id] <= effect.threshold).length / effect.per) : 0;
+            if (!count) return null;
+            const inner = effect.effect;
+            return inner.kind === 'workshopMood' ? { ...inner, add: (inner.add ?? 0) * count } : 'value' in inner ? { ...inner, value: round(inner.value * count) } as SkillEffect : null;
+          }
+          if (effect.kind === 'abyssalMood') {
+            const others = allAssigned.filter(id => id !== operatorId && groupsOf(id).includes('深海獵人'));
+            const dormIds = new Set(base.facilities.filter(item => item.type === 'dormitory').flatMap(item => base.assignments?.[item.id] ?? []));
+            const outside = others.filter(id => !dormIds.has(id)).length, inside = others.filter(id => dormIds.has(id));
+            const full = moods ? inside.filter(id => moodOf(id) >= maxMood(id)).length : 0;
+            return { kind: 'moodCost', value: round(outside * effect.outside - inside.length * effect.inside - full * effect.full) };
+          }
           if (effect.kind === 'whenTraining') return (!effect.professions || (!!base.training?.profession && effect.professions.includes(base.training.profession))) && (!effect.atMastery || base.training?.mastery === effect.atMastery) ? effect.effect : null;
           if (effect.kind === 'ifPresent') {
             const pool = effect.where === 'base' ? assignedIn(() => true) : effect.where === 'work' ? assignedIn(item => item.type !== 'dormitory') : assignedIn(item => ROOM_OF[item.type] === effect.where);
@@ -616,7 +885,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           return effect;
         }).filter((effect): effect is SkillEffect => !!effect).map(effect => {
           if (effect.kind !== 'perGroup' || !('value' in effect.per)) return effect;
-          const count = effect.scope === 'room' ? assigned.filter(id => groupsOf(id).includes(effect.group)).length : Math.min(effect.max ?? Infinity, baseMembers(effect.group));
+          const count = effect.scope === 'room' ? assigned.filter(id => groupsOf(id).includes(effect.group)).length : Math.min(effect.max ?? Infinity, baseMembers(effect.group) - (effect.excludeSelf && groupsOf(operatorId).includes(effect.group) ? 1 : 0));
           return { ...effect.per, value: round(effect.per.value * count) } as SkillEffect;
         }).filter(effect => effect.kind !== 'perGroup' && productMatches(effect, facility));
         let applied = false;
@@ -630,6 +899,10 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           else if (effect.kind === 'goldLine') extraLines += effect.value;
           else if (effect.kind === 'perOrderLimit' || effect.kind === 'perGoldLines') deferred.push({ operatorId, effect });
           else if (effect.kind === 'perRoomStat') stacked.push({ operatorId, effect });
+          else if (effect.kind === 'perCategory' || effect.kind === 'perRoomCapacity' || effect.kind === 'orderCount') later.push({ operatorId, effect });
+          else if (effect.kind === 'categoryAlias') aliases.push(effect);
+          else if (effect.kind === 'moodFor') { for (const id of effect.others ? assigned.filter(item => item !== operatorId) : assigned.filter(item => nameOf(item) === effect.name)) result.moodAdjust[id] = round((result.moodAdjust[id] ?? 0) + effect.value); }
+          else if (effect.kind === 'capacity') capByOp.set(operatorId, (capByOp.get(operatorId) ?? 0) + effect.value);
           else if (effect.kind === 'drone') result.totals.drone += effect.value;
           else if (effect.kind === 'moodRecoverAll') { result.allByOp[operatorId] = round((result.allByOp[operatorId] ?? 0) + effect.value); result.totals.moodRecoverAll = Math.max(result.totals.moodRecoverAll, result.allByOp[operatorId]); }
           else if (effect.kind === 'dormSingle') result.totals.dormSingle = Math.max(result.totals.dormSingle, effect.value);
@@ -637,7 +910,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           else if (effect.kind === 'clue') { if (!effect.alone || assigned.length === 1) result.totals.clue += effect.value; }
           else if (effect.kind === 'contact') result.totals.contact += effect.perDormLevel ? effect.value * dormLevels : effect.value;
           else if (effect.kind === 'training') { if ((!effect.professions || (!!base.training?.profession && effect.professions.includes(base.training.profession))) && (!effect.atMastery || base.training?.mastery === effect.atMastery)) result.totals.training += effect.value; }
-          else if (effect.kind === 'byproduct') { if (effect.category === 'any' || effect.category === base.workshop) result.totals.byproduct += effect.value; }
+          else if (effect.kind === 'byproduct') { if (formula ? (effect.target ? workshopMatches(effect.target, formula) : effect.category === 'any' || CATEGORY_TYPE[effect.category] === formula.type) : (effect.category === 'any' || effect.category === base.workshop)) result.totals.byproduct += effect.value; }
         }
         if (!applied && !(partner && !comboActive)) result.notApplicable.push({ operatorId, skill: skill.active });
         if (partner && !comboActive) result.comboMissing.push({ operatorId, skill: skill.active, partner });
@@ -660,19 +933,89 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
       if (effect.kind === 'perOrderLimit') addOrder(operatorId, round(Math.min(effect.max ?? Infinity, Math.floor(raisedLimit / effect.per) * effect.value)));
     }
     if (deferred.some(item => item.effect.kind === 'perGoldLines')) result.notes.push(`赤金生產線 ${goldLines + bonusLines} 條（生產赤金的製造站 ${goldLines - extraLines} 座${extraLines + bonusLines ? `＋技能提供 ${extraLines + bonusLines} 條` : ''}；估計）。`);
+    // 技能類別（標準化類等）：數同站生效中的該類技能；意識相容讓其他類別也算作標準化類。
+    const categoryCount = (category: string) => {
+      const names = new Set([category, ...aliases.filter(alias => alias.to === category).flatMap(alias => alias.from)].flatMap(name => catalog.skillCategories?.[name] ?? []));
+      return result.operators.reduce((sum, op) => sum + op.skills.filter(skill => skill.applies && skill.active && names.has(skill.active.name)).length, 0);
+    };
+    for (const { operatorId, effect } of later) {
+      if (effect.kind !== 'perCategory' || !('value' in effect.effect)) continue;
+      const count = categoryCount(effect.category);
+      if (!count) continue;
+      const value = round(effect.effect.value * count);
+      if (effect.effect.kind === 'productivity') { result.totals.productivity += value; contributions.push({ operatorId, stat: 'productivity', value, countBased: false }); }
+      else if (effect.effect.kind === 'capacity') capByOp.set(operatorId, (capByOp.get(operatorId) ?? 0) + value);
+    }
+    // 倉庫容量換算生產力（大就是好優先，不與回收利用疊加）。
+    const capacityRules = later.filter(item => item.effect.kind === 'perRoomCapacity') as { operatorId: string; effect: Extract<SkillEffect, { kind: 'perRoomCapacity' }> }[];
+    const capacityRule = capacityRules.sort((a, b) => b.effect.priority - a.effect.priority)[0];
+    if (capacityRule) {
+      const perTier = (raised: number) => { const tier = capacityRule.effect.tiers.find(item => raised <= item.upTo) ?? capacityRule.effect.tiers.at(-1)!; return raised * tier.value; };
+      const raisedList = [...capByOp.values()].filter(value => value > 0);
+      const value = round(capacityRule.effect.perOperator ? raisedList.reduce((sum, raised) => sum + perTier(raised), 0) : perTier(raisedList.reduce((sum, raised) => sum + raised, 0)));
+      if (value) { result.totals.productivity += value; contributions.push({ operatorId: capacityRule.operatorId, stat: 'productivity', value, countBased: false }); }
+    }
+    // 依訂單數變動（市井之道、攤販經濟）：模擬時用追蹤到的訂單數，單點評估以上限的一半估計。
+    for (const { operatorId, effect } of later) {
+      if (effect.kind !== 'orderCount') continue;
+      let limit = (tradingParams.limits[facility.level - 1] ?? tradingParams.limits.at(-1) ?? 0) + result.totals.orderLimit;
+      if (effect.limitPer) {
+        const others = contributions.filter(item => item.stat === 'order' && item.operatorId !== operatorId).reduce((sum, item) => sum + item.value, 0);
+        const drop = Math.min(Math.max(0, limit - 1), Math.floor(Math.max(0, others) / effect.limitPer));
+        limit -= drop; result.totals.orderLimit -= drop;
+      }
+      limit = Math.max(1, limit);
+      const orders = Math.min(limit, orderCounts?.[facility.id] ?? Math.floor(limit / 2));
+      const value = round(effect.value * (effect.mode === 'perOrder' ? orders : limit - orders));
+      result.totals.order += value;
+      const entry = { operatorId, stat: 'order' as const, value, countBased: false };
+      contributions.push(entry); noStack.add(entry);
+      result.notes.push(`${nameOf(operatorId)}：訂單 ${orders}／${limit} 筆時 +${value}%${orderCounts ? '' : '（以上限一半估計）'}。`);
+    }
     // 「每 N% 額外提供 M%」：以其他技能提供的加成計算（配合意識不含依設施數量的加成），彼此不疊算。
     const before = [...contributions];
     for (const { operatorId, effect } of stacked) {
-      const pool = before.filter(item => item.stat === effect.stat && (!effect.others || (item.operatorId !== operatorId && !item.countBased))).reduce((sum, item) => sum + item.value, 0);
+      const pool = before.filter(item => !noStack.has(item) && item.stat === effect.stat && (!effect.others || (item.operatorId !== operatorId && !item.countBased))).reduce((sum, item) => sum + item.value, 0);
       const value = round(Math.min(effect.max, Math.floor(Math.max(0, pool) / effect.per) * effect.value));
       if (effect.stat === 'order') result.totals.order += value; else result.totals.productivity += value;
       contributions.push({ operatorId, stat: effect.stat, value, countBased: false });
     }
     // 其他幹員加成歸零：只保留歸零技能持有者本人的加成與依設施數量的加成（每名進駐幹員的基礎 1% 不受影響）。
+    if (zeroers.length) result.zeroed = true;
     for (const zero of zeroers) {
       const kept = contributions.filter(item => item.stat === zero.stat && (item.operatorId === zero.operatorId || item.countBased)).reduce((sum, item) => sum + item.value, 0);
       if (zero.stat === 'productivity') result.totals.productivity = kept; else result.totals.order = kept;
       result.notes.push(`${definitions.get(zero.operatorId)?.displayName ?? zero.operatorId}使同站其他幹員的${zero.stat === 'productivity' ? '生產力' : '訂單效率'}加成歸零。`);
+    }
+    // 加工站：依選定配方計算每次加工的心情與副產品機率。
+    if (facility.type === 'workshop' && formula && result.operators.length) {
+      const effects = result.operators.flatMap(op => op.skills.flatMap(skill => skill.applied ?? []));
+      const notes: string[] = [];
+      let mood = formula.mood, set: number | undefined;
+      for (const effect of effects) {
+        if (effect.kind !== 'workshopMood' || !workshopMatches(effect.target, formula)) continue;
+        if (effect.cost !== undefined && !(effect.gte ? formula.mood >= effect.cost : formula.mood === effect.cost)) continue;
+        if (effect.set !== undefined) set = effect.set;
+        if (effect.add) mood += effect.add;
+        if (effect.divide) mood /= effect.divide;
+      }
+      if (set !== undefined) mood = set;
+      mood = Math.max(0, mood);
+      const baseRate = formula.byproductRate;
+      let rate = Math.min(1, baseRate * (1 + result.totals.byproduct / 100));
+      for (const effect of effects) {
+        if (effect.kind === 'karma' && workshopMatches(effect.target, formula)) {
+          const rule = Object.values(catalog.terms ?? {}).find(term => term.name === effect.resource)?.description.match(/加工心情消耗(\d+)(以下)?的配方未產出副產品時，所消耗的每1點心情轉化為1點/u);
+          if (!rule || !(rule[2] ? formula.mood <= Number(rule[1]) : formula.mood === Number(rule[1]))) continue;
+          const extra = (1 - rate) * mood / effect.per;
+          rate = Math.min(1, rate + extra); notes.push(`${effect.resource}：未出副產品時累積，平均每次加工多 ${round(extra * 100)}% 副產品`);
+        }
+      }
+      for (const effect of effects) {
+        if (effect.kind === 'refundOnMiss' && workshopMatches(effect.target, formula)) { const before = mood; mood = mood * (1 - (1 - rate) / effect.every); notes.push(`未出副產品的退回心情：平均每次 ${round(before)} → ${round(mood)}`); }
+      }
+      const efficiency = mood > 0 ? round((((1 + rate) / mood) / ((1 + baseRate) / formula.mood) - 1) * 100) : 999;
+      result.workshop = { formulaId: formula.id, name: formula.name, baseMood: formula.mood, mood: round(mood), baseRate, rate: round(rate), gold: formula.gold, efficiency, notes };
     }
     const basic = roomType === 'MANUFACTURE' ? catalog.basicSpeedPercent.MANUFACTURE : roomType === 'TRADING' ? catalog.basicSpeedPercent.TRADING : 0;
     result.totals.basic = round(basic * result.operators.length);
@@ -756,10 +1099,39 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           const value = round(each.value * members);
           if (each.kind === 'productivity') target.totals.productivity = round(target.totals.productivity + value);
           else if (each.kind === 'order') target.totals.order = round(target.totals.order + value);
+          else if (each.kind === 'clue') target.totals.clue = round(target.totals.clue + value);
           else continue;
-          target.remote.push({ from: op.name, skill: skill.active!.name, text: `${effect.group} ${members} 名`, value, kind: each.kind });
+          target.remote.push({ from: op.name, skill: skill.active!.name, text: `${effect.group} ${members} 名`, value, kind: each.kind === 'order' ? 'order' : 'productivity' });
         }
       }
+    }
+  }
+  // 指定幹員所在設施（野鬃所在製造站、赫德雷所在貿易站、伊內絲所在會客室）與「存在 N 名某陣營」的設施。
+  const applyTo = (target: FacilityResult, effect: SkillEffect, from: string, skill: string, text: string) => {
+    if (!('value' in effect) || !productMatches(effect, target.facility)) return;
+    if (effect.kind === 'productivity') target.totals.productivity = round(target.totals.productivity + effect.value);
+    else if (effect.kind === 'order') target.totals.order = round(target.totals.order + effect.value);
+    else if (effect.kind === 'clue') target.totals.clue = round(target.totals.clue + effect.value);
+    else if (effect.kind === 'orderLimit') target.totals.orderLimit += effect.value;
+    else return;
+    target.remote.push({ from, skill, text, value: effect.value, kind: effect.kind === 'order' || effect.kind === 'orderLimit' ? 'order' : 'productivity' });
+  };
+  let abyssal = { per: 0, max: 0, from: '', skill: '' };
+  for (const source of facilities) for (const op of source.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
+    if (effect.kind === 'remoteTo') { for (const target of facilities.filter(item => ROOM_OF[item.facility.type] === effect.target && item.operators.some(member => member.name === effect.name))) applyTo(target, effect.effect, op.name, skill.active!.name, `${effect.name}在此`); }
+    else if (effect.kind === 'remoteGroupMin') { for (const target of facilities.filter(item => ROOM_OF[item.facility.type] === effect.target && new Set(item.operators.filter(member => groupsOf(member.operatorId).includes(effect.group)).map(member => characterOf(member.operatorId))).size >= effect.min)) applyTo(target, effect.effect, op.name, skill.active!.name, `${effect.group} ${effect.min} 名以上`); }
+    else if (effect.kind === 'abyssalBoost') {
+      const term = catalog.terms?.[`cc.c.abyssal2_${effect.tier}`]?.description.match(/提供(\d+)%生產力，最多給單個製造站提供(\d+)%/u);
+      if (term && Number(term[1]) > abyssal.per) abyssal = { per: Number(term[1]), max: Number(term[2]), from: op.name, skill: skill.active!.name };
+    }
+  }
+  // 深海獵人特殊加成（名詞表數值）：每名進駐製造站的深海獵人，給每座有深海獵人的製造站 +per%（單站上限 max）；有清零技能的製造站不生效。
+  if (abyssal.per) {
+    const manufacture = facilities.filter(result => result.facility.type === 'manufacturing');
+    const total = manufacture.reduce((sum, result) => sum + result.operators.filter(member => groupsOf(member.operatorId).includes('深海獵人')).length, 0);
+    for (const target of manufacture.filter(result => result.operators.some(member => groupsOf(member.operatorId).includes('深海獵人')))) {
+      if (target.zeroed) { target.notes.push('深海獵人特殊加成被本站的清零技能取代。'); continue; }
+      applyTo(target, { kind: 'productivity', value: Math.min(abyssal.max, abyssal.per * total) }, abyssal.from, abyssal.skill, `深海獵人 ${total} 名進駐製造站`);
     }
   }
   // 控制中樞的全域加成：同種效果取最高者只取最大值，其餘相加。
@@ -779,10 +1151,14 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
       if (target === 'MANUFACTURE') result.totals.productivity = round(result.totals.productivity + value);
       else if (target === 'TRADING') result.totals.order = round(result.totals.order + value);
       else if (target === 'MEETING') result.totals.clue = round(result.totals.clue + value);
+      else if (target === 'TRAINING') result.totals.training = round(result.totals.training + value);
       else result.totals.contact = round(result.totals.contact + value);
       result.remote.push({ from: '控制中樞', skill: entry.sources.join('、'), text: '全域加成', value, kind: target === 'MANUFACTURE' ? 'productivity' : 'order' });
     }
   }
+  // 感染力：辦公室聯絡速度（含基礎 5%）低於門檻時額外加成，全域唯一。
+  const floor = facilities.filter(result => result.facility.type === 'control').flatMap(result => result.operators.flatMap(op => op.skills.flatMap(skill => (skill.applied ?? []).filter(effect => effect.kind === 'contactFloor').map(effect => ({ effect: effect as Extract<SkillEffect, { kind: 'contactFloor' }>, from: op.name, skill: skill.active!.name })))))[0];
+  if (floor) for (const result of facilities.filter(item => item.facility.type === 'office' && item.operators.length)) if (5 + result.totals.contact < floor.effect.below) { result.totals.contact = round(result.totals.contact + floor.effect.value); result.remote.push({ from: floor.from, skill: floor.skill, text: `聯絡速度低於 ${floor.effect.below}%`, value: floor.effect.value, kind: 'productivity' }); }
   for (const [roomType, count] of counts) {
     const room = rooms.get(roomType);
     if (room && room.maxCount && count > room.maxCount) issues.push(`${room.name}最多 ${room.maxCount} 座，目前設定 ${count} 座。`);
@@ -791,6 +1167,12 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
   return { facilities, electricity: { produced, consumed }, issues, resources: resourceList };
 }
 const round = (value: number) => Math.round(value * 100) / 100;
+/** 效果（含巢狀條件）引用的陣營名稱；任一陣營沒有成員資料時整個技能不計入。 */
+function effectGroups(effect: SkillEffect): string[] {
+  const own = 'group' in effect && typeof effect.group === 'string' && effect.kind !== 'resource' ? [effect.group] : [];
+  const nested = 'effect' in effect ? effectGroups(effect.effect) : effect.kind === 'perGroup' ? effectGroups(effect.per) : effect.kind === 'remote' ? effect.effects.flatMap(effectGroups) : effect.kind === 'outerGround' ? [...effectGroups(effect.outer), ...effectGroups(effect.ground)] : [];
+  return [...own, ...nested].filter(group => group !== '深海獵人' || true);
+}
 
 /* ------------------------------------------------------------------ */
 /* 候選名單：只依已生效且可解析的技能排序，未知解鎖排在已確認之後。         */
@@ -1022,6 +1404,25 @@ export interface BaseStatistics {
   storageWarnings: string[];
 }
 
+/** 名詞表「其他設施」：中樞對工作中幹員的心情恢復預設作用的設施。 */
+const OTHER_ROOMS: BaseRoomType[] = ['POWER', 'MANUFACTURE', 'TRADING', 'HIRE', 'MEETING'];
+/** 每名工作中幹員的每小時心情消耗：設施基礎＋自身技能＋同站全體＋他人指定調整＋中樞恢復（取單一中樞幹員最強者，依設施種類）。 */
+export function moodRates(evaluation: BaseEvaluation, catalog: BaseCatalog): { facilityId: string; label: string; operatorId: string; name: string; rate: number }[] {
+  const controls = evaluation.facilities.filter(result => result.facility.type === 'control');
+  const sumOf = (op: OperatorInRoom, kind: SkillEffect['kind'], room?: BaseRoomType) => op.skills.reduce((sum, skill) => sum + (skill.applied ?? []).filter(effect => effect.kind === kind && (!room || effect.kind !== 'workingMood' || (effect.rooms ?? OTHER_ROOMS).includes(room))).reduce((a, effect) => a + scalar(effect), 0), 0);
+  const workingMood = (room: BaseRoomType) => Math.min(0, ...controls.flatMap(result => result.operators.map(op => sumOf(op, 'workingMood', room))));
+  const list: { facilityId: string; label: string; operatorId: string; name: string; rate: number }[] = [];
+  for (const result of evaluation.facilities) {
+    if (result.facility.type === 'dormitory') continue;
+    const room = ROOM_OF[result.facility.type];
+    const baseCost = catalog.mood?.costPerHour[room]?.[result.facility.level - 1] ?? 0;
+    const roomMood = result.operators.reduce((sum, op) => sum + sumOf(op, 'moodRoom'), 0);
+    const remote = room === 'CONTROL' ? 0 : workingMood(room);
+    for (const op of result.operators) list.push({ facilityId: result.facility.id, label: result.label, operatorId: op.operatorId, name: op.name, rate: round(baseCost + sumOf(op, 'moodCost') + roomMood + (result.moodAdjust[op.operatorId] ?? 0) + remote) });
+  }
+  return list;
+}
+
 export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog): BaseStatistics {
   const empty: BaseStatistics = { available: false, manufacture: [], goldPerDay: 0, expPerDay: 0, trading: [], lmdPerDay: 0, goldConsumedPerDay: 0, shifts: [], storageWarnings: [] };
   if (!catalog.formulas || !catalog.mood) return empty;
@@ -1029,6 +1430,7 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
   const manufacture: ManufactureStat[] = [];
   const shifts: ShiftStat[] = [];
   const trading: TradingStat[] = [];
+  const rates = new Map(moodRates(evaluation, catalog).map(item => [item.operatorId, item.rate]));
   for (const result of evaluation.facilities) {
     const { facility } = result;
     const roomType = ROOM_OF[facility.type];
@@ -1064,10 +1466,8 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
     const base = catalog.mood.costPerHour[roomType]?.[facility.level - 1] ?? 0;
     if (base <= 0 || !result.operators.length) continue;
     let worst: ShiftStat | undefined;
-    const roomMood = result.operators.reduce((sum, op) => sum + op.skills.reduce((inner, skill) => inner + (skill.applies ? (skill.applied ?? []).filter(effect => effect.kind === 'moodRoom').reduce((a, effect) => a + scalar(effect), 0) : 0), 0), 0);
     for (const op of result.operators) {
-      const delta = op.skills.reduce((sum, skill) => sum + (skill.applies ? (skill.applied ?? []).filter(effect => effect.kind === 'moodCost').reduce((a, effect) => a + effect.value, 0) : 0), 0);
-      const rate = Math.max(0.05, base + delta + roomMood);
+      const rate = Math.max(0.05, rates.get(op.operatorId) ?? base);
       const max = catalog.mood.maxByOperator?.[op.operatorId] ?? catalog.mood.max;
       const hours = round(max / rate);
       if (!worst || hours < worst.hours) worst = { facilityId: facility.id, label: result.label, hours, operator: op.name, rate: round(rate) };
@@ -1113,7 +1513,7 @@ export function baseObjective(evaluation: BaseEvaluation, catalog: BaseCatalog, 
     if (!result.operators.length) continue;
     if (result.facility.type === 'manufacturing') { const value = result.totals.basic + result.totals.productivity; if (result.facility.product === 'record') record += value; else gold += value; }
     if (result.facility.type === 'power') power += result.totals.drone;
-    clue += result.totals.clue; contact += result.totals.contact; training += result.totals.training; byproduct += result.totals.byproduct;
+    clue += result.totals.clue; contact += result.totals.contact; training += result.totals.training; byproduct += result.workshop ? result.workshop.efficiency : result.totals.byproduct;
   }
   // 貿易站：龍門幣相對「常規訂單、效率 0」的提升；赤金不足時按供應比例打折（佩佩等不耗赤金的訂單不受影響）。
   const goldFactor = stats.goldConsumedPerDay > 0 ? Math.min(1, stats.goldPerDay / stats.goldConsumedPerDay) : 1;
@@ -1265,17 +1665,19 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
     if (room === 'MEETING') return [result.totals.clue, '線索 %'];
     if (room === 'HIRE') return [result.totals.contact, '聯絡 %'];
     if (room === 'TRAINING') return [result.totals.training, '訓練 %'];
-    if (room === 'WORKSHOP') return [result.totals.byproduct, '副產品 %'];
+    if (room === 'WORKSHOP') return result.workshop ? [result.workshop.efficiency, '每點心情產出 %'] : [result.totals.byproduct, '副產品 %'];
     return [0, ''];
   };
   const sums = new Map<string, { start: number; total: number; unit: string; label: string }>();
   const totals = { goldPerDay: 0, expPerDay: 0, lmdPerDay: 0 };
   let start = { goldPerDay: 0, expPerDay: 0, lmdPerDay: 0 };
   const zeroAt = new Map<string, { label: string; hours: number }>();
+  const orders: Record<string, number> = Object.fromEntries(base.facilities.filter(facility => facility.type === 'trading').map(facility => [facility.id, 0]));
+  const tradingLimits = (catalog.trading ?? DEFAULT_TRADING).limits;
   const steps = Math.max(1, Math.round(hours / step));
   const names = new Map(base.facilities.map((facility, index) => [facility.id, evaluateBase(base, catalog, [], definitions).facilities[index]?.label ?? facility.id]));
   for (let i = 0; i < steps; i++) {
-    const evaluation = evaluateBase(base, catalog, roster, definitions, moods, i * step + step / 2);
+    const evaluation = evaluateBase(base, catalog, roster, definitions, moods, i * step + step / 2, Object.fromEntries(Object.entries(orders).map(([id, value]) => [id, Math.floor(value)])));
     const stats = baseStatistics(evaluation, catalog);
     if (i === 0) start = { goldPerDay: stats.goldPerDay, expPerDay: stats.expPerDay, lmdPerDay: stats.lmdPerDay };
     totals.goldPerDay += stats.goldPerDay; totals.expPerDay += stats.expPerDay; totals.lmdPerDay += stats.lmdPerDay;
@@ -1285,19 +1687,17 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
       const entry = sums.get(result.facility.id) ?? { start: value, total: 0, unit, label: result.label };
       entry.total += value; sums.set(result.facility.id, entry);
     }
-    // 中樞對其他設施工作中幹員的恢復：取單一幹員合計最強者（PRTS 註明有特殊比較規則，此處為估計）。
-    const workingMood = Math.min(0, ...evaluation.facilities.filter(result => result.facility.type === 'control').flatMap(result => result.operators.map(op => op.skills.reduce((sum, skill) => sum + (skill.applied ?? []).filter(effect => effect.kind === 'workingMood').reduce((a, effect) => a + scalar(effect), 0), 0))));
-    for (const result of evaluation.facilities) {
-      if (result.facility.type === 'dormitory') continue;
-      const baseCost = catalog.mood?.costPerHour[ROOM_OF[result.facility.type]]?.[result.facility.level - 1] ?? 0;
-      const roomMood = result.operators.reduce((sum, op) => sum + op.skills.reduce((inner, skill) => inner + (skill.applied ?? []).filter(effect => effect.kind === 'moodRoom').reduce((a, effect) => a + scalar(effect), 0), 0), 0);
-      for (const op of result.operators) {
-        const self = op.skills.reduce((sum, skill) => sum + (skill.applied ?? []).filter(effect => effect.kind === 'moodCost').reduce((a, effect) => a + scalar(effect), 0), 0);
-        const rate = baseCost + self + roomMood + (result.facility.type === 'control' ? 0 : workingMood);
-        const next = Math.min(maxMood(op.operatorId), Math.max(0, moods[op.operatorId] - rate * step));
-        if (next <= 0 && !zeroAt.has(op.operatorId)) zeroAt.set(op.operatorId, { label: result.label, hours: round((i + 1) * step) });
-        moods[op.operatorId] = next;
-      }
+    // 中樞對其他設施工作中幹員的恢復：取單一幹員合計最強者（名詞表註明有特殊比較規則，此處為估計）。
+    for (const item of moodRates(evaluation, catalog)) {
+      const next = Math.min(maxMood(item.operatorId), Math.max(0, moods[item.operatorId] - item.rate * step));
+      if (next <= 0 && !zeroAt.has(item.operatorId)) zeroAt.set(item.operatorId, { label: item.label, hours: round((i + 1) * step) });
+      moods[item.operatorId] = next;
+    }
+    // 貿易站訂單數：依當下訂單效率累積，達上限即停（換班時收取歸零）。
+    for (const item of stats.trading) {
+      const result = evaluation.facilities.find(entry => entry.facility.id === item.facilityId);
+      const limit = Math.max(1, (tradingLimits[(result?.facility.level ?? 1) - 1] ?? tradingLimits.at(-1) ?? 0) + (result?.totals.orderLimit ?? 0));
+      orders[item.facilityId] = Math.min(limit, (orders[item.facilityId] ?? 0) + item.ordersPerDay / 24 * step);
     }
   }
   const average = { goldPerDay: round(totals.goldPerDay / steps), expPerDay: Math.round(totals.expPerDay / steps), lmdPerDay: Math.round(totals.lmdPerDay / steps) };
@@ -1305,18 +1705,34 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
   const dorms = base.facilities.filter(facility => facility.type === 'dormitory');
   const finalEval = evaluateBase(base, catalog, roster, definitions);
   // 中樞「所有宿舍」恢復，同種效果取最高。
-  const globalDorm = Math.max(0, ...finalEval.facilities.filter(result => result.facility.type === 'control').flatMap(result => result.operators.flatMap(op => op.skills.flatMap(skill => (skill.applied ?? []).filter(effect => effect.kind === 'globalDorm').map(scalar)))));
-  const dormRates = dorms.map(facility => {
+  // 最累的人：本班消耗最多者；全宿舍恢復若限定陣營，只有符合者適用。
+  const tired = Object.entries(moods).sort((a, b) => (maxMood(b[0]) - b[1]) - (maxMood(a[0]) - a[1]))[0];
+  const tiredGroups = tired ? (catalog.meta?.[tired[0]]?.groups ?? []) : [];
+  const globalDorm = Math.max(0, ...finalEval.facilities.filter(result => result.facility.type === 'control').flatMap(result => result.operators.flatMap(op => op.skills.flatMap(skill => (skill.applied ?? []).filter(effect => effect.kind === 'globalDorm' && (!effect.group || tiredGroups.includes(effect.group))).map(scalar)))));
+  const consumed = tired ? Math.max(0, maxMood(tired[0]) - tired[1]) : 0;
+  const tiredMax = tired ? maxMood(tired[0]) : 24;
+  const restTime = (facility: Facility) => {
     const result = finalEval.facilities.find(item => item.facility.id === facility.id);
     const atmosphere = Math.min(facility.atmosphere ?? facility.level * 1000, facility.level * 1000);
-    // 最累的人安排在該宿舍，單人恢復技能也給他。
-    return (catalog.mood?.dormRecover?.[facility.level - 1] ?? 0) + 0.0004 * atmosphere + (result?.totals.moodRecoverAll ?? 0) + (result?.totals.dormSingle ?? 0) + globalDorm;
-  }).filter(rate => rate > 0);
-  const consumed = Math.max(0, ...Object.entries(moods).map(([id, mood]) => maxMood(id) - mood));
-  const dormRate = dormRates.length ? round(Math.max(...dormRates)) : 0;
+    const effects = result?.operators.flatMap(op => op.skills.flatMap(skill => skill.applied ?? [])) ?? [];
+    const groupBonus = Math.max(0, ...effects.filter(effect => effect.kind === 'dormGroupBonus' && tiredGroups.includes(effect.group) && result!.operators.some(op => op.name === effect.name)).map(effect => (effect as { value: number }).value));
+    // 最累的人安排在該宿舍，單人恢復技能也給他；「心情 N 以下額外恢復」依當下心情分段計算。
+    const rate = (catalog.mood?.dormRecover?.[facility.level - 1] ?? 0) + 0.0004 * atmosphere + (result?.totals.moodRecoverAll ?? 0) + (result?.totals.dormSingle ?? 0) + globalDorm + groupBonus;
+    const below = effects.filter(effect => effect.kind === 'dormBelow') as Extract<SkillEffect, { kind: 'dormBelow' }>[];
+    if (rate <= 0) return { rate: 0, hours: Infinity };
+    let mood = tiredMax - consumed, time = 0;
+    while (mood < tiredMax - 1e-9) {
+      const extra = Math.max(0, ...below.filter(effect => mood < effect.threshold + 1e-9).map(effect => effect.value));
+      const next = Math.min(tiredMax, ...below.map(effect => effect.threshold).filter(threshold => threshold > mood + 1e-9));
+      time += (next - mood) / (rate + extra); mood = next;
+    }
+    return { rate: round(rate + Math.max(0, ...below.map(effect => effect.value))), hours: time };
+  };
+  const best = dorms.map(restTime).filter(item => item.rate > 0).sort((a, b) => a.hours - b.hours)[0];
+  const dormRate = best ? best.rate : 0;
   const shifts = Math.max(1, Math.round(24 / hours));
   const available = round(hours * Math.max(1, shifts - 1));
-  const rest = dormRate > 0 ? { consumed: round(consumed), dormRate, restHours: round(consumed / dormRate), available, feasible: consumed / dormRate <= available } : null;
+  const rest = best ? { consumed: round(consumed), dormRate, restHours: round(best.hours), available, feasible: best.hours <= available } : null;
   return {
     hours, step, average, start,
     facilities: [...sums].map(([facilityId, entry]) => ({ facilityId, label: entry.label, start: round(entry.start), average: round(entry.total / steps), unit: entry.unit })),

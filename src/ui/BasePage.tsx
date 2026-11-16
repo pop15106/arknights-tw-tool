@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { AppState, Settings } from '../domain/model';
 import type { BaseCatalog } from '../catalog/base';
-import { candidatesFor, compareLayout, DEFAULT_WEIGHTS, evaluateBase, LAYOUTS, layoutFacilities, optimizeBase, type LayoutComparison, type ObjectiveWeights, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
+import { candidatesFor, compareLayout, DEFAULT_WEIGHTS, evaluateBase, LAYOUTS, layoutFacilities, optimizeBase, type LayoutComparison, type ObjectiveWeights, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect, type WorkshopTarget } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -14,6 +14,9 @@ const TYPES: FacilityType[] = ['control', 'manufacturing', 'trading', 'power', '
 const newId = () => `f-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const signed = (value: number, unit = '%') => `${value >= 0 ? '+' : ''}${value}${unit}`;
 
+const roomLabel = (room: string) => FACILITY_LABEL[Object.entries(ROOM_OF).find(([, value]) => value === room)?.[0] as FacilityType] ?? room;
+const WORKSHOP_TYPE_LABEL: Record<string, string> = { F_EVOLVE: '精英材料', F_SKILL: '技巧概要', F_BUILDING: '基建材料', F_ASC: '晶片' };
+const targetText = (target: WorkshopTarget) => [target.mood !== undefined ? `原始心情 ${target.mood}` : '', target.types?.map(type => WORKSHOP_TYPE_LABEL[type] ?? type).join('、') ?? '', target.includes ? `${target.includes}類` : '', target.equals ?? ''].filter(Boolean).join('的') || '任意材料';
 function effectText(effect: SkillEffect): string {
   switch (effect.kind) {
     case 'productivity': return `${effect.product === 'gold' ? '赤金' : effect.product === 'record' ? '作戰記錄' : effect.product === 'originium' ? '源石類' : ''}生產力 ${signed(effect.value)}`;
@@ -32,8 +35,8 @@ function effectText(effect: SkillEffect): string {
     case 'clue': return `線索蒐集速度 +${effect.value}%${effect.alone ? '（會客室只有自己工作時）' : ''}`;
     case 'contact': return `聯絡速度 +${effect.value}%${effect.perDormLevel ? '／宿舍每級' : ''}`;
     case 'training': return `${effect.professions ? effect.professions.join('、') : ''}專精訓練 +${effect.value}%${effect.atMastery ? `（訓練至專精 ${effect.atMastery}）` : ''}`;
-    case 'byproduct': return `副產品機率 +${effect.value}%（${{ elite: '精英材料', skill: '技巧概要', base: '基建材料', any: '任意材料' }[effect.category]}）`;
-    case 'global': return `所有${effect.product === 'gold' ? '赤金' : ''}${{ MANUFACTURE: '製造站生產力', TRADING: '貿易站訂單效率', MEETING: '會客室線索速度', HIRE: '辦公室聯絡速度' }[effect.target]} ${signed(effect.value)}${effect.maxOnly ? '（取最高）' : ''}`;
+    case 'byproduct': return `副產品機率 +${effect.value}%（${effect.target ? targetText(effect.target) : { elite: '精英材料', skill: '技巧概要', base: '基建材料', any: '任意材料', other: '指定材料' }[effect.category]}）`;
+    case 'global': return `所有${effect.product === 'gold' ? '赤金' : ''}${{ MANUFACTURE: '製造站生產力', TRADING: '貿易站訂單效率', MEETING: '會客室線索速度', HIRE: '辦公室聯絡速度', TRAINING: '訓練室專精速度' }[effect.target]} ${signed(effect.value)}${effect.maxOnly ? '（取最高）' : ''}`;
     case 'moodRoom': return `同設施所有人心情 ${effect.value < 0 ? `恢復 +${-effect.value}` : `消耗 +${effect.value}`}/時`;
     case 'whenMood': return `${effect.cond === 'high' ? '心情 > 12 時' : '心情 ≤ 12 時'}：${effectText(effect.effect)}`;
     case 'perMoodDrop': return `每 ${effect.per} 點心情落差：${effectText(effect.effect)}`;
@@ -52,9 +55,33 @@ function effectText(effect: SkillEffect): string {
     case 'ifPresent': return `${effect.name}在${effect.where === 'base' ? '基建內' : effect.where === 'work' ? '工作場所' : FACILITY_LABEL[Object.entries(ROOM_OF).find(([, room]) => room === effect.where)?.[0] as FacilityType] ?? effect.where}時：${effectText(effect.effect)}`;
     case 'ifGroupInRoom': return `同設施有${effect.group}幹員時：${effectText(effect.effect)}`;
     case 'globalDorm': return `所有宿舍心情恢復 +${effect.value}/時（取最高）`;
-    case 'ramp': return `${effect.stat === 'productivity' ? '生產力' : '無人機'}首小時 +${effect.first}%、每小時 +${effect.perHour}%、最多 +${effect.max}%`;
+    case 'ramp': return `${{ productivity: '生產力', drone: '無人機', clue: '線索速度' }[effect.stat]}首小時 +${effect.first}%、每小時 +${effect.perHour}%、最多 +${effect.max}%`;
     case 'orderMod': return { qualityAlpha: '提高高品質訂單（α）', qualityBeta: '提高高品質訂單（β）', pepe: '特別獨佔訂單', closure: '可露希爾特別訂單', twoGold: '赤金交付數固定為 2', breach: '交付數小於 4 視為違約訂單', breachBonus: `違約訂單赤金 +${effect.amount}`, invest: `4 赤金訂單龍門幣 +${effect.amount}` }[effect.mod];
-    case 'remote': return `${effect.target === 'MANUFACTURE' ? '製造站' : '貿易站'}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
+    case 'remote': return `${{ MANUFACTURE: '製造站', TRADING: '貿易站', MEETING: '會客室' }[effect.target]}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
+    case 'perCategory': return `同站每個${effect.category}技能：${effectText(effect.effect)}`;
+    case 'categoryAlias': return `同站${effect.from.join('、')}技能也算作${effect.to}`;
+    case 'perGroupIn': return `${roomLabel(effect.where)}每名${effect.others ? '其他' : ''}${effect.group}：${effectText(effect.effect)}`;
+    case 'ifGroupCount': return `${roomLabel(effect.where)}有 ${effect.min} 名以上${effect.others ? '其他' : ''}${effect.group}時：${effectText(effect.effect)}`;
+    case 'powerCount': return `發電站數量 +${effect.value}（只影響依發電站數的技能）${effect.ifName ? `，需${effect.ifName}在發電站` : ''}${effect.unlessGroup ? `，其他發電站沒有${effect.unlessGroup}時` : ''}`;
+    case 'remoteTo': return `${effect.name}所在的${roomLabel(effect.target)}：${effectText(effect.effect)}`;
+    case 'remoteGroupMin': return `有 ${effect.min} 名以上${effect.group}的${roomLabel(effect.target)}：${effectText(effect.effect)}`;
+    case 'outerGround': return `外勢 ≥ 實地時 ${effectText(effect.outer)}；否則 ${effectText(effect.ground)}`;
+    case 'abyssalBoost': return '深海獵人進駐製造站時的特殊加成（名詞表數值）';
+    case 'abyssalMood': return `宿舍外每名深海獵人自身心情消耗 +${effect.outside}，宿舍內每名恢復 +${effect.inside}（滿心情再 +${effect.full}）`;
+    case 'moodFor': return `${effect.others ? '同站其他幹員' : effect.name}心情${effect.value < 0 ? `恢復 +${-effect.value}` : `消耗 +${effect.value}`}/時`;
+    case 'contactFloor': return `辦公室聯絡速度低於 ${effect.below}% 時 +${effect.value}%`;
+    case 'orderCount': return effect.mode === 'perOrder' ? `每筆訂單 +${effect.value}% 訂單效率（其他人每 ${effect.limitPer}% 效率使上限 -1）` : `與訂單上限每差 1 筆 +${effect.value}% 訂單效率`;
+    case 'perFacilityWith': return `每間有${effect.group}的設施：${effectText(effect.effect)}（最多 ${effect.max} 間）`;
+    case 'dormSplit': return `總計 +${effect.value}/時，平均分給心情未滿的成員`;
+    case 'dormBelow': return `心情 ${effect.threshold} 以下者額外恢復 +${effect.value}/時`;
+    case 'dormGroupBonus': return `${effect.name}對${effect.group}幹員額外恢復 +${effect.value}/時`;
+    case 'whenExchange': return `線索交流期間：${effectText(effect.effect)}`;
+    case 'qualitative': return `${effect.text}（無數值）`;
+    case 'perRoomCapacity': return `同站提升的倉庫容量換算生產力（${effect.tiers.map(tier => `${Number.isFinite(tier.upTo) ? `${tier.upTo} 格以下` : '其餘'}每格 ${tier.value}%`).join('、')}）`;
+    case 'workshopMood': return `${effect.target ? `${targetText(effect.target)}：` : ''}${effect.cost !== undefined ? `心情消耗 ${effect.cost}${effect.gte ? ' 以上' : ''}的配方` : '配方'}${effect.set !== undefined ? `心情恆定 ${effect.set}` : effect.divide ? `心情 ÷${effect.divide}` : `心情 ${signed(effect.add ?? 0, '')}`}`;
+    case 'perDormLow': return `宿舍每 ${effect.per} 名心情 ${effect.threshold} 以下者：${effectText(effect.effect)}`;
+    case 'karma': return `未出副產品時累積${effect.resource}，每 ${effect.per} 點必出一次`;
+    case 'refundOnMiss': return `每 ${effect.every} 次沒出副產品退回一次心情`;
     default: return '';
   }
 }
@@ -103,10 +130,16 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
       <label><span>等級</span><select className="filter" value={facility.level} disabled={busy} onChange={event => onChange({ level: Number(event.currentTarget.value) })}>{(room?.phases ?? [{}]).map((_, index) => <option key={index} value={index + 1}>{index + 1} 級</option>)}</select></label>
       {facility.type === 'training' && <><label><span>訓練中的職業</span><select className="filter" value={base.training?.profession ?? ''} disabled={busy} onChange={event => onSettings({ training: { ...base.training, profession: event.currentTarget.value || undefined } })}><option value="">未設定（只計通用加成）</option>{['先鋒', '近衛', '重裝', '狙擊', '術師', '醫療', '輔助', '特種'].map(item => <option key={item} value={item}>{item}</option>)}</select></label>
         <label><span>目標專精</span><select className="filter" value={base.training?.mastery ?? ''} disabled={busy} onChange={event => onSettings({ training: { ...base.training, mastery: event.currentTarget.value ? Number(event.currentTarget.value) as 1 | 2 | 3 : undefined } })}><option value="">未設定</option>{[1, 2, 3].map(item => <option key={item} value={item}>專精 {item}</option>)}</select></label></>}
-      {facility.type === 'workshop' && <label><span>主要加工</span><select className="filter" value={base.workshop ?? ''} disabled={busy} onChange={event => onSettings({ workshop: (event.currentTarget.value || undefined) as Base['workshop'] })}><option value="">未設定（只計任意材料加成）</option><option value="elite">精英材料</option><option value="skill">技巧概要</option><option value="base">基建材料</option></select></label>}
+      {facility.type === 'workshop' && <label><span>加工配方</span><select className="filter" value={base.workshopFormula ? `f:${base.workshopFormula}` : base.workshop ? `c:${base.workshop}` : ''} disabled={busy} onChange={event => { const [kind, value] = event.currentTarget.value.split(':'); const formula = kind === 'f' ? catalog.workshop?.find(item => item.id === value) : undefined; onSettings({ workshopFormula: formula?.id, workshop: kind === 'c' ? value as Base['workshop'] : formula ? ({ F_EVOLVE: 'elite', F_SKILL: 'skill', F_BUILDING: 'base' } as Record<string, Base['workshop']>)[formula.type] : undefined }); }}>
+        <option value="">未設定（只計任意材料加成）</option>
+        <optgroup label="只指定類別"><option value="c:elite">精英材料</option><option value="c:skill">技巧概要</option><option value="c:base">基建材料</option></optgroup>
+        {Object.entries(WORKSHOP_TYPE_LABEL).map(([type, label]) => <optgroup key={type} label={`${label}（指定配方）`}>{(catalog.workshop ?? []).filter(item => item.type === type).map(item => <option key={item.id} value={`f:${item.id}`}>{item.name}（心情 {item.mood}）</option>)}</optgroup>)}
+      </select></label>}
+      {facility.type === 'meeting' && <label className="checkbox-line"><input type="checkbox" checked={!!base.clueExchange} disabled={busy} onChange={event => onSettings({ clueExchange: event.currentTarget.checked || undefined })}/><span>線索交流中</span></label>}
       {facility.type === 'manufacturing' && <label><span>產品</span><select className="filter" value={facility.product ?? ''} disabled={busy} onChange={event => onChange({ product: event.currentTarget.value as Facility['product'] })}><option value="" disabled>選擇產品</option><option value="gold">{PRODUCT_LABEL.gold}</option><option value="record">{PRODUCT_LABEL.record}</option></select></label>}
     </div>
     {metrics.length > 0 && <dl className="facility-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}{(roomType === 'MANUFACTURE' || roomType === 'TRADING') && <div><dt>其中基礎</dt><dd>{signed(result.totals.basic)}</dd></div>}</dl>}
+    {result.workshop && <p className="facility-remote">{result.workshop.name}：每次心情 {result.workshop.baseMood} → {result.workshop.mood}、副產品機率 {Math.round(result.workshop.baseRate * 1000) / 10}% → {Math.round(result.workshop.rate * 1000) / 10}%、每點心情產出 {signed(result.workshop.efficiency)}{result.workshop.gold ? `、每次 ${result.workshop.gold} 龍門幣` : ''}{result.workshop.notes.length ? `（${result.workshop.notes.join('；')}）` : ''}</p>}
     {result.remote.length > 0 && <p className="facility-remote">控制中樞加成：{result.remote.map(item => `${item.from}「${item.skill}」${item.text} ${item.value >= 0 ? '+' : ''}${item.value}%`).join('；')}</p>}
     {incomplete > 0 && <p className="facility-warning"><Icon name="alert" size={14}/>有 {incomplete} 個技能未計入或待核對，合計不完整。</p>}
     {result.issues.map(issue => <p key={issue} className="facility-issue">{issue}</p>)}
@@ -123,9 +156,10 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
           const tone = skill.state === 'locked' ? 'muted' : skill.state === 'unknown' ? 'amber' : comboMissing ? 'amber' : offProduct ? 'muted' : parsed?.supported ? 'ok' : 'info';
           const effectLabel = (skill.applied ?? []).map(effectText).join('、');
           return <details key={index} className={`skill-chip ${tone}`}>
-            <summary><span>{shown.name}</span><em>{skill.state === 'locked' ? `未解鎖（精英 ${skill.next?.elite}・等級 ${skill.next?.level}）` : skill.state === 'unknown' ? '解鎖待核對' : comboMissing ? `需與${skill.combo!.partner}同房` : offProduct ? '不適用目前產品' : parsed?.supported ? `${skill.combo?.active ? '搭配成立：' : ''}${effectLabel}` : '未計入'}</em></summary>
+            <summary><span>{shown.name}</span><em>{skill.state === 'locked' ? `未解鎖（精英 ${skill.next?.elite}・等級 ${skill.next?.level}）` : skill.state === 'unknown' ? '解鎖待核對' : comboMissing ? `需與${skill.combo!.partner}同房` : offProduct ? (roomType === 'MANUFACTURE' ? '不適用目前產品' : '目前條件未成立') : parsed?.supported ? `${skill.combo?.active ? '搭配成立：' : ''}${effectLabel}` : '未計入'}</em></summary>
             <p>{shown.description}</p>
             {parsed?.ignoredCondition && <p className="fine-print">{parsed.ignoredCondition}尚未支援，未計入。</p>}
+            {parsed?.estimate && <p className="fine-print">估計：{parsed.estimate}。</p>}
             {skill.maybeUpgraded && skill.active && <p className="fine-print">可能已升級為「{skill.maybeUpgraded.name}」：養成數值未知，暫以已確認版本計算。</p>}
           </details>;
         })}{!op.skills.some(skill => skill.applies) && <span className="fine-print">沒有{FACILITY_LABEL[facility.type]}技能{roomType === 'MANUFACTURE' || roomType === 'TRADING' ? '，只計基礎加成' : ''}</span>}</div>

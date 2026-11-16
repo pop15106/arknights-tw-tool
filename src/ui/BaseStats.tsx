@@ -66,11 +66,13 @@ export function BaseStats({ evaluation, catalog, base, state }: { evaluation: Ba
     </section>}
     <details className="plain-details"><summary>計算方式與限制</summary><ul className="gap-list">
       <li>每日產量＝86,400 秒 ×（1＋已計入生產力）÷ 配方秒數。赤金每條 {fmt((catalog.formulas?.gold.seconds ?? 0) / 60, 0)} 分鐘；作戰記錄依製造站等級取可生產的最高級記錄，時間與經驗值取自資料表。</li>
-      <li>生產力只含資料表的基礎加成與句型可解析的技能；控制中樞、聯動與條件型技能不計入，所以實際產量通常更高。</li>
+      <li>生產力含資料表的基礎加成、可解析的技能、控制中樞的跨設施與全域加成、陣營／技能類別（名詞表成員名單）、基建資源與條件型技能；沒有寫數值的效果（線索傾向等）只標示、不計分。</li>
       <li>龍門幣＝86,400 ×（1＋訂單效率）× 一筆訂單的期望龍門幣 ÷ 期望訂單時間。赤金訂單為 {trading.orders.map(order => `${order.gold} 條→${order.lmd.toLocaleString()} 龍門幣（${Math.floor(order.seconds / 3600)}:${String(order.seconds % 3600 / 60).padStart(2, '0')}）`).join('、')}，各等級出現機率依來源表格加權。</li>
       <li>訂單數據出處：<a href={trading.source.url} target="_blank" rel="noopener noreferrer">{trading.source.name}</a>{trading.source.revision ? `（頁面版本 ${trading.source.revision}` : '（'}{trading.source.editedAt ? `，${date(trading.source.editedAt)} 編輯` : ''}；{catalog.trading ? `${date(trading.source.fetchedAt)} 同步` : '尚未同步，使用內建值'}）。{trading.source.note}。遊戲資料表沒有這些數值，每次「更新遊戲資料」會一併向 PRTS 同步。</li>
       <li>訂單品質（α／β）、特別獨佔訂單、可露希爾特別訂單、赤金交付數固定、違約與投資訂單依 PRTS 同步的數據計算；品質技能使用累積工作達峰值後的分布，多人疊加只有 PRTS 有觀測值的組合，其餘標示為估計。</li>
-      <li>工作時長＝心情上限（{catalog.mood?.max}）÷（設施基礎消耗＋技能寫明的自身心情消耗調整）。設施人數、控制中樞、宿舍恢復與條件型心情技能沒有計入。</li>
+      <li>工作時長＝心情上限（{catalog.mood?.max}）÷（設施基礎消耗＋自身技能＋同站全體調整＋他人指定調整＋控制中樞對其他設施的恢復）。中樞恢復只作用在名詞表「其他設施」（發電站、製造站、貿易站、辦公室、會客室）或技能指定的設施。</li>
+      <li>市井之道、攤販經濟依當下訂單數變動：班次模擬每半小時依訂單效率累積訂單（換班時收取歸零）；單點評估以訂單上限的一半估計。</li>
+      <li>加工站需在設施設定選定配方，才能套用「心情消耗為 N 的配方」「異鐵類材料」等條件；每點心情產出＝（1＋副產品機率）÷每次心情，與無技能時比較。</li>
       <li>換班間隔取「最先累的人」可工作時長以內、能整除 24 小時的班數，方便每天固定時間換班。</li>
       <li>班次模擬每半小時依當下心情重算：心情 0 者停工；心情大於 12／12 以下、心情落差與「除自身以外工作中幹員」等條件依當下狀態判斷；中樞對其他設施的心情恢復取最強者（PRTS 註明有特殊比較規則，為估計）。</li>
       <li>宿舍恢復＝基礎（資料表 1 級 1.6～5 級 2.0）＋0.0004×氛圍（PRTS；未設定時以該等級上限計）＋全宿舍恢復技能（同一人的加成疊加後，幹員間取最高）＋單人恢復技能（假設給最累的人）；休息時間以恢復最快的宿舍計算。</li>
