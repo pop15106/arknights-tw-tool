@@ -22,7 +22,6 @@ test('白名單句型解析；任一子句不支援即整個技能不計入', ()
   assert.deepEqual(parseSkill({ roomType: 'DORMITORY', description: '進駐宿舍時，該宿舍內所有幹員的心情每小時恢復+0.2（同種效果取最高）' }).effects, [{ kind: 'moodRecoverAll', value: 0.2 }]);
   for (const description of [
     '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每有1個標準化類技能為當前製造站+5%的生產力',
-    '進駐製造站時，每10架無人機上限+1%無人機充能速度（最多+25%）',
     '進駐製造站時，如果有2台以上作業平台進駐在發電站，則生產力+2%',
     '進駐控制中樞時，提升線索板上某條線索的價值',
   ]) assert.equal(parseSkill({ roomType: description.includes('控制中樞') ? 'CONTROL' : 'MANUFACTURE', description }).supported, false, description);
@@ -566,4 +565,14 @@ test('加工站：依選定配方計算心情與副產品', async () => {
   assert.equal(rock.efficiency, Math.round(((1.16 / 2) / (1.1 / 4) - 1) * 10000) / 100);
   assert.deepEqual(parseSkill({ roomType: 'WORKSHOP', description: '進駐加工站加工異鐵組材料時，副產品的產出機率提升90%' }).effects, [{ kind: 'byproduct', value: 90, category: 'other', target: { equals: '異鐵組' } }]);
   assert.equal(parseSkill({ roomType: 'WORKSHOP', description: '進駐加工站加工任意類材料時，每2次加工沒有產出副產品，則恢復自身一次心情，恢復量為對應配方所需消耗的心情（加工結束後統一結算）' }).effects[0].kind, 'refundOnMiss');
+});
+
+test('巡線框架：依無人機上限，未設定時取技能上限', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.skills.line = { id: 'line', name: '巡線框架', roomType: 'POWER', description: '進駐發電站時，每10架無人機上限+1%無人機充能速度（最多+25%）' };
+  catalog.operators['demo-1'] = [[{ buffId: 'line', elite: 0, level: 1 }]];
+  const drone = (droneCap?: number) => evaluateBase({ facilities: [{ id: 'p', type: 'power', level: 3 }], onlineSlots: [], assignments: { p: ['demo-1'] }, ...(droneCap === undefined ? {} : { droneCap }) }, catalog, state.roster, definitions).facilities[0].totals.drone;
+  assert.equal(drone(), 25);
+  assert.equal(drone(200), 20);
 });

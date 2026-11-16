@@ -43,7 +43,7 @@ function effectText(effect: SkillEffect): string {
     case 'perOtherWorking': return `同設施每名其他工作中幹員：${effectText(effect.effect)}`;
     case 'workingMood': return `其他設施工作中幹員心情恢復 +${-effect.value}/時`;
     case 'dormSingle': return `宿舍內某位心情未滿者恢復 +${effect.value}/時（取最高）`;
-    case 'scaleBy': return `${{ recruitSlots: '每個招募位', powerPlants: `每 ${effect.per} 間發電站`, roomLevel: '本設施每級', dormLevels: '宿舍每級', tradingPosts: '每個貿易站', meetingLevel: '會客室每級', trainingLevel: '訓練室每級', roomOccupants: '同站每人', productTypes: '製造站每類配方' }[effect.by]}：${effectText(effect.effect)}${effect.max ? `（最多 ${effect.max}%）` : ''}`;
+    case 'scaleBy': return `${{ recruitSlots: '每個招募位', powerPlants: `每 ${effect.per} 間發電站`, roomLevel: '本設施每級', dormLevels: '宿舍每級', tradingPosts: '每個貿易站', meetingLevel: '會客室每級', trainingLevel: '訓練室每級', roomOccupants: '同站每人', productTypes: '製造站每類配方', droneCap: `每 ${effect.per} 架無人機上限` }[effect.by]}：${effectText(effect.effect)}${effect.max ? `（最多 ${effect.max}%）` : ''}`;
     case 'perRoomStat': return `同站${effect.others ? '其他' : ''}幹員的${effect.stat === 'order' ? '訂單效率' : '生產力'}每 ${effect.per}% 再＋${effect.value}%（最多 ${effect.max}%）`;
     case 'whenTraining': return `協助${effect.professions?.join('、') ?? ''}幹員專精至 ${effect.atMastery} 級時：${effectText(effect.effect)}`;
     case 'moodNeutral': return effect.scope === 'self' ? '消除自身心情消耗的影響' : `消除同站${effect.group ? `${effect.group}幹員` : '所有幹員'}自身心情消耗的影響`;
@@ -135,6 +135,7 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
         <optgroup label="只指定類別"><option value="c:elite">精英材料</option><option value="c:skill">技巧概要</option><option value="c:base">基建材料</option></optgroup>
         {Object.entries(WORKSHOP_TYPE_LABEL).map(([type, label]) => <optgroup key={type} label={`${label}（指定配方）`}>{(catalog.workshop ?? []).filter(item => item.type === type).map(item => <option key={item.id} value={`f:${item.id}`}>{item.name}（心情 {item.mood}）</option>)}</optgroup>)}
       </select></label>}
+      {facility.type === 'power' && <label><span>無人機上限</span><input className="filter" type="number" min={0} max={999} placeholder="未設定（視為滿等）" value={base.droneCap ?? ''} disabled={busy} onChange={event => { const value = event.currentTarget.value; onSettings({ droneCap: value === '' ? undefined : Math.max(0, Math.min(999, Math.round(Number(value)))) }); }}/></label>}
       {facility.type === 'meeting' && <label className="checkbox-line"><input type="checkbox" checked={!!base.clueExchange} disabled={busy} onChange={event => onSettings({ clueExchange: event.currentTarget.checked || undefined })}/><span>線索交流中</span></label>}
       {facility.type === 'manufacturing' && <label><span>產品</span><select className="filter" value={facility.product ?? ''} disabled={busy} onChange={event => onChange({ product: event.currentTarget.value as Facility['product'] })}><option value="" disabled>選擇產品</option><option value="gold">{PRODUCT_LABEL.gold}</option><option value="record">{PRODUCT_LABEL.record}</option></select></label>}
     </div>

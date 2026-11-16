@@ -48,7 +48,7 @@ export type SkillEffect =
   /** 宿舍：讓該宿舍某位心情未滿的其他幹員每小時恢復（同種效果取最高）。 */
   | { kind: 'dormSingle'; value: number }
   /** 依招募位、發電站數、本設施等級、宿舍總等級、貿易站數、會客室／訓練室等級倍增 effect；max 為加成上限。 */
-  | { kind: 'scaleBy'; by: 'recruitSlots' | 'powerPlants' | 'roomLevel' | 'dormLevels' | 'tradingPosts' | 'meetingLevel' | 'trainingLevel' | 'roomOccupants' | 'productTypes'; per: number; effect: SkillEffect; max?: number }
+  | { kind: 'scaleBy'; by: 'recruitSlots' | 'powerPlants' | 'roomLevel' | 'dormLevels' | 'tradingPosts' | 'meetingLevel' | 'trainingLevel' | 'roomOccupants' | 'productTypes' | 'droneCap'; per: number; effect: SkillEffect; max?: number }
   /** 同站每個某類技能（標準化類等）給一次 effect。 */
   | { kind: 'perCategory'; category: string; effect: SkillEffect }
   /** 同站的某些類別技能也視作另一類（意識相容）。 */
@@ -524,6 +524,8 @@ const EXTRA_RULES: ExtraRule[] = [
   { room: 'POWER', pattern: /^進駐發電站時，如果其他發電站內沒有進駐(.+?)，則發電站額外\+(\d+)\(僅影響設施數量\)$/u, parse: m => [{ kind: 'powerCount', value: Number(m[2]), unlessGroup: m[1] }] },
   { room: 'POWER', pattern: /^進駐發電站時，如果其他(.+?)(?:幹員)?進駐在發電站，則無人機充能速度\+(\d+)%$/u, parse: m => [{ kind: 'ifGroupCount', group: m[1], where: 'POWER', min: 1, others: true, effect: { kind: 'drone', value: Number(m[2]) } }] },
   { room: 'POWER', pattern: /^進駐發電站時，無人機充能速度\+(\d+)%，基建內（不包含副手及活動室使用者）每有1名除自身以外的(.+?)幹員（最多(\d+)名），充能速度額外\+(\d+)%$/u, parse: m => [{ kind: 'drone', value: Number(m[1]) }, { kind: 'perGroup', scope: 'base', group: m[2], max: Number(m[3]), excludeSelf: true, per: { kind: 'drone', value: Number(m[4]) } }] },
+  // 無人機上限：使用者在發電站設定；未設定時依「滿等已達上限」取技能最大值。
+  { room: 'POWER', pattern: /^進駐發電站時，每(\d+)架無人機上限\+(\d+)%無人機充能速度（最多\+(\d+)%）$/u, parse: m => [{ kind: 'scaleBy', by: 'droneCap', per: Number(m[1]), effect: { kind: 'drone', value: Number(m[2]) }, max: Number(m[3]) }] },
   { room: 'POWER', pattern: /^進駐發電站時，(.+?)所在的製造站生產力\+(\d+)%$/u, parse: m => [{ kind: 'remoteTo', name: m[1], target: 'MANUFACTURE', effect: { kind: 'productivity', value: Number(m[2]) } }] },
   // 控制中樞
   { room: 'CONTROL', pattern: /^進駐控制中樞時，如果有(\d+)台以上(.+?)進駐在發電站，則所有製造站生產力\+(\d+)%（同種效果取最高）$/u, parse: m => [{ kind: 'ifGroupCount', group: m[2], where: 'POWER', min: Number(m[1]), effect: { kind: 'global', target: 'MANUFACTURE', value: Number(m[3]), maxOnly: true } }] },
@@ -845,7 +847,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           if (effect.kind === 'perMoodDrop') { const count = Math.floor((maxMood(operatorId) - moodOf(operatorId)) / effect.per); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
           if (effect.kind === 'scaleBy') {
             const levelOf = (type: FacilityType) => Math.max(0, ...base.facilities.filter(item => item.type === type).map(item => item.level));
-            const source = { recruitSlots: base.recruitSlots ?? 0, powerPlants: base.facilities.filter(item => item.type === 'power').length + extraPower, roomLevel: facility.level, dormLevels, tradingPosts: base.facilities.filter(item => item.type === 'trading').length, meetingLevel: levelOf('meeting'), trainingLevel: levelOf('training'), roomOccupants: assigned.length, productTypes: new Set(base.facilities.filter(item => item.type === 'manufacturing' && item.product && (base.assignments?.[item.id]?.length ?? 0) > 0).map(item => item.product)).size }[effect.by];
+            const source = { recruitSlots: base.recruitSlots ?? 0, powerPlants: base.facilities.filter(item => item.type === 'power').length + extraPower, roomLevel: facility.level, dormLevels, tradingPosts: base.facilities.filter(item => item.type === 'trading').length, meetingLevel: levelOf('meeting'), trainingLevel: levelOf('training'), roomOccupants: assigned.length, droneCap: base.droneCap ?? 9999, productTypes: new Set(base.facilities.filter(item => item.type === 'manufacturing' && item.product && (base.assignments?.[item.id]?.length ?? 0) > 0).map(item => item.product)).size }[effect.by];
             const count = Math.floor(source / effect.per);
             if (!count || !('value' in effect.effect)) return null;
             const scaled = { ...effect.effect, value: round(Math.min(effect.max ?? Infinity, effect.effect.value * count)) } as SkillEffect;

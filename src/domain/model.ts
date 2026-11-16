@@ -107,6 +107,8 @@ export interface Settings {
     recruitSlots?: number;
     /** 會客室是否處於線索交流期間（部分技能只在此時生效）。 */
     clueExchange?: boolean;
+    /** 無人機上限（巡線框架用）；未設定時視為滿等已達技能上限。 */
+    droneCap?: number;
     /** 加工站要加工的配方（workshopFormulas 的 formulaId）。 */
     workshopFormula?: string;
   };
@@ -340,7 +342,7 @@ export function parseImportText(textValue: string): ImportDocument { return vali
 
 function validateSettings(value: unknown): void {
   const settings = object(value, ['base', 'analysis', 'lastBackupAt'], ['base', 'analysis']);
-  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments', 'training', 'workshop', 'recruitSlots', 'clueExchange', 'workshopFormula'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
+  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments', 'training', 'workshop', 'recruitSlots', 'clueExchange', 'workshopFormula', 'droneCap'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
   for (const item of base.facilities) {
     const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
     if (facility.product !== undefined) choice(facility.product, ['gold', 'record', 'lmd'], '產品'); if (facility.atmosphere !== undefined) integer(facility.atmosphere, 0, 10000, '氛圍');
@@ -353,6 +355,7 @@ function validateSettings(value: unknown): void {
   }
   if (base.workshop !== undefined) choice(base.workshop, ['elite', 'skill', 'base', 'any'], '加工類別');
   if (base.recruitSlots !== undefined) integer(base.recruitSlots, 0, 3, '額外招募位');
+  if (base.droneCap !== undefined) integer(base.droneCap, 0, 999, '無人機上限');
   if (base.clueExchange !== undefined && typeof base.clueExchange !== 'boolean') throw new Error('線索交流設定必須是是／否。');
   if (base.workshopFormula !== undefined && (typeof base.workshopFormula !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/u.test(base.workshopFormula))) throw new Error('加工配方代碼格式不正確。');
   if (base.assignments !== undefined) {
