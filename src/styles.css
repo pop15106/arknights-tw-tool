@@ -703,3 +703,51 @@ h2 { font-weight: 800; }
   .page-title h1 { font-size: 20px; }
   .stat-value { font-size: 24px; }
 }
+
+/* ---------- 基建一圖流 ---------- */
+.view-switch { justify-self: start; }
+.base-map { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; padding: 14px; border: 2px solid var(--edge); border-radius: var(--radius-lg); box-shadow: var(--pop);
+  background: radial-gradient(circle, color-mix(in srgb, var(--edge) 14%, transparent) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--surface-2); }
+.map-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.map-room {
+  --room: #e8e2d8;
+  position: relative; overflow: hidden; display: grid; gap: 8px; align-content: start; min-height: 150px; padding: 12px 12px 14px; text-align: left;
+  border: 2px solid var(--edge); border-radius: 14px; background: #24211f; color: #f3ede5; box-shadow: var(--pop-sm);
+  transition: transform .12s var(--ease), box-shadow .12s var(--ease);
+}
+.map-room.wide { grid-column: 1 / -1; }
+.map-room:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.room-trading { --room: #4fb3ea; } .room-manufacturing { --room: #f2c14e; } .room-power { --room: #8fd16a; }
+.room-control { --room: #ff8a4c; } .room-dormitory { --room: #b998f0; }
+.map-room-bg { position: absolute; right: -12px; bottom: -18px; color: #fff; opacity: .05; pointer-events: none; }
+.map-room-head { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-left: 10px; }
+.map-room-head::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 4px; border-radius: 2px; background: var(--room); }
+.map-room-name { font-size: 15px; font-weight: 900; letter-spacing: .02em; }
+.map-pips { display: inline-flex; gap: 3px; }
+.map-pips i { width: 8px; height: 13px; border-radius: 3px; background: rgb(255 255 255 / .16); }
+.map-pips i.on { background: var(--room); }
+.map-product { padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 800; background: rgb(255 255 255 / .1); color: var(--room); }
+.map-room-status { position: relative; font-size: 12px; color: #b9b0a5; }
+.map-room-status.bad { color: #ff8b7e; }
+.map-room-status em { font-style: normal; color: #f0b544; }
+.map-slots { position: relative; display: flex; flex-wrap: wrap; gap: 8px; }
+.map-slot { position: relative; width: 64px; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: #3a3633; }
+.map-slot.empty { background: linear-gradient(135deg, transparent calc(50% - 1px), rgb(255 255 255 / .14) 50%, transparent calc(50% + 1px)), #3a3633; border: 1px solid rgb(255 255 255 / .08); }
+.map-slot.filled { border: 2px solid var(--room); }
+.map-slot.over { border-color: #ff6b5e; }
+.map-slot .portrait { position: absolute; inset: 0; }
+.map-slot .portrait img { object-position: 50% 8%; }
+.map-slot .portrait-placeholder { background: #34302d; }
+.map-slot .portrait-placeholder > span { font-size: 22px; color: var(--room); }
+.map-slot .portrait-placeholder small, .map-slot .portrait-retry { display: none; }
+.map-slot-name { position: absolute; inset: auto 0 0; padding: 10px 3px 2px; font-size: 10.5px; font-weight: 800; line-height: 1.2; text-align: center; color: #fff;
+  background: linear-gradient(transparent, rgb(0 0 0 / .78)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .map-room:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--edge); } }
+@media (max-width: 1100px) { .base-map { grid-template-columns: 1fr; } }
+@media (max-width: 860px) {
+  .base-map { padding: 10px; gap: 10px; }
+  .map-side { gap: 10px; }
+  .map-room { min-height: 0; padding: 10px; }
+  .map-slot { width: 52px; }
+}
+@media (max-width: 480px) { .map-side { grid-template-columns: 1fr; } }

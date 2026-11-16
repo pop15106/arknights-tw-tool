@@ -54,6 +54,7 @@ export function createDemoBaseCatalog(): BaseCatalog {
       { id: 'MANUFACTURE', name: '製造站', maxCount: 5, phases: [[1, -10], [2, -30], [3, -60]].map(([maxStationedNum, electricity]) => ({ maxStationedNum, electricity })) },
       { id: 'TRADING', name: '貿易站', maxCount: 5, phases: [[1, -10], [2, -30], [3, -60]].map(([maxStationedNum, electricity]) => ({ maxStationedNum, electricity })) },
       { id: 'DORMITORY', name: '宿舍', maxCount: 4, phases: [-10, -20, -30, -45, -65].map(electricity => ({ maxStationedNum: 5, electricity })) },
+      ...(['MEETING', 'HIRE', 'TRAINING', 'WORKSHOP'] as const).map(id => ({ id, name: { MEETING: '會客室', HIRE: '辦公室', TRAINING: '訓練室', WORKSHOP: '加工站' }[id], maxCount: 1, phases: [-10, -30, -60].map(electricity => ({ maxStationedNum: id === 'HIRE' || id === 'WORKSHOP' ? 1 : 2, electricity })) })),
     ],
     basicSpeedPercent: { MANUFACTURE: 1, TRADING: 1 },
     skills,

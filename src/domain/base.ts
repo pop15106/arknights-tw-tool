@@ -3,8 +3,8 @@ import type { OperatorDefinition, OwnedOperator, Settings } from './model.ts';
 
 export type Facility = Settings['base']['facilities'][number];
 export type FacilityType = Facility['type'];
-export const ROOM_OF: Record<FacilityType, BaseRoomType> = { control: 'CONTROL', power: 'POWER', manufacturing: 'MANUFACTURE', trading: 'TRADING', dormitory: 'DORMITORY' };
-export const FACILITY_LABEL: Record<FacilityType, string> = { control: '控制中樞', power: '發電站', manufacturing: '製造站', trading: '貿易站', dormitory: '宿舍' };
+export const ROOM_OF: Record<FacilityType, BaseRoomType> = { control: 'CONTROL', power: 'POWER', manufacturing: 'MANUFACTURE', trading: 'TRADING', dormitory: 'DORMITORY', meeting: 'MEETING', office: 'HIRE', training: 'TRAINING', workshop: 'WORKSHOP' };
+export const FACILITY_LABEL: Record<FacilityType, string> = { control: '控制中樞', power: '發電站', manufacturing: '製造站', trading: '貿易站', dormitory: '宿舍', meeting: '會客室', office: '辦公室', training: '訓練室', workshop: '加工站' };
 export const PRODUCT_LABEL = { gold: '赤金（貴金屬）', record: '作戰記錄', lmd: '龍門幣訂單' } as const;
 
 /* ------------------------------------------------------------------ */

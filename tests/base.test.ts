@@ -95,7 +95,7 @@ test('設定保存進駐名單；格式錯誤或重複會被拒絕', async () =>
 
 test('由原始 building_data 投影：只保留需要欄位與已知幹員', () => {
   const raw = {
-    rooms: Object.fromEntries(['CONTROL', 'POWER', 'MANUFACTURE', 'TRADING', 'DORMITORY'].map(id => [id, { name: `<@x>${id}</>`, maxCount: 2, phases: [{ maxStationedNum: 1, electricity: -10, extra: 'ignored' }] }])),
+    rooms: Object.fromEntries(['CONTROL', 'POWER', 'MANUFACTURE', 'TRADING', 'DORMITORY', 'MEETING', 'HIRE', 'TRAINING', 'WORKSHOP'].map(id => [id, { name: `<@x>${id}</>`, maxCount: 2, phases: [{ maxStationedNum: 1, electricity: -10, extra: 'ignored' }] }])),
     buffs: { 'b[000]': { buffName: '測試', roomType: 'MANUFACTURE', description: '進駐製造站時，生產力<@cc.vup>+15%</>' } },
     chars: { char_1: { buffChar: [{ buffData: [{ buffId: 'b[000]', cond: { phase: 'PHASE_1', level: 30 } }] }, { buffData: [] }] }, char_unused: { buffChar: [] } },
     manufactData: { basicSpeedBuff: 0.01 }, tradingData: { basicSpeedBuff: 0.01 },

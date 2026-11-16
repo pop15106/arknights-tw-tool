@@ -95,7 +95,7 @@ export interface BatchRecord {
 }
 export interface Settings {
   base: {
-    facilities: { id: string; type: 'control' | 'manufacturing' | 'trading' | 'power' | 'dormitory'; level: number; product?: 'gold' | 'record' | 'lmd'; atmosphere?: number }[];
+    facilities: { id: string; type: 'control' | 'manufacturing' | 'trading' | 'power' | 'dormitory' | 'meeting' | 'office' | 'training' | 'workshop'; level: number; product?: 'gold' | 'record' | 'lmd'; atmosphere?: number }[];
     onlineSlots: string[];
     /** 設施 ID → 進駐幹員 ID。只是配置草稿，不代表遊戲內現況。 */
     assignments?: Record<string, string[]>;
@@ -332,7 +332,7 @@ function validateSettings(value: unknown): void {
   const settings = object(value, ['base', 'analysis', 'lastBackupAt'], ['base', 'analysis']);
   const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
   for (const item of base.facilities) {
-    const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
+    const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
     if (facility.product !== undefined) choice(facility.product, ['gold', 'record', 'lmd'], '產品'); if (facility.atmosphere !== undefined) integer(facility.atmosphere, 0, 10000, '氛圍');
   }
   unique((base.facilities as { id: string }[]).map(f => f.id), '設施');

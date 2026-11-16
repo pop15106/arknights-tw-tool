@@ -1,8 +1,8 @@
 // 由 building_data.json 投影出基建頁需要的欄位；不執行任何遊戲標記。
 type Row = Record<string, any>;
 
-export type BaseRoomType = 'CONTROL' | 'POWER' | 'MANUFACTURE' | 'TRADING' | 'DORMITORY';
-export const BASE_ROOM_TYPES: readonly BaseRoomType[] = ['CONTROL', 'POWER', 'MANUFACTURE', 'TRADING', 'DORMITORY'];
+export type BaseRoomType = 'CONTROL' | 'POWER' | 'MANUFACTURE' | 'TRADING' | 'DORMITORY' | 'MEETING' | 'HIRE' | 'TRAINING' | 'WORKSHOP';
+export const BASE_ROOM_TYPES: readonly BaseRoomType[] = ['CONTROL', 'POWER', 'MANUFACTURE', 'TRADING', 'DORMITORY', 'MEETING', 'HIRE', 'TRAINING', 'WORKSHOP'];
 
 export interface BaseRoom { id: BaseRoomType; name: string; maxCount: number; phases: { maxStationedNum: number; electricity: number }[] }
 export interface BaseSkill { id: string; name: string; roomType: string; description: string }

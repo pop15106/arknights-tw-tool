@@ -4,13 +4,15 @@ import type { BaseCatalog } from '../catalog/base';
 import { candidatesFor, evaluateBase, recommendBase, type BaseRecommendation, FACILITY_LABEL, parseSkill, productMatches, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
+import { Modal } from './Modal';
+import { BaseMap } from './BaseMap';
 
 type Base = Settings['base'];
-const TYPES: FacilityType[] = ['control', 'manufacturing', 'trading', 'power', 'dormitory'];
+const TYPES: FacilityType[] = ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'];
 const TEMPLATES: { label: string; layout: [FacilityType, number, number, Facility['product']?][] }[] = [
-  { label: '243（貿易 2、製造 4、發電 3）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 2, 3, 'record'], ['power', 3, 3], ['dormitory', 4, 5]] },
-  { label: '153（貿易 1、製造 5、發電 3）', layout: [['control', 1, 5], ['trading', 1, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 3, 3], ['dormitory', 4, 5]] },
-  { label: '252（貿易 2、製造 5、發電 2）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 2, 3], ['dormitory', 4, 5]] },
+  { label: '243（貿易 2、製造 4、發電 3）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 2, 3, 'record'], ['power', 3, 3], ['meeting', 1, 3], ['office', 1, 3], ['training', 1, 3], ['workshop', 1, 3], ['dormitory', 4, 5]] },
+  { label: '153（貿易 1、製造 5、發電 3）', layout: [['control', 1, 5], ['trading', 1, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 3, 3], ['meeting', 1, 3], ['office', 1, 3], ['training', 1, 3], ['workshop', 1, 3], ['dormitory', 4, 5]] },
+  { label: '252（貿易 2、製造 5、發電 2）', layout: [['control', 1, 5], ['trading', 2, 3], ['manufacturing', 2, 3, 'gold'], ['manufacturing', 3, 3, 'record'], ['power', 2, 3], ['meeting', 1, 3], ['office', 1, 3], ['training', 1, 3], ['workshop', 1, 3], ['dormitory', 4, 5]] },
 ];
 const newId = () => `f-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const signed = (value: number, unit = '%') => `${value >= 0 ? '+' : ''}${value}${unit}`;
@@ -181,6 +183,9 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
   const { catalog, error } = useBaseCatalog(isDemo, attempt);
   const [draft, setDraft] = useState<Base>(state.settings.base);
   const [addType, setAddType] = useState<FacilityType>('manufacturing');
+  const [view, setView] = useState<'map' | 'list'>(() => { try { return localStorage.getItem('arknights-tw-base-view') === 'list' ? 'list' : 'map'; } catch { return 'map'; } });
+  const [editing, setEditing] = useState<string | null>(null);
+  useEffect(() => { try { localStorage.setItem('arknights-tw-base-view', view); } catch { /* 不影響使用 */ } }, [view]);
   const saved = JSON.stringify(state.settings.base);
   useEffect(() => { setDraft(state.settings.base); }, [saved]);
   const dirty = JSON.stringify(draft) !== saved;
@@ -202,6 +207,10 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
   };
   const { produced, consumed } = evaluation.electricity;
   const unsupportedTotal = evaluation.facilities.reduce((sum, f) => sum + f.unsupported.length + f.uncertain.length, 0);
+  const editingResult = editing ? evaluation.facilities.find(result => result.facility.id === editing) : undefined;
+  const renderCard = (result: FacilityResult) => <FacilityCard key={result.facility.id} result={result} catalog={catalog} state={state} base={draft} busy={busy}
+    onChange={patch => patchFacility(result.facility.id, patch)} onRemove={() => { removeFacility(result.facility.id); setEditing(null); }}
+    onAssign={id => assign(result.facility.id, id)} onUnassign={id => unassign(result.facility.id, id)}/>;
 
   return <div className="base-page">
     {isDemo && <p className="callout warning">示範庫使用自製的虛構基建技能與數值，只用來體驗操作，不代表遊戲規則。</p>}
@@ -219,11 +228,17 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
     {!draft.facilities.length && <section className="empty-inline base-empty"><strong>先建立設施配置</strong><span>選一個常見布局作為起點，或逐一新增設施；之後可以再調整等級與數量。</span>
       <div className="inline-actions center">{TEMPLATES.map((template, index) => <button type="button" key={template.label} className="button secondary small" disabled={busy} onClick={() => applyTemplate(index)}>{template.label}</button>)}</div>
     </section>}
-    <div className="facility-grid">
-      {evaluation.facilities.map(result => <FacilityCard key={result.facility.id} result={result} catalog={catalog} state={state} base={draft} busy={busy}
-        onChange={patch => patchFacility(result.facility.id, patch)} onRemove={() => removeFacility(result.facility.id)}
-        onAssign={id => assign(result.facility.id, id)} onUnassign={id => unassign(result.facility.id, id)}/>)}
-    </div>
+    {draft.facilities.length > 0 && <div className="segmented view-switch" role="tablist" aria-label="基建檢視方式">
+      <button type="button" role="tab" aria-selected={view === 'map'} className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>一圖流布局</button>
+      <button type="button" role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>列表式布局</button>
+    </div>}
+    {view === 'map' ? <BaseMap facilities={evaluation.facilities} definitions={definitions} onOpen={setEditing}/> : <div className="facility-grid">
+      {evaluation.facilities.map(result => renderCard(result))}
+    </div>}
+    {editingResult && <Modal title={editingResult.label} eyebrow="設施設定與進駐" onClose={() => setEditing(null)} footer={<button type="button" className="button primary" onClick={() => setEditing(null)}>完成</button>}>
+      {renderCard(editingResult)}
+      <p className="fine-print">變更會先留在配置草稿，按頁面上方「保存配置」才寫入本機。</p>
+    </Modal>}
     <div className="base-add">
       <select className="filter" aria-label="新增設施種類" value={addType} disabled={busy} onChange={event => setAddType(event.currentTarget.value as FacilityType)}>{TYPES.map(type => <option key={type} value={type}>{FACILITY_LABEL[type]}</option>)}</select>
       <button type="button" className="button secondary" disabled={busy || draft.facilities.length >= 20} onClick={() => update({ ...draft, facilities: [...draft.facilities, addFacility(addType, 1, addType === 'manufacturing' ? 'gold' : undefined)] })}><Icon name="plus" size={16}/>新增設施</button>
