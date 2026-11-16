@@ -2,6 +2,7 @@ import type { BaseCatalog } from '../catalog/base';
 import { baseStatistics, simulateShift, type BaseEvaluation } from '../domain/base';
 import type { AppState, Settings } from '../domain/model';
 import { DEFAULT_TRADING } from '../catalog/trading';
+import { ShiftReminder } from './ShiftReminder';
 
 const fmt = (value: number, digits = 1) => value.toLocaleString('zh-TW', { maximumFractionDigits: digits });
 
@@ -23,6 +24,7 @@ export function BaseStats({ evaluation, catalog, base, state }: { evaluation: Ba
       <div className="stats-card lmd"><span>龍門幣</span><strong>{stats.trading.length ? fmt(stats.lmdPerDay, 0) : '—'}</strong><small>{stats.trading.length ? `龍門幣／日・PRTS ${catalog.trading ? `${date(trading.source.fetchedAt)} 同步` : '內建值'}` : '貿易站尚未排人'}</small></div>
       <div className="stats-card shift"><span>建議換班</span><strong>{stats.suggestion ? `${stats.suggestion.hours} 小時` : '—'}</strong><small>{stats.suggestion?.text ?? '尚未排人'}</small></div>
     </div>
+    {stats.suggestion && <ShiftReminder hours={stats.suggestion.hours}/>}
     {(stats.goldPerDay > 0 || stats.goldConsumedPerDay > 0) && <div className={`gold-balance ${stats.goldPerDay >= stats.goldConsumedPerDay ? 'ok' : 'short'}`}>
       <strong>赤金收支</strong>
       <span>製造 {fmt(stats.goldPerDay)} 條／日 − 貿易站消耗 {fmt(stats.goldConsumedPerDay)} 條／日 ＝ <b>{stats.goldPerDay >= stats.goldConsumedPerDay ? '+' : ''}{fmt(stats.goldPerDay - stats.goldConsumedPerDay)} 條／日</b></span>

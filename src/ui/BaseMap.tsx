@@ -57,3 +57,37 @@ export function BaseMap({ facilities, definitions, onOpen }: { facilities: Facil
     <div className="map-side">{order(right, ['meeting', 'office', 'training', 'workshop', 'dormitory']).map(result => <RoomTile key={result.facility.id} result={result} definitions={definitions} onOpen={() => onOpen(result.facility.id)}/>)}</div>
   </div>;
 }
+
+const TYPE_COLOR: Record<FacilityType, string> = { control: '#ff7a3d', trading: '#3d9be9', manufacturing: '#f2b632', power: '#7cc96b', dormitory: '#a98bf0', meeting: '#e0e0e0', office: '#e0e0e0', training: '#e0e0e0', workshop: '#e0e0e0' };
+/** 把一圖流畫成 PNG（只用 canvas，不含頭像，方便分享）。 */
+export async function mapImage(facilities: FacilityResult[], definitions: ReadonlyMap<string, OperatorDefinition>, title: string): Promise<Blob> {
+  const scale = 2, width = 1200, column = (width - 72) / 2;
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d')!;
+  const font = (size: number, weight = 400) => `${weight} ${size}px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif`;
+  const wrap = (text: string, max: number, size: number) => { context.font = font(size); const lines: string[] = []; let line = ''; for (const part of text.split('、')) { const next = line ? `${line}、${part}` : part; if (context.measureText(next).width > max && line) { lines.push(line); line = part; } else line = next; } if (line) lines.push(line); return lines; };
+  const tile = (result: FacilityResult) => { const names = result.operators.map(op => definitions.get(op.operatorId)?.displayName ?? op.name).join('、') || '（空）'; return { result, lines: wrap(names, column - 36, 15) }; };
+  const left = LEFT.flatMap(type => facilities.filter(item => item.facility.type === type)).map(tile);
+  const right = (['meeting', 'office', 'training', 'workshop', 'dormitory'] as FacilityType[]).flatMap(type => facilities.filter(item => item.facility.type === type)).map(tile);
+  const heightOf = (item: ReturnType<typeof tile>) => 62 + item.lines.length * 22;
+  const columnHeight = (list: ReturnType<typeof tile>[]) => list.reduce((sum, item) => sum + heightOf(item) + 12, 0);
+  const height = 96 + Math.max(columnHeight(left), columnHeight(right)) + 40;
+  canvas.width = width * scale; canvas.height = height * scale; context.scale(scale, scale);
+  context.fillStyle = '#1f1a17'; context.fillRect(0, 0, width, height);
+  context.fillStyle = '#fff'; context.font = font(26, 800); context.fillText(title, 24, 48);
+  context.fillStyle = '#a89d94'; context.font = font(13); context.fillText('幹員檔案室・繁中服基建一圖流', 24, 72);
+  const draw = (list: ReturnType<typeof tile>[], x: number) => {
+    let y = 96;
+    for (const item of list) {
+      const h = heightOf(item), color = TYPE_COLOR[item.result.facility.type];
+      context.fillStyle = '#2b2420'; context.beginPath(); context.roundRect(x, y, column, h, 12); context.fill();
+      context.fillStyle = color; context.fillRect(x, y + 10, 4, h - 20);
+      context.fillStyle = '#fff'; context.font = font(17, 700); context.fillText(`${item.result.label}・${item.result.facility.level} 級`, x + 18, y + 28);
+      const value = metric(item.result); if (value) { context.fillStyle = color; context.font = font(13, 700); context.fillText(value, x + column - 18 - context.measureText(value).width, y + 28); }
+      context.fillStyle = '#e8e0d8'; context.font = font(15); item.lines.forEach((line, index) => context.fillText(line, x + 18, y + 54 + index * 22));
+      y += h + 12;
+    }
+  };
+  draw(left, 24); draw(right, 48 + column);
+  return await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('無法產生圖片。')), 'image/png'));
+}

@@ -5,7 +5,7 @@ import { candidatesFor, compareLayout, DEFAULT_WEIGHTS, evaluateBase, LAYOUTS, l
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
-import { BaseMap } from './BaseMap';
+import { BaseMap, mapImage } from './BaseMap';
 import { BaseTraining } from './BaseTraining';
 import { BaseStats } from './BaseStats';
 import { BaseRotation } from './BaseRotation';
@@ -403,7 +403,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
       <button type="button" role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>列表式布局</button>
       <button type="button" role="tab" aria-selected={view === 'training'} className={view === 'training' ? 'active' : ''} onClick={() => setView('training')}>練卡建議</button>
     </div>}
-    {view === 'training' ? <BaseTraining state={state} catalog={catalog} base={draft}/> : view === 'map' ? <BaseMap facilities={evaluation.facilities} definitions={definitions} onOpen={setEditing}/> : <div className="facility-grid">
+    {view === 'training' ? <BaseTraining state={state} catalog={catalog} base={draft}/> : view === 'map' ? <><BaseMap facilities={evaluation.facilities} definitions={definitions} onOpen={setEditing}/><div className="inline-actions"><button type="button" className="button ghost small" onClick={() => void mapImage(evaluation.facilities, definitions, '基建一圖流').then(blob => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'base-map.png'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); })}>存成圖片</button></div></> : <div className="facility-grid">
       {evaluation.facilities.map(result => renderCard(result))}
     </div>}
     {editingResult && <Modal title={editingResult.label} eyebrow="設施設定與進駐" onClose={() => setEditing(null)} footer={<button type="button" className="button primary" onClick={() => setEditing(null)}>完成</button>}>
