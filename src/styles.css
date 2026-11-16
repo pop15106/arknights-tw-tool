@@ -844,3 +844,33 @@ h2 { font-weight: 800; }
 .sim-compare strong { font: 800 20px var(--font-mono); }
 .sim-compare small { font-size: 11.5px; color: var(--muted); }
 @media (max-width: 860px) { .sim-compare { grid-template-columns: 1fr; } }
+
+/* 養成計算 */
+.growth-page { display: grid; gap: 16px; }
+.growth-search { display: block; margin-top: 12px; }
+.growth-search .text-input { width: 100%; max-width: 420px; }
+.growth-matches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.growth-plans { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); }
+.growth-card { display: grid; gap: 10px; align-content: start; }
+.growth-card-head { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; }
+.growth-card-head h3 { margin: 0; }
+.growth-card-head .portrait, .growth-card-head img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
+.growth-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.growth-summary { margin: 0; font-size: 14px; }
+.fine-print.amber { color: var(--amber); }
+.growth-items td:nth-child(n+2), .growth-items th:nth-child(n+2) { text-align: right; font-family: var(--font-mono); }
+.growth-items tr.short td:last-child { color: var(--danger); font-weight: 700; }
+.growth-items .text-input.small { width: 96px; min-height: 32px; padding: 4px 8px; text-align: right; }
+.rarity { font-weight: 600; }
+.rarity.r5 { color: var(--amber); }
+.rarity.r4 { color: #a77de0; }
+.rarity.r3 { color: #3d9be9; }
+.rarity.r2 { color: #8bab3a; }
+@media (max-width: 640px) { .growth-items .text-input.small { width: 72px; } }
+.growth-card-head .portrait { width: 56px; height: 56px; overflow: hidden; border-radius: 12px; }
+.growth-card-head .portrait-placeholder { width: 100%; height: 100%; display: grid; place-items: center; }
+.growth-card-head .portrait-placeholder small, .growth-card-head .portrait-retry { display: none; }
+.stats-table.growth-items { width: 100%; min-width: 0; table-layout: fixed; }
+.growth-items th:nth-child(1) { width: 44%; } .growth-items th:nth-child(2) { width: 16%; } .growth-items th:nth-child(3) { width: 24%; } .growth-items th:nth-child(4) { width: 16%; }
+.growth-items td:first-child { overflow-wrap: anywhere; }
+@media (max-width: 640px) { .growth-items .text-input.small { width: 100%; min-width: 0; } .growth-items td, .growth-items th { padding-left: 4px; padding-right: 4px; } }

@@ -1,6 +1,7 @@
 import { buildModules } from './modules.ts';
 import { renderGameText } from './game-text.ts';
 import { buildBaseCatalog, type BaseCatalog } from './base.ts';
+import { buildGrowthCatalog, type GrowthCatalog } from './growth.ts';
 export { renderGameText } from './game-text.ts';
 import { sealDataset, type Dataset, type OperatorDefinition } from '../domain/model.ts';
 
@@ -12,9 +13,9 @@ export interface GameDataStatus {
   counts: { operators: number; stages: number; events: number };
   sourceKind: 'public-mirror'; sourceUrl: string; lastError?: string; catalogRevision?: number; moduleSource?: { version: string; sourceUrl: string; sourceUpdatedAt: string };
 }
-export interface GameDataSnapshot { dataset: Dataset; stages: Row[]; events: Row[]; status: GameDataStatus; base?: BaseCatalog }
+export interface GameDataSnapshot { dataset: Dataset; stages: Row[]; events: Row[]; status: GameDataStatus; base?: BaseCatalog; growth?: GrowthCatalog }
 export const DATA_REPO = 'arkntools/arknights-data-tw-for-maa';
-export const CATALOG_REVISION = 8;
+export const CATALOG_REVISION = 9;
 export const MODULE_DATA_REPO = 'ArknightsAssets/ArknightsGamedata';
 export const MODULE_DATA_COMMIT = '624d3fa212dabc40bdbc2a873d87d0c7dbdf4fe5';
 export const MODULE_DATA_DATE = '2026-11-02T09:23:25Z';
@@ -78,5 +79,6 @@ export async function buildGameData(tables: GameDataTables, source: { commit: st
     return [op.id, { name: op.displayName, ids, groups: ids.map(teamName).filter((value): value is string => typeof value === 'string'), ...(char.isSpChar ? { alter: true } : {}), ...(patchOwner.get(op.id) ? { character: patchOwner.get(op.id) } : {}) }];
   }));
   const base = tables.building ? buildBaseCatalog(tables.building, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} building_data.json`, tables.items, operatorMeta, tables.constants) : undefined;
-  return { dataset, stages, events, ...(base ? { base } : {}), status: { catalogRevision: CATALOG_REVISION, ...(tables.battleEquip ? { moduleSource: { version: MODULE_DATA_COMMIT, sourceUrl: `https://github.com/${MODULE_DATA_REPO}/tree/${MODULE_DATA_COMMIT}/tw/gamedata/excel`, sourceUpdatedAt: MODULE_DATA_DATE } } : {}), version: source.commit, sourceUpdatedAt: source.sourceUpdatedAt, syncedAt: source.syncedAt, counts: { operators: operators.length, stages: stages.length, events: events.length }, sourceKind: 'public-mirror', sourceUrl: `https://github.com/${DATA_REPO}/tree/${source.commit}` } };
+  const growth = buildGrowthCatalog(tables, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} character_table／gamedata_const／item_table`);
+  return { dataset, stages, events, ...(base ? { base } : {}), ...(growth ? { growth } : {}), status: { catalogRevision: CATALOG_REVISION, ...(tables.battleEquip ? { moduleSource: { version: MODULE_DATA_COMMIT, sourceUrl: `https://github.com/${MODULE_DATA_REPO}/tree/${MODULE_DATA_COMMIT}/tw/gamedata/excel`, sourceUpdatedAt: MODULE_DATA_DATE } } : {}), version: source.commit, sourceUpdatedAt: source.sourceUpdatedAt, syncedAt: source.syncedAt, counts: { operators: operators.length, stages: stages.length, events: events.length }, sourceKind: 'public-mirror', sourceUrl: `https://github.com/${DATA_REPO}/tree/${source.commit}` } };
 }

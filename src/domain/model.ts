@@ -112,6 +112,8 @@ export interface Settings {
     /** 加工站要加工的配方（workshopFormulas 的 formulaId）。 */
     workshopFormula?: string;
   };
+  /** 養成計畫：各幹員的目標，以及材料庫存（本機手動輸入）。 */
+  growth?: { plans: { operatorId: string; target: { elite: number; level: number; skillLevel: number; masteries: Record<string, number>; modules: Record<string, number> } }[]; expand?: boolean; inventory?: Record<string, number> };
   analysis: { mode: 'story' | 'integrated-strategies' | 'reclamation' | 'stationary-security' | 'defense'; goal: string; budget: number };
   lastBackupAt?: string;
 }
@@ -341,7 +343,20 @@ export function parseJson(textValue: string, maxBytes: number): unknown {
 export function parseImportText(textValue: string): ImportDocument { return validateImportDocument(parseJson(textValue, MAX_IMPORT_BYTES)); }
 
 function validateSettings(value: unknown): void {
-  const settings = object(value, ['base', 'analysis', 'lastBackupAt'], ['base', 'analysis']);
+  const settings = object(value, ['base', 'analysis', 'lastBackupAt', 'growth'], ['base', 'analysis']);
+  if (settings.growth !== undefined) {
+    const growth = object(settings.growth, ['plans', 'expand', 'inventory'], ['plans']); list(growth.plans, 200, '養成計畫');
+    for (const item of growth.plans as unknown[]) {
+      const plan = object(item, ['operatorId', 'target'], ['operatorId', 'target']); id(plan.operatorId);
+      const target = object(plan.target, ['elite', 'level', 'skillLevel', 'masteries', 'modules'], ['elite', 'level', 'skillLevel', 'masteries', 'modules']);
+      integer(target.elite, 0, 2, '目標精英'); integer(target.level, 1, 90, '目標等級'); integer(target.skillLevel, 1, 7, '目標技能等級');
+      for (const [key, level] of Object.entries(object(target.masteries, Object.keys(target.masteries as object), []))) { id(key); integer(level, 0, 3, '目標專精'); }
+      for (const [key, level] of Object.entries(object(target.modules, Object.keys(target.modules as object), []))) { id(key); integer(level, 0, 3, '目標模組等級'); }
+    }
+    unique((growth.plans as { operatorId: string }[]).map(plan => plan.operatorId), '養成計畫');
+    if (growth.expand !== undefined && typeof growth.expand !== 'boolean') throw new Error('展開合成設定必須是是／否。');
+    if (growth.inventory !== undefined) for (const [key, count] of Object.entries(object(growth.inventory, Object.keys(growth.inventory as object), []))) { id(key); integer(count, 0, 10_000_000, '庫存數量'); }
+  }
   const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments', 'training', 'workshop', 'recruitSlots', 'clueExchange', 'workshopFormula', 'droneCap'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
   for (const item of base.facilities) {
     const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'], '設施種類'); integer(facility.level, 1, 5, '設施等級');

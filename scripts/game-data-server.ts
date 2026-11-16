@@ -62,7 +62,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const sync = options.sync ?? (async () => (await import('./game-data-sync.ts')).syncGameData());
   const loadTrading = options.loadTrading ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadTradingData());
   let origin = '', host = '';
-  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'sync'].map(name => `/api/game-data/${name}`));
+  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     try {
       if (req.headers.host !== host && !isLoopbackHost(req.headers.host)) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
@@ -97,6 +97,10 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (!snapshot) throw new ApiError(503, 'DATA_UNAVAILABLE', '尚未同步公開遊戲資料。');
       if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
+      if (url.pathname === '/api/game-data/growth') {
+        if (!snapshot.growth) throw new ApiError(503, 'GROWTH_UNAVAILABLE', '目前的遊戲資料沒有養成成本資料，請到設定按「更新遊戲資料」。');
+        json(res, 200, snapshot.growth); return;
+      }
       if (url.pathname === '/api/game-data/base') {
         if (!snapshot.base) throw new ApiError(503, 'BASE_UNAVAILABLE', '目前的遊戲資料沒有基建資料，請到設定按「更新遊戲資料」。');
         const trading = await loadTrading().catch(() => null);
