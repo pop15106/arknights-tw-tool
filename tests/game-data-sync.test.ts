@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createGameDataStore } from '../scripts/game-data-sync.ts';
@@ -38,6 +38,39 @@ test('不支援的版本不能用於檔案路徑，且不替換有效快取',asy
   try{await assert.rejects(store.sync(),/更新失敗/);assert.equal(await store.load(),null);}finally{await rm(dir,{recursive:true,force:true});}
 });
 
+test('REL-01：指標損壞、快照缺檔或校驗不符時改用可驗證舊版，且仍可重新同步修復', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'ark-catalog-repair-'));
+  const older = 'a'.repeat(40), newer = 'b'.repeat(40), later = '2026-11-14T00:00:00.000Z';
+  const store = createGameDataStore({ cacheDirectory: dir, assetDirectory: path.join(dir, 'assets'),
+    fetcher: async () => new Response(JSON.stringify({ sha: newer, commit: { committer: { date } } })),
+    build: async (_tables, source) => { const value = await fixture(source.commit); value.status.syncedAt = source.syncedAt; return value; } });
+  const pointer = path.join(dir, 'current.json');
+  try {
+    await store.seed({} as never, { commit: older, sourceUpdatedAt: date, syncedAt: date });
+    await store.seed({} as never, { commit: newer, sourceUpdatedAt: date, syncedAt: later });
+    const good = await readFile(pointer, 'utf8');
+    const snapshotFile = path.join(dir, 'snapshots', `${newer}-${JSON.parse(good).sha256}.json`);
+
+    await writeFile(pointer, '{不是 JSON');
+    let loaded = await store.load();
+    assert.equal(loaded?.status.version, newer); assert.match(loaded!.status.lastError!, /損壞/);
+
+    await writeFile(pointer, 'null');
+    assert.equal((await store.load())?.status.version, newer);
+
+    await writeFile(snapshotFile, (await readFile(snapshotFile, 'utf8')).replace('合成測試', '竄改測試'));
+    await writeFile(pointer, good);
+    loaded = await store.load();
+    assert.equal(loaded?.status.version, older, '校驗不符的最新快照不得使用，改用上一個可驗證版本');
+
+    await rm(path.join(dir, 'snapshots'), { recursive: true });
+    await assert.rejects(store.load(), /沒有可用舊版/);
+    const repaired = await store.sync();
+    assert.equal(repaired.status.version, newer);
+    const reloaded = await store.load();
+    assert.equal(reloaded?.status.version, newer); assert.equal(reloaded?.status.lastError, undefined);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
 
 test('相同上游版本但舊解析版本仍補抓效果與信賴表，失敗保留舊快取', async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'ark-catalog-upgrade-'));

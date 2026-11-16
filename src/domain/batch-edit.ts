@@ -1,4 +1,9 @@
-import { fieldKeys, object, validateAppState, validateImportDocument, type AppState, type Evidence, type ImportDocument, type OperatorDefinition, type OwnedOperator } from './model.ts';
+import { fieldKeys, object, validateAppState, validateImportDocument, type AppState, type Evidence, type ImportDocument, type OperatorDefinition } from './model.ts';
+import { changeModuleIssues, formatModuleIssues, isOriginalModule, type ModuleIssue } from './module-consistency.ts';
+
+export function assertModuleConsistency(issues: readonly ModuleIssue[]): void {
+  if (issues.length) throw new Error(`模組解鎖、等級或裝備互相矛盾，請一併調整相關欄位：${formatModuleIssues(issues)}`);
+}
 
 export const BATCH_FIELDS = {
   elite: { label: '精英階段', min: 0, max: 2 },
@@ -18,7 +23,7 @@ export interface BatchModuleChange {
 }
 
 export function matchingModules(definition: OperatorDefinition, kind: string) {
-  return definition.modules.filter(module => module.type !== 'original' && module.kind !== 'ORIGINAL' && module.kind.split('-').at(-1) === kind);
+  return definition.modules.filter(module => !isOriginalModule(module) && module.kind.split('-').at(-1) === kind);
 }
 
 export function createBatchEdit(state: AppState, operatorIds: readonly string[], changes: Partial<Record<BatchField, BatchChange>>, createdAt = new Date().toISOString(), moduleChange?: BatchModuleChange): ImportDocument {
@@ -61,40 +66,13 @@ export function createBatchEdit(state: AppState, operatorIds: readonly string[],
       if (moduleChange.level !== undefined) nextFields[`moduleLevel:${module.id}`] = { ...meta, ...moduleChange.level };
       if (moduleChange.equipped !== undefined) nextFields.equippedModule = moduleChange.equipped === 'unknown' ? { ...meta, status: 'unknown' } : { ...meta, status: 'known', value: moduleChange.equipped === 'selected' ? module.id : 'none' };
       const row = state.roster.find(item => item.operatorId === operatorId)!;
-      const effective = (key: string) => { const evidence = nextFields[key] ?? row.fields[key]; return evidence?.status === 'known' ? evidence.value : undefined; };
-      const unlocked = effective(`moduleUnlocked:${module.id}`), level = effective(`moduleLevel:${module.id}`), equipped = effective('equippedModule') === module.id;
-      if ((unlocked === false && ((typeof level === 'number' && level > 0) || equipped)) || (level === 0 && (unlocked === true || equipped))) throw new Error(`${definition.displayName}的模組解鎖、等級或裝備結果互相矛盾，請一併調整相關欄位。`);
+      const moduleFields = Object.fromEntries(Object.entries(nextFields).filter(([key]) => key === 'equippedModule' || key.startsWith('module')));
+      assertModuleConsistency(changeModuleIssues(definition, row, moduleFields));
     }
     return { operatorId, fields: nextFields };
   });
   return validateImportDocument({ format: 'arknights-roster-import', schemaVersion: 1, product: 'arknights', server: 'tw', namespace: state.dataset.metadata.namespace, dataset: structuredClone(state.dataset),
     candidates, completeness: 'partial', source: '使用者在本機批次修正', adapterVersion: 'manual-batch-1', createdAt });
-}
-
-function validateGridModules(previous: OwnedOperator, candidate: OwnedOperator, definition: OperatorDefinition): void {
-  const affected = new Set<string>();
-  for (const field of Object.keys(candidate.fields)) {
-    for (const prefix of ['moduleAvailable:', 'moduleUnlocked:', 'moduleLevel:']) if (field.startsWith(prefix)) affected.add(field.slice(prefix.length));
-  }
-  if (Object.hasOwn(candidate.fields, 'equippedModule')) {
-    for (const evidence of [previous.fields.equippedModule, candidate.fields.equippedModule]) {
-      if (evidence?.status === 'known' && typeof evidence.value === 'string' && evidence.value !== 'none') affected.add(evidence.value);
-    }
-  }
-  const effective = (field: string) => {
-    const evidence = candidate.fields[field] ?? previous.fields[field];
-    return evidence?.status === 'known' ? evidence.value : undefined;
-  };
-  for (const id of affected) {
-    const module = definition.modules.find(module => module.id === id)!;
-    const original = module.type === 'original' || module.kind === 'ORIGINAL';
-    const unlocked = effective(`moduleUnlocked:${id}`), level = effective(`moduleLevel:${id}`), equipped = effective('equippedModule') === id;
-    if (original && typeof level === 'number' && level > 0) throw new Error(`${definition.displayName}的原始模組不可升級。`);
-    // 未知及不適用不推論為零或未解鎖；原始證章沒有進階模組的升級階段。
-    if ((unlocked === false && ((typeof level === 'number' && level > 0) || equipped)) || (!original && level === 0 && (unlocked === true || equipped))) {
-      throw new Error(`${definition.displayName}的模組解鎖、等級或裝備結果互相矛盾，請一併調整相關欄位。`);
-    }
-  }
 }
 
 export function createGridEdit(state: AppState, edits: Record<string, Record<string, GridChange>>, createdAt = new Date().toISOString()): ImportDocument {
@@ -121,6 +99,6 @@ export function createGridEdit(state: AppState, edits: Record<string, Record<str
   // 先核對所有列的欄位型別與範圍，再檢查模組關係；任一失敗都不產生可接受候選。
   const input = validateImportDocument({ format: 'arknights-roster-import', schemaVersion: 1, product: 'arknights', server: 'tw', namespace: state.dataset.metadata.namespace,
     dataset: structuredClone(state.dataset), candidates, completeness: 'partial', source, adapterVersion: 'manual-grid-1', createdAt });
-  for (const candidate of input.candidates) validateGridModules(roster.get(candidate.operatorId)!, candidate, definitions.get(candidate.operatorId)!);
+  for (const candidate of input.candidates) assertModuleConsistency(changeModuleIssues(definitions.get(candidate.operatorId)!, roster.get(candidate.operatorId), candidate.fields));
   return input;
 }

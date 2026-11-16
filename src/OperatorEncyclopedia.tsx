@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { OperatorDefinition, OwnedOperator } from './domain/model';
+import { isOriginalModule, moduleProblems } from './domain/module-consistency';
 
 export function OperatorPortrait({ definition, large = false }: { definition: OperatorDefinition; large?: boolean }) {
   const [failed, setFailed] = useState<string | null>(null);
@@ -52,7 +53,7 @@ function talentCondition(talent: Talent, row: OwnedOperator): 'ready' | 'blocked
 
 type Module = OperatorDefinition['modules'][number];
 function ModuleDescription({ module, row }: { module: Module; row: OwnedOperator }) {
-  const original = module.type === 'original' || module.kind.toUpperCase() === 'ORIGINAL';
+  const original = isOriginalModule(module);
   const levels = original ? [] : (module.levels ?? []).slice().sort((left, right) => left.level - right.level);
   const current = knownNumber(row, `moduleLevel:${module.id}`);
   const unlockedField = row.fields[`moduleUnlocked:${module.id}`];
@@ -62,7 +63,7 @@ function ModuleDescription({ module, row }: { module: Module; row: OwnedOperator
   const potential = knownNumber(row, 'potential');
   const { level, select } = useDescriptionLevel(`${row.operatorId}:${module.id}:${unlocked ?? 'unknown'}`, levels.map(item => item.level), current);
   const selected = levels.find(item => item.level === level);
-  const inconsistent = !original && ((unlocked === false && ((current ?? 0) > 0 || equipped === true)) || (unlocked === true && current === 0));
+  const problems = moduleProblems(module, row.fields);
   const effects = selected?.effects ?? [];
   return <article className="encyclopedia-entry module-entry" aria-label={`模組：${module.name}`}>
     <div className="split-heading"><h4>{module.name}</h4><span className="tag muted">{original ? '原始證章 · 無升級等級' : `${module.kind} 模組`}</span></div>
@@ -73,7 +74,7 @@ function ModuleDescription({ module, row }: { module: Module; row: OwnedOperator
         <div><dt>個人裝備紀錄</dt><dd>{equipped === undefined ? '裝備狀態未知' : equipped ? '已裝備此模組' : '未裝備此模組'}</dd></div>
         <div><dt>個人潛能紀錄</dt><dd>{potential === undefined ? '潛能未知，效果條件待核對' : `潛能 ${potential}`}</dd></div>
       </dl>
-      {inconsistent && <p className="warning-note">解鎖、等級或裝備紀錄互相矛盾，請至批次修正核對。</p>}
+      {problems.length > 0 && <p className="warning-note">紀錄互相矛盾：{problems.join(' ')}請至批次修正核對。</p>}
       <p className="module-unlock">{module.unlock ? `解鎖條件：精英 ${module.unlock.elite} · 等級 ${module.unlock.level}` : '資料包尚未提供解鎖精英與等級條件。'}{selected?.trust !== undefined && <><br/>信賴需求：{selected.trust}%</>}</p>
       {levels.length ? <>
         <label className="skill-level-picker"><span>查看模組說明等級</span><select className="filter" aria-label={`${module.name}的模組說明等級`} value={level} onChange={event => select(Number(event.currentTarget.value))}>{levels.map(item => <option key={item.level} value={item.level}>模組 {item.level} 級</option>)}</select></label>

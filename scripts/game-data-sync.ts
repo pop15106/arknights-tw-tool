@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -22,6 +22,8 @@ export function createGameDataStore(options: {
   const build = options.build ?? buildGameData;
   let active: Promise<GameDataSnapshot> | undefined;
   let lastError: string | undefined;
+  let recovered = false;
+  const fileExists = (file: string) => access(file).then(() => true, () => false);
   async function bytes(url: string, limit: number): Promise<Buffer> {
     const response = await fetcher(url, { redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(45_000), headers: { Accept: url.endsWith('.png') ? 'image/png' : 'application/json', 'User-Agent': 'Local-Arknights-Catalog/1' } });
     if (!response.ok || !response.body || Number(response.headers.get('content-length') ?? 0) > limit) { await response.body?.cancel(); throw new Error('公開來源回應失敗或過大。'); }
@@ -31,16 +33,48 @@ export function createGameDataStore(options: {
     finally { reader.releaseLock(); }
     return Buffer.concat(chunks);
   }
-  async function load(): Promise<GameDataSnapshot | null> {
-    let pointer: { version: string; sha256: string };
-    try { pointer = JSON.parse(await readFile(path.join(cache, 'current.json'), 'utf8')); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw new Error('遊戲資料快取無效，請重新同步。'); }
-    if (!validVersion(pointer.version) || !/^[a-f0-9]{64}$/u.test(pointer.sha256)) throw new Error('遊戲資料版本無效。');
-    const raw = await readFile(path.join(cache, 'snapshots', `${pointer.version}-${pointer.sha256}.json`));
-    if (createHash('sha256').update(raw).digest('hex') !== pointer.sha256) throw new Error('遊戲資料快取校驗失敗。');
+  async function readSnapshot(version: string, sha256: string): Promise<GameDataSnapshot> {
+    if (!validVersion(version) || !/^[a-f0-9]{64}$/u.test(sha256)) throw new Error('遊戲資料版本無效。');
+    const raw = await readFile(path.join(cache, 'snapshots', `${version}-${sha256}.json`));
+    if (createHash('sha256').update(raw).digest('hex') !== sha256) throw new Error('遊戲資料快取校驗失敗。');
     const snapshot = JSON.parse(raw.toString('utf8')) as GameDataSnapshot;
     validateDataset(snapshot.dataset); await verifyDatasetChecksum(snapshot.dataset);
-    if (snapshot.status.version !== pointer.version || !Array.isArray(snapshot.stages) || !Array.isArray(snapshot.events)) throw new Error('遊戲資料快取格式錯誤。');
+    if (snapshot.status?.version !== version || !Array.isArray(snapshot.stages) || !Array.isArray(snapshot.events)) throw new Error('遊戲資料快取格式錯誤。');
+    return snapshot;
+  }
+  // 指標損壞或指向缺檔／校驗不符的快照時，改用仍可完整驗證的最新快照，不要求使用者手動刪目錄。
+  async function fallbackSnapshot(): Promise<GameDataSnapshot | null> {
+    let names: string[];
+    try { names = await readdir(path.join(cache, 'snapshots')); } catch { return null; }
+    let best: GameDataSnapshot | null = null;
+    for (const name of names) {
+      const match = /^([a-f0-9]{40})-([a-f0-9]{64})\.json$/u.exec(name);
+      if (!match) continue;
+      try {
+        const snapshot = await readSnapshot(match[1], match[2]);
+        if (!best || Date.parse(snapshot.status.syncedAt) > Date.parse(best.status.syncedAt)) best = snapshot;
+      } catch { /* 略過無法驗證的快照 */ }
+    }
+    return best;
+  }
+  async function load(): Promise<GameDataSnapshot | null> {
+    let snapshot: GameDataSnapshot | null;
+    try {
+      const pointer: unknown = JSON.parse(await readFile(path.join(cache, 'current.json'), 'utf8'));
+      if (!pointer || typeof pointer !== 'object') throw new Error('遊戲資料快取指標格式錯誤。');
+      const { version, sha256 } = pointer as Record<string, unknown>;
+      snapshot = await readSnapshot(version as string, sha256 as string);
+    } catch (error) {
+      snapshot = await fallbackSnapshot();
+      if (!snapshot) {
+        if (!(await fileExists(path.join(cache, 'current.json')))) return null;
+        throw new Error('遊戲資料快取損壞且沒有可用舊版，請按「更新遊戲資料」重新同步。');
+      }
+      snapshot.status.lastError = '遊戲資料快取指標損壞，已改用仍通過校驗的上一版；重新同步即可修復。';
+      recovered = true;
+      return snapshot;
+    }
+    recovered = false;
     if (lastError) snapshot.status.lastError = lastError;
     return snapshot;
   }
@@ -81,8 +115,9 @@ export function createGameDataStore(options: {
     try {
       const commit = JSON.parse((await bytes(`https://api.github.com/repos/${DATA_REPO}/commits/main`, 2 * 1024 * 1024)).toString('utf8'));
       if (!validVersion(commit.sha) || !Number.isFinite(Date.parse(commit.commit?.committer?.date))) throw new Error('來源版本無效。');
-      const previous = await load();
-      if (previous && previous.status.version === commit.sha && previous.status.catalogRevision === CATALOG_REVISION && previous.status.moduleSource?.version === MODULE_DATA_COMMIT) { await images(previous); lastError = undefined; delete previous.status.lastError; return previous; }
+      // 快取損壞不能阻止重新同步；改用備援快照時一律重建以修好指標。
+      const previous = await load().catch(() => null);
+      if (previous && !recovered && previous.status.version === commit.sha && previous.status.catalogRevision === CATALOG_REVISION && previous.status.moduleSource?.version === MODULE_DATA_COMMIT) { await images(previous); lastError = undefined; delete previous.status.lastError; return previous; }
       const tables = {} as GameDataTables;
       for (const [key, filename] of Object.entries(TABLES)) tables[key as keyof GameDataTables] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${DATA_REPO}/${commit.sha}/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json' })) tables[key as 'battleEquip' | 'favor'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
