@@ -5,6 +5,7 @@ import { currentState, emptyTarget, expandRecipes, expToRecords, growthCost, LMD
 import { OperatorPortrait } from '../OperatorEncyclopedia';
 import { Icon } from './Icon';
 import { useStageData } from './gameData';
+import { parseDepot, type DepotImport } from '../domain/depot';
 import { bestAcquire, materialSources, OCCURRENCE, type Acquire } from '../domain/stages';
 
 type Growth = NonNullable<Settings['growth']>;
@@ -50,6 +51,9 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
   const now = useMemo(() => Date.now(), [stageData]);
   const [draft, setDraft] = useState<Growth>(state.settings.growth ?? { plans: [] });
   const [query, setQuery] = useState('');
+  const [depotText, setDepotText] = useState<string | null>(null);
+  const [depot, setDepot] = useState<DepotImport | null>(null);
+  const [depotError, setDepotError] = useState('');
   const definitions = useMemo(() => new Map(state.dataset.operators.map(op => [op.id, op])), [state.dataset]);
   const rows = useMemo(() => new Map(state.roster.map(row => [row.operatorId, row])), [state.roster]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(state.settings.growth ?? { plans: [] });
@@ -98,6 +102,8 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
     return `${source.stage.code}・${OCCURRENCE[source.drop.occurrence]?.label ?? ''}`;
   };
 
+  const previewDepot = (text: string) => { setDepotError(''); setDepot(null); try { setDepot(parseDepot(text, new Set(Object.keys(catalog.items)))); } catch (err) { setDepotError(err instanceof Error ? err.message : '無法讀取。'); } };
+  const applyDepot = () => { if (!depot) return; setDraft(current => { const next = { ...(current.inventory ?? {}) }; for (const [id, count] of Object.entries(depot.items)) { if (count > 0) next[id] = count; else delete next[id]; } return { ...current, inventory: next }; }); setDepot(null); setDepotText(null); };
   const setHave = (id: string, value: string) => setDraft(current => { const next = { ...(current.inventory ?? {}) }; const count = Math.max(0, Math.min(10_000_000, Math.round(Number(value) || 0))); if (count) next[id] = count; else delete next[id]; return { ...current, inventory: next }; });
   return <div className="growth-page">
     <section className="panel">
@@ -108,11 +114,21 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
       {query.trim() && !matches.length && <p className="fine-print">找不到持有中、尚未加入的幹員。</p>}
       <div className="inline-actions">
         <button type="button" className="button primary" disabled={busy || !dirty} onClick={() => onSave(draft)}>保存計畫</button>
+        <button type="button" className="button secondary" disabled={busy} onClick={() => { setDepotText(depotText === null ? '' : null); setDepot(null); setDepotError(''); }}>匯入倉庫（MAA）</button>
         {dirty && <button type="button" className="button ghost" disabled={busy} onClick={() => setDraft(state.settings.growth ?? { plans: [] })}>還原</button>}
         <span className="fine-print">{dirty ? '有尚未保存的變更。' : '計畫與庫存只存在這台裝置。'}</span>
       </div>
     </section>
 
+    {depotText !== null && <section className="panel" aria-label="匯入倉庫">
+      <h3>匯入 MAA 倉庫辨識結果</h3>
+      <p className="fine-print">在 MAA 的「小工具 → 倉庫辨識」辨識完成後匯出，選擇檔案或貼上 JSON。支援 MAA 的物品數量格式（{'{'}"物品ID": 數量{'}'}）與企鵝物流刷圖規劃格式。只會更新檔案中有的材料，其他庫存保留；確認後仍需按「保存計畫」。</p>
+      <input className="file-input" type="file" accept="application/json,.json,.txt" onChange={async event => { const file = event.currentTarget.files?.[0]; if (!file) return; if (file.size > 2 * 1024 * 1024) { setDepotError('檔案過大，上限 2 MB。'); return; } const text = await file.text(); setDepotText(text); previewDepot(text); }}/>
+      <textarea className="text-area" placeholder='或貼上，例如 {"30012": 120, "30013": 45}' value={depotText} onInput={event => setDepotText(event.currentTarget.value)}/>
+      <div className="inline-actions"><button type="button" className="button secondary" disabled={!depotText?.trim()} onClick={() => previewDepot(depotText ?? '')}>預覽</button>{depot && <button type="button" className="button primary" onClick={applyDepot}>套用 {Object.keys(depot.items).length} 種材料</button>}</div>
+      {depotError && <p className="callout warning">{depotError}</p>}
+      {depot && <p className="fine-print">格式：{depot.format}；可匯入 {Object.keys(depot.items).length} 種{depot.unknown.length ? `，${depot.unknown.length} 個物品 ID 不在材料清單（略過）` : ''}。例如：{Object.entries(depot.items).slice(0, 6).map(([id, count]) => `${catalog.items[id]?.name ?? id}×${count}`).join('、')}。</p>}
+    </section>}
     {costs.length > 0 && <section className="panel" aria-label="合計">
       <div className="stats-cards">
         <div className="stats-card lmd"><span>龍門幣</span><strong>{fmt(lmd)}</strong><small>{expanded ? `含合成 ${fmt(expanded.lmd)}` : '不含加工合成'}</small></div>

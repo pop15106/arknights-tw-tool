@@ -43,3 +43,13 @@ test('展開合成與目前狀態讀取', () => {
   assert.equal(state.elite, 1); assert.equal(state.level, 1);
   assert.ok(unknown.includes('等級'));
 });
+
+test('倉庫匯入：MAA 物品數量、回呼 details、企鵝物流格式', async () => {
+  const { parseDepot } = await import('../src/domain/depot.ts');
+  const known = new Set(['2001', '31043', '30012']);
+  assert.deepEqual(parseDepot('{"2001":18000,"31043":317,"zzz":5,"30012":-1}', known), { items: { '2001': 18000, '31043': 317 }, unknown: ['zzz'], format: 'MAA 倉庫辨識（物品 ID：數量）' });
+  assert.deepEqual(parseDepot(JSON.stringify({ done: true, data: '{"30012":7}' }), known).items, { '30012': 7 });
+  assert.deepEqual(parseDepot(JSON.stringify({ '@type': '@penguin-statistics/depot', items: [{ id: '30012', have: 9, name: '固源岩' }] }), known).items, { '30012': 9 });
+  assert.throws(() => parseDepot('not json', known), /JSON/);
+  assert.throws(() => parseDepot('{"zzz":1}', known), /沒有可匯入/);
+});
