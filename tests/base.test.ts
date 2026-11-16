@@ -23,7 +23,7 @@ test('白名單句型解析；任一子句不支援即整個技能不計入', ()
   for (const description of [
     '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每個發電站為當前製造站+5%的生產力',
     '進駐製造站後，生產力首小時+15%，此後每小時+2%，最終達到+25%',
-    '進駐製造站時，每2個工程機器人+1%生產力',
+    '進駐製造站時，如果有2台以上作業平台進駐在發電站，則生產力+2%',
     '進駐控制中樞時，較容易獲得線索板上尚未擁有的線索，但控制中樞內除自身以外的其餘幹員心情每小時消耗+0.25',
   ]) assert.equal(parseSkill({ roomType: description.includes('控制中樞') ? 'CONTROL' : 'MANUFACTURE', description }).supported, false, description);
   // 房間不符也不計入
@@ -382,4 +382,31 @@ test('功能設施：會客室（含只有自己時）、辦公室（含宿舍�
   assert.equal(ws.totals.byproduct, 0);
   [me, of, tr, ws] = run({ training: { profession: '重裝', mastery: 3 }, workshop: 'elite' }, ['demo-2']);
   assert.equal(me.totals.clue, 30); assert.equal(tr.totals.training, 75); assert.equal(ws.totals.byproduct, 70);
+});
+
+test('通用資源：產生→轉化→依數量／門檻加成，含招募位與全基建等級上限', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const add = (id: string, roomType: string, description: string, operator: string) => { catalog.skills[id] = { id, name: id, roomType, description }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('sense', 'MANUFACTURE', '進駐製造站時，宿舍內每有1名幹員則感知資訊+1，同時每1點感知資訊轉化為1點思維鏈環', 'demo-1');
+  add('chain', 'MANUFACTURE', '進駐製造站時，每1點思維鏈環+1%生產力', 'demo-3');
+  add('robot', 'MANUFACTURE', '進駐製造站時，基建內除活動室外每間設施每級+1個工程機器人，上限64個', 'demo-4');
+  add('robotUse', 'MANUFACTURE', '進駐製造站時，每8個工程機器人+5%生產力', 'demo-5');
+  add('recruit', 'HIRE', '進駐人力辦公室時，每個招募位（不包含初始招募位）+15點無聲共鳴', 'demo-6');
+  add('song', 'TRADING', '進駐貿易站時，每2點無聲共鳴+1%訂單效率', 'demo-7');
+  add('drink', 'MEETING', '進駐會客室時，線索蒐集速度提升5%，同時每1點情報儲備額外提升5%', 'demo-8');
+  const parsed = parseSkill(catalog.skills.sense).effects;
+  assert.deepEqual(parsed.map(e => e.kind), ['resource', 'convert']);
+  const facilities: Facility[] = [{ id: 'm1', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'm2', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'of', type: 'office', level: 3 }, { id: 't', type: 'trading', level: 3 }, { id: 'me', type: 'meeting', level: 3 }, { id: 'd', type: 'dormitory', level: 5 }];
+  const ev = evaluateBase({ facilities, onlineSlots: [], recruitSlots: 2, assignments: { m1: ['demo-1', 'demo-3', 'demo-4'], m2: ['demo-5'], of: ['demo-6'], t: ['demo-7'], me: ['demo-8'], d: ['demo-2'] } } as never, catalog, state.roster, definitions);
+  const pool = (name: string) => ev.resources.find(r => r.name === name)?.used;
+  assert.equal(pool('思維鏈環'), 1, '宿舍 1 人 → 感知資訊 1 → 轉化為思維鏈環 1');
+  assert.equal(pool('感知資訊'), 0, '轉化後扣除');
+  assert.equal(pool('工程機器人'), 3 + 3 + 3 + 3 + 3 + 5, '設施等級合計 20（未達上限 64）');
+  assert.equal(pool('無聲共鳴'), 30, '2 個招募位 × 15');
+  const [m1, m2, , trade, meeting] = ev.facilities;
+  assert.equal(m1.totals.productivity, 1, '思維鏈環 1 點 → +1%');
+  assert.equal(m2.totals.productivity, 10, '工程機器人 20 個 → floor(20/8)=2 → +10%');
+  assert.equal(trade.totals.order, 15, '無聲共鳴 30 → floor(30/2) → +15%');
+  assert.equal(meeting.totals.clue, 5, '沒有情報儲備時只有基礎 5%');
 });

@@ -30,17 +30,25 @@ export type SkillEffect =
   | { kind: 'training'; value: number; professions?: string[]; atMastery?: number }
   | { kind: 'byproduct'; value: number; category: 'elite' | 'skill' | 'base' | 'any' }
   /** 控制中樞對所有製造站／貿易站的加成；maxOnly 為「同種效果取最高」。 */
-  | { kind: 'global'; target: 'MANUFACTURE' | 'TRADING'; value: number; product?: 'gold'; maxOnly: boolean }
+  | { kind: 'global'; target: 'MANUFACTURE' | 'TRADING' | 'MEETING' | 'HIRE'; value: number; product?: 'gold'; maxOnly: boolean }
   /** 同設施內所有幹員的心情消耗調整（負值＝恢復）。 */
   | { kind: 'moodRoom'; value: number }
   /** 改變貿易站訂單內容的技能（品質、特殊訂單、違約、投資），數值依 PRTS 同步的訂單參數計算。 */
-  /** 產生人間煙火：flat 為固定值（可限心情高／低時）；perGroupOutsideDorm 為宿舍外每名某陣營幹員；perDormOccupant 為宿舍每名幹員。 */
-  | { kind: 'resource'; resource: '人間煙火'; source: 'flat' | 'perGroupOutsideDorm' | 'perDormOccupant'; amount: number; when?: 'high' | 'low'; group?: string; max?: number }
-  /** 依人間煙火數量給加成：每 per 點給 amount（生產力或訂單效率，%）。 */
-  | { kind: 'resourceScale'; resource: '人間煙火'; per: number; target: 'productivity' | 'order'; amount: number }
+  /** 產生基建資源（人間煙火、熱情值、感知資訊等）。when 限定自身心情高（>12）或低（≤12）時。 */
+  | { kind: 'resource'; resource: string; source: ResourceSource; amount: number; when?: 'high' | 'low'; group?: string; max?: number }
+  /** 每 per 點 from 轉化為 1 點 to（推定會扣除原資源）。 */
+  | { kind: 'convert'; from: string; to: string; per: number }
+  /** 每 per 點資源，effect 的數值乘上倍數（effect 為任意一般效果）。 */
+  | { kind: 'resourceScale'; resource: string; per: number; effect: SkillEffect }
+  /** 資源達到 min 以上時 effect 生效。 */
+  | { kind: 'resourceThreshold'; resource: string; min: number; effect: SkillEffect }
   | { kind: 'orderMod'; mod: 'qualityAlpha' | 'qualityBeta' | 'pepe' | 'closure' | 'twoGold' | 'breach' | 'breachBonus' | 'invest'; amount?: number };
 /** 單純數值效果的值；倍增與跨設施效果需另依配置計算，這裡回傳 0。 */
 export const scalar = (effect: SkillEffect): number => 'value' in effect ? effect.value : 0;
+export type ResourceSource = 'flat' | 'perGroupOutsideDorm' | 'perDormOccupant' | 'perRoomOccupant' | 'perGroupInRoom' | 'perRoomLevel' | 'perFacilityLevel' | 'perRecruitSlot';
+/** 已知的基建資源名稱；只有這些名稱會被當成資源解析，避免把一般數值誤判成資源。 */
+export const BASE_RESOURCES = ['人間煙火', '熱情值', '感知資訊', '思維鏈環', '情報儲備', '烏薩斯特飲', '木天蓼', '無聲共鳴', '魔物料理', '夢境', '小節', '巫術結晶', '工程機器人', '記憶碎片'];
+const RES = `(${BASE_RESOURCES.join('|')})`;
 
 /** 訂單技能換算成「龍門幣／時」相對常規 3 級貿易站的提升百分點，讓推薦能與訂單效率比較。 */
 export function orderModScore(effects: SkillEffect[], catalog: Pick<BaseCatalog, 'trading'>): number {
@@ -83,6 +91,8 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^訂單(?:獲取|獲得)效率${NUM}%$`, 'u'), effect: m => ({ kind: 'order', value: Number(m[1]) }) },
   { pattern: new RegExp(`^且?訂單上限${NUM}$`, 'u'), effect: m => ({ kind: 'orderLimit', value: Number(m[1]) }) },
   { pattern: new RegExp(`^所有(製造站|貿易站)(?:生產力|訂單(?:獲取|獲得)?效率)${NUM}%（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'global', target: m[1] === '製造站' ? 'MANUFACTURE' : 'TRADING', value: Number(m[2]), maxOnly: true }) },
+  { pattern: new RegExp(`^人脈資源的聯絡速度${NUM}%（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'global', target: 'HIRE', value: Number(m[1]), maxOnly: true }) },
+  { pattern: new RegExp(`^會客室線索蒐集速度提升\\+?(\\d+(?:\\.\\d+)?)%（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'global', target: 'MEETING', value: Number(m[1]), maxOnly: true }) },
   { pattern: new RegExp(`^所有生產貴金屬類配方的製造站生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'global', target: 'MANUFACTURE', value: Number(m[1]), product: 'gold', maxOnly: false }) },
   { pattern: new RegExp(`^控制中樞內所有幹員的心情每小時恢復\\+([\\d.]+)$`, 'u'), effect: m => ({ kind: 'moodRoom', value: -Number(m[1]) }) },
   { pattern: new RegExp(`^線索(?:蒐集|搜集)速度(?:提升|\\+)(\\d+(?:\\.\\d+)?)%$`, 'u'), effect: m => ({ kind: 'clue', value: Number(m[1]) }) },
@@ -91,6 +101,7 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^(?:((?:先鋒|近衛|重裝|狙擊|術師|醫療|輔助|特種)(?:與(?:先鋒|近衛|重裝|狙擊|術師|醫療|輔助|特種))?))?幹員的專精技能訓練速度${NUM}%$`, 'u'), effect: m => ({ kind: 'training', value: Number(m[2]), ...(m[1] ? { professions: m[1].split('與') } : {}) }) },
   { pattern: new RegExp(`^如果本次訓練專精技能至(\\d)級，則訓練速度(?:額外)?${NUM}%$`, 'u'), effect: m => ({ kind: 'training', value: Number(m[2]), atMastery: Number(m[1]) }) },
   { pattern: new RegExp(`^副產品的產出機率提升(\\d+(?:\\.\\d+)?)%$`, 'u'), effect: m => ({ kind: 'byproduct', value: Number(m[1]), category: 'any' }) },
+  { pattern: new RegExp(`^(?:貿易站|製造站|發電站)內全體幹員每小時心情消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodRoom', value: Number(m[1]) }) },
   { pattern: new RegExp(`^無人機充能速度${NUM}%$`, 'u'), effect: m => ({ kind: 'drone', value: Number(m[1]) }) },
   { pattern: new RegExp(`^自身心情每小時恢復${NUM}$`, 'u'), effect: m => ({ kind: 'moodRecoverSelf', value: Number(m[1]) }) },
   { pattern: new RegExp(`^該宿舍內所有幹員的心情每小時恢復${NUM}（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'moodRecoverAll', value: Number(m[1]) }) },
@@ -98,9 +109,62 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
 
 function parseClause(raw: string): SkillEffect | null {
   // 搭配條件中的「額外」只是語氣；「當前／目前貿易站」只是指本設施。
-  const clause = raw.trim().replace(/額外(?=[+-])/u, '').replace(/^(?:當前|目前)(?:貿易站|製造站)/u, '');
+  const clause = raw.trim().replace(/額外(?=[+-]|提升)/u, '').replace(/^(?:當前|目前)(?:貿易站|製造站)/u, '');
   const rule = CLAUSES.map(item => ({ item, match: clause.match(item.pattern) })).find(entry => entry.match);
   return rule?.match ? rule.item.effect(rule.match) : null;
+}
+
+const reRes = (body: string) => new RegExp(`^(?:同時)?${body.replaceAll('RES', RES)}$`, 'u');
+/** 解析資源相關子句；回傳 undefined 表示不是資源句，null 表示是資源句但無法解析。consumed 為用掉的子句數。 */
+function parseResourceClause(parts: string[], index: number, previous: SkillEffect[]): { effects: SkillEffect[]; consumed: number } | null | undefined {
+  const part = parts[index], next = parts[index + 1] ?? '';
+  const lastValue = [...previous].reverse().find(effect => 'value' in effect) as (SkillEffect & { value: number }) | undefined;
+  const reuse = (value: number): SkillEffect | null => lastValue ? { ...lastValue, value } as SkillEffect : null;
+  let m: RegExpMatchArray | null;
+  if ((m = part.match(reRes('RES\\+(\\d+)')))) return { effects: [{ kind: 'resource', resource: m[1], source: 'flat', amount: Number(m[2]) }], consumed: 1 };
+  if ((m = part.match(reRes('(該)?宿舍內每有1名幹員(?:則RES\\+(\\d+))?')))) {
+    const inline = m[2] ? [m[2], m[3]] : next.match(reRes('RES\\+(\\d+)'))?.slice(1);
+    return inline ? { effects: [{ kind: 'resource', resource: inline[0], source: m[1] ? 'perRoomOccupant' : 'perDormOccupant', amount: Number(inline[1]) }], consumed: m[2] ? 1 : 2 } : null;
+  }
+  if ((m = part.match(/^控制中樞內每有1名(.+?)幹員$/u))) {
+    const gain = next.match(reRes('則RES\\+(\\d+)'));
+    return gain ? { effects: [{ kind: 'resource', resource: gain[1], source: 'perGroupInRoom', group: m[1], amount: Number(gain[2]) }], consumed: 2 } : null;
+  }
+  if ((m = part.match(/^當自身心情(大於12|處於12以下)時$/u))) {
+    const gain = next.match(reRes('RES\\+(\\d+)'));
+    return gain ? { effects: [{ kind: 'resource', resource: gain[1], source: 'flat', amount: Number(gain[2]), when: m[1] === '大於12' ? 'high' : 'low' }], consumed: 2 } : undefined;
+  }
+  if ((m = part.match(reRes('(?:目前|當前)宿舍每級提供1(?:層|個)RES')))) return { effects: [{ kind: 'resource', resource: m[1], source: 'perRoomLevel', amount: 1 }], consumed: 1 };
+  if ((m = part.match(reRes('基建內除活動室外每間設施每級\\+(\\d+)個RES')))) {
+    const cap = next.match(/^上限(\d+)個$/u);
+    return { effects: [{ kind: 'resource', resource: m[2], source: 'perFacilityLevel', amount: Number(m[1]), ...(cap ? { max: Number(cap[1]) } : {}) }], consumed: cap ? 2 : 1 };
+  }
+  if ((m = part.match(reRes('每個招募位（不包含初始招募位）\\+(\\d+)點<?RES')))) return { effects: [{ kind: 'resource', resource: m[2], source: 'perRecruitSlot', amount: Number(m[1]) }], consumed: 1 };
+  if ((m = part.match(reRes('每(\\d+)(?:點|層|個)RES轉化為1點RES')))) return { effects: [{ kind: 'convert', from: m[2], to: m[3], per: Number(m[1]) }], consumed: 1 };
+  if ((m = part.match(reRes('每(\\d+)(?:點|個)RES\\+(\\d+(?:\\.\\d+)?)%(生產力|訂單效率|專精技能訓練速度)')))) {
+    const kind = m[4] === '生產力' ? 'productivity' : m[4] === '訂單效率' ? 'order' : 'training';
+    return { effects: [{ kind: 'resourceScale', resource: m[2], per: Number(m[1]), effect: { kind, value: Number(m[3]) } as SkillEffect }], consumed: 1 };
+  }
+  if ((m = part.match(reRes('每(\\d+)(?:點|瓶)RES(?:額外)?\\+(\\d+(?:\\.\\d+)?)%聯絡速度')))) return { effects: [{ kind: 'resourceScale', resource: m[2], per: Number(m[1]), effect: { kind: 'contact', value: Number(m[3]) } }], consumed: 1 };
+  if ((m = part.match(reRes('每(\\d+)點RES額外提升(\\d+(?:\\.\\d+)?)%')))) { const effect = reuse(Number(m[3])); return effect ? { effects: [{ kind: 'resourceScale', resource: m[2], per: Number(m[1]), effect }], consumed: 1 } : null; }
+  // 「每有／每擁有 N 點資源」之後的所有子句都按數量倍增；「則(額外)±N」沿用前一個效果的種類。
+  if ((m = part.match(reRes('每(?:有|擁有)(\\d+)(?:點|個|瓶)RES')))) {
+    const rest = parts.slice(index + 1);
+    const scaled: SkillEffect[] = [];
+    for (const raw of rest) {
+      const bare = raw.match(/^則(?:額外)?([+-][\d.]+)$/u);
+      const effect = bare ? reuse(Number(bare[1])) : parseClause(raw.replace(/^則/u, ''));
+      if (!effect) return null;
+      scaled.push(effect);
+    }
+    return scaled.length ? { effects: scaled.map(effect => ({ kind: 'resourceScale', resource: m![2], per: Number(m![1]), effect })), consumed: 1 + rest.length } : null;
+  }
+  if ((m = part.match(reRes('(?:如果)?RES(?:達到|處於)(\\d+)(?:點|瓶)(?:及以上時)?')))) {
+    const bonus = next.match(/^則額外提升(\d+(?:\.\d+)?)%$/u);
+    const effect = bonus ? reuse(Number(bonus[1])) : parseClause(next);
+    return effect ? { effects: [{ kind: 'resourceThreshold', resource: m[1], min: Number(m[2]), effect }], consumed: 2 } : null;
+  }
+  return /人間煙火|熱情值|感知資訊|思維鏈環|情報儲備|特飲|木天蓼|無聲共鳴|魔物料理|夢境|小節|巫術結晶|工程機器人|記憶碎片/u.test(part) ? null : undefined;
 }
 
 function parseClauses(text: string): SkillEffect[] | null {
@@ -127,6 +191,9 @@ function parseClauses(text: string): SkillEffect[] | null {
       index++;
       continue;
     }
+    const resource = parseResourceClause(parts, index, effects);
+    if (resource === null) return null;
+    if (resource) { effects.push(...resource.effects); index += resource.consumed - 1; continue; }
     // 「如果本次訓練專精技能至N級，則訓練速度(額外)+M%」被逗號拆成兩句，在此接回。
     const mastery = part.match(/^如果本次訓練專精技能至(\d)級$/u);
     if (mastery) {
@@ -159,8 +226,8 @@ const RESOURCE_SKILLS: { room: string; pattern: RegExp; effects: (m: RegExpMatch
   { room: 'CONTROL', pattern: /^進駐控制中樞時，當自身心情大於12時，人間煙火\+(\d+)；當自身心情處於12以下時，感知資訊\+\d+$/u, effects: m => [{ kind: 'resource', resource: '人間煙火', source: 'flat', amount: Number(m[1]), when: 'high' }], ignored: '心情 12 以下時的感知資訊' },
   { room: 'CONTROL', pattern: /^進駐控制中樞時，控制中樞內所有幹員的心情每小時恢復\+[\d.]+；當自身心情處於12以下時，人間煙火\+(\d+)$/u, effects: m => [{ kind: 'resource', resource: '人間煙火', source: 'flat', amount: Number(m[1]), when: 'low' }], ignored: '控制中樞全體心情恢復' },
   { room: 'CONTROL', pattern: /^進駐控制中樞時，自身心情每小時消耗\+([\d.]+)；每個歲幹員進駐在宿舍和活動室以外的設施則人間煙火\+(\d+)（最多(\d+)名）$/u, effects: m => [{ kind: 'moodCost', value: Number(m[1]) }, { kind: 'resource', resource: '人間煙火', source: 'perGroupOutsideDorm', group: '歲', amount: Number(m[2]), max: Number(m[3]) }] },
-  { room: 'TRADING', pattern: /^進駐貿易站時，宿舍內每有1名幹員則人間煙火\+(\d+)，同時每有1點人間煙火，則訂單獲取效率\+(\d+)%$/u, effects: m => [{ kind: 'resource', resource: '人間煙火', source: 'perDormOccupant', amount: Number(m[1]) }, { kind: 'resourceScale', resource: '人間煙火', per: 1, target: 'order', amount: Number(m[2]) }] },
-  { room: 'MANUFACTURE', pattern: /^進駐製造站時，每(\d+)點人間煙火\+(\d+)%生產力$/u, effects: m => [{ kind: 'resourceScale', resource: '人間煙火', per: Number(m[1]), target: 'productivity', amount: Number(m[2]) }] },
+  { room: 'TRADING', pattern: /^進駐貿易站時，宿舍內每有1名幹員則人間煙火\+(\d+)，同時每有1點人間煙火，則訂單獲取效率\+(\d+)%$/u, effects: m => [{ kind: 'resource', resource: '人間煙火', source: 'perDormOccupant', amount: Number(m[1]) }, { kind: 'resourceScale', resource: '人間煙火', per: 1, effect: { kind: 'order', value: Number(m[2]) } }] },
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，每(\d+)點人間煙火\+(\d+)%生產力$/u, effects: m => [{ kind: 'resourceScale', resource: '人間煙火', per: Number(m[1]), effect: { kind: 'productivity', value: Number(m[2]) } }] },
 ];
 
 export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): ParsedSkill {
@@ -269,7 +336,7 @@ export interface FacilityResult {
   notApplicable: { operatorId: string; skill: BaseSkill }[];
   issues: string[];
 }
-export interface BaseEvaluation { facilities: FacilityResult[]; electricity: { produced: number; consumed: number }; issues: string[]; resources: { name: '人間煙火'; high: number; low: number; used: number; sources: string[] }[] }
+export interface BaseEvaluation { facilities: FacilityResult[]; electricity: { produced: number; consumed: number }; issues: string[]; resources: { name: string; high: number; low: number; used: number; sources: string[] }[] }
 
 function roomSkillApplies(skill: BaseSkill, roomType: BaseRoomType): boolean { return skill.roomType === roomType; }
 export function productMatches(effect: SkillEffect, facility: Pick<Facility, 'product'>): boolean {
@@ -362,27 +429,63 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     result.totals.drone = round(result.totals.drone);
     return result;
   });
-  // 人間煙火：先加總全基建產量（分心情高／低兩種情況），再套用到依數量加成的技能，取兩者較低值（保守）。
-  const dormOccupants = facilities.filter(result => result.facility.type === 'dormitory').reduce((sum, result) => sum + result.operators.length, 0);
+  // 基建資源：①加總所有產生來源（分心情高／低）②依序轉化 ③依數量或門檻套用加成（取高低兩情況的較低值，保守）。
+  const dormFacilities = facilities.filter(result => result.facility.type === 'dormitory');
+  const dormOccupants = dormFacilities.reduce((sum, result) => sum + result.operators.length, 0);
   const outsideDorm = facilities.filter(result => result.facility.type !== 'dormitory').flatMap(result => result.operators.map(op => op.operatorId));
-  const smoke = { high: 0, low: 0, sources: [] as string[] };
+  const facilityLevels = base.facilities.reduce((sum, facility) => sum + facility.level, 0);
+  const pools = { high: new Map<string, number>(), low: new Map<string, number>() };
+  const sources = new Map<string, string[]>();
+  const add = (map: Map<string, number>, key: string, value: number) => map.set(key, (map.get(key) ?? 0) + value);
   for (const result of facilities) for (const op of result.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
     if (effect.kind !== 'resource') continue;
-    const amount = effect.source === 'flat' ? effect.amount
+    const members = (list: string[]) => new Set(list.filter(id => groupsOf(id).includes(effect.group ?? '')).map(characterOf)).size;
+    const raw = effect.source === 'flat' ? effect.amount
       : effect.source === 'perDormOccupant' ? effect.amount * dormOccupants
-      : effect.amount * Math.min(effect.max ?? Infinity, new Set(outsideDorm.filter(id => groupsOf(id).includes(effect.group ?? '')).map(characterOf)).size);
-    if (effect.when !== 'low') smoke.high += amount;
-    if (effect.when !== 'high') smoke.low += amount;
-    smoke.sources.push(`${op.name}「${skill.active!.name}」${effect.when === 'high' ? '（心情 > 12）' : effect.when === 'low' ? '（心情 ≤ 12）' : ''} +${amount}`);
+      : effect.source === 'perRoomOccupant' ? effect.amount * result.operators.length
+      : effect.source === 'perRoomLevel' ? effect.amount * result.facility.level
+      : effect.source === 'perFacilityLevel' ? effect.amount * facilityLevels
+      : effect.source === 'perRecruitSlot' ? effect.amount * (base.recruitSlots ?? 0)
+      : effect.source === 'perGroupInRoom' ? effect.amount * Math.min(effect.max ?? Infinity, members(result.operators.map(item => item.operatorId)))
+      : effect.amount * Math.min(effect.max ?? Infinity, members(outsideDorm));
+    // 陣營類的 max 為「最多幾名」（已在上面處理）；其他類的 max 為總量上限。
+    const capped = effect.source === 'perGroupOutsideDorm' || effect.source === 'perGroupInRoom' ? raw : Math.min(raw, effect.max ?? Infinity);
+    if (effect.when !== 'low') add(pools.high, effect.resource, capped);
+    if (effect.when !== 'high') add(pools.low, effect.resource, capped);
+    sources.set(effect.resource, [...(sources.get(effect.resource) ?? []), `${op.name}「${skill.active!.name}」${effect.when === 'high' ? '（心情 > 12）' : effect.when === 'low' ? '（心情 ≤ 12）' : ''} +${capped}`]);
   }
-  const smokeUsed = Math.min(smoke.high, smoke.low);
-  for (const result of facilities) for (const op of result.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
-    if (effect.kind !== 'resourceScale' || !smokeUsed) continue;
-    const value = round(Math.floor(smokeUsed / effect.per) * effect.amount);
-    if (effect.target === 'productivity') result.totals.productivity = round(result.totals.productivity + value);
-    else result.totals.order = round(result.totals.order + value);
-    result.remote.push({ from: op.name, skill: skill.active!.name, text: `人間煙火 ${smokeUsed} 點`, value, kind: effect.target });
+  const conversions = facilities.flatMap(result => result.operators.flatMap(op => op.skills.flatMap(skill => (skill.applied ?? []).filter(effect => effect.kind === 'convert').map(effect => ({ effect: effect as Extract<SkillEffect, { kind: 'convert' }>, label: `${op.name}「${skill.active!.name}」` })))));
+  for (let round2 = 0; round2 < 3; round2++) for (const { effect, label } of conversions) for (const pool of [pools.high, pools.low]) {
+    const units = Math.floor((pool.get(effect.from) ?? 0) / effect.per);
+    if (!units) continue;
+    add(pool, effect.from, -units * effect.per); add(pool, effect.to, units);
+    if (pool === pools.high && round2 === 0) sources.set(effect.to, [...(sources.get(effect.to) ?? []), `${label} 由${effect.from}轉化 +${units}`]);
   }
+  const used = (resource: string) => Math.min(pools.high.get(resource) ?? 0, pools.low.get(resource) ?? 0);
+  const addToTotals = (result: FacilityResult, effect: SkillEffect) => {
+    if (!('value' in effect)) return;
+    if (effect.kind === 'productivity' && productMatches(effect, result.facility)) result.totals.productivity = round(result.totals.productivity + effect.value);
+    else if (effect.kind === 'order') result.totals.order = round(result.totals.order + effect.value);
+    else if (effect.kind === 'clue') result.totals.clue = round(result.totals.clue + effect.value);
+    else if (effect.kind === 'contact') result.totals.contact = round(result.totals.contact + effect.value);
+    else if (effect.kind === 'training') result.totals.training = round(result.totals.training + effect.value);
+    else if (effect.kind === 'byproduct') result.totals.byproduct = round(result.totals.byproduct + effect.value);
+  };
+  for (const result of facilities) for (const op of result.operators) for (const skill of op.skills) {
+    const extra: SkillEffect[] = [];
+    for (const effect of skill.applied ?? []) {
+      if (effect.kind === 'resourceScale') {
+        const count = Math.floor(used(effect.resource) / effect.per);
+        if (!count || !('value' in effect.effect)) continue;
+        const scaled = { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect;
+        extra.push(scaled); addToTotals(result, scaled);
+        result.remote.push({ from: op.name, skill: skill.active!.name, text: `${effect.resource} ${used(effect.resource)} 點`, value: scalar(scaled), kind: scaled.kind === 'order' ? 'order' : 'productivity' });
+      } else if (effect.kind === 'resourceThreshold' && used(effect.resource) >= effect.min) { extra.push(effect.effect); addToTotals(result, effect.effect); }
+    }
+    if (extra.length) skill.applied = [...(skill.applied ?? []), ...extra];
+  }
+  const resourceList = [...new Set([...pools.high.keys(), ...pools.low.keys()])].filter(name => (sources.get(name) ?? []).length)
+    .map(name => ({ name, high: round(pools.high.get(name) ?? 0), low: round(pools.low.get(name) ?? 0), used: round(used(name)), sources: sources.get(name) ?? [] }));
   // 第二輪：控制中樞對其他設施中特定陣營幹員的加成，記在被加成的設施上。
   for (const control of facilities.filter(result => result.facility.type === 'control')) {
     for (const op of control.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
@@ -415,7 +518,10 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     const [target, product] = key.split(':');
     for (const result of facilities.filter(item => ROOM_OF[item.facility.type] === target && (!product || item.facility.product === product))) {
       const value = round(entry.max + entry.sum);
-      if (target === 'MANUFACTURE') result.totals.productivity = round(result.totals.productivity + value); else result.totals.order = round(result.totals.order + value);
+      if (target === 'MANUFACTURE') result.totals.productivity = round(result.totals.productivity + value);
+      else if (target === 'TRADING') result.totals.order = round(result.totals.order + value);
+      else if (target === 'MEETING') result.totals.clue = round(result.totals.clue + value);
+      else result.totals.contact = round(result.totals.contact + value);
       result.remote.push({ from: '控制中樞', skill: entry.sources.join('、'), text: '全域加成', value, kind: target === 'MANUFACTURE' ? 'productivity' : 'order' });
     }
   }
@@ -424,7 +530,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     if (room && room.maxCount && count > room.maxCount) issues.push(`${room.name}最多 ${room.maxCount} 座，目前設定 ${count} 座。`);
   }
   if (consumed > produced) issues.push(`電力不足：需要 ${consumed}，發電 ${produced}。`);
-  return { facilities, electricity: { produced, consumed }, issues, resources: smoke.sources.length ? [{ name: '人間煙火', high: smoke.high, low: smoke.low, used: smokeUsed, sources: smoke.sources }] : [] };
+  return { facilities, electricity: { produced, consumed }, issues, resources: resourceList };
 }
 const round = (value: number) => Math.round(value * 100) / 100;
 

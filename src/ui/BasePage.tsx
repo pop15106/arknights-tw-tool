@@ -25,16 +25,19 @@ function effectText(effect: SkillEffect): string {
     case 'moodRecoverSelf': return `自身心情恢復 ${signed(effect.value, '/時')}`;
     case 'moodRecoverAll': return `全宿舍心情恢復 ${signed(effect.value, '/時')}（取最高）`;
     case 'perGroup': return `${effect.scope === 'room' ? '同設施' : '基建內'}每名${effect.group}：${effectText(effect.per)}${effect.max ? `（最多 ${effect.max} 名）` : ''}`;
-    case 'resource': return `人間煙火 +${effect.amount}${effect.source === 'perDormOccupant' ? '／宿舍每人' : effect.source === 'perGroupOutsideDorm' ? `／每名${effect.group}（最多 ${effect.max} 名）` : ''}${effect.when === 'high' ? '（心情 > 12）' : effect.when === 'low' ? '（心情 ≤ 12）' : ''}`;
-    case 'resourceScale': return `每 ${effect.per} 點人間煙火${effect.target === 'productivity' ? '生產力' : '訂單效率'} +${effect.amount}%`;
+    case 'resource': return `${effect.resource} +${effect.amount}${{ flat: '', perDormOccupant: '／宿舍每人', perRoomOccupant: '／本宿舍每人', perRoomLevel: '／本設施每級', perFacilityLevel: '／全基建每級', perRecruitSlot: '／每個招募位', perGroupOutsideDorm: `／宿舍外每名${effect.group}`, perGroupInRoom: `／本設施每名${effect.group}` }[effect.source]}${effect.max ? `（上限 ${effect.max}）` : ''}${effect.when === 'high' ? '（心情 > 12）' : effect.when === 'low' ? '（心情 ≤ 12）' : ''}`;
+    case 'convert': return `每 ${effect.per} 點${effect.from}轉化為 1 點${effect.to}`;
+    case 'resourceScale': return `每 ${effect.per} 點${effect.resource}：${effectText(effect.effect)}`;
+    case 'resourceThreshold': return `${effect.resource}達 ${effect.min} 以上：${effectText(effect.effect)}`;
     case 'clue': return `線索蒐集速度 +${effect.value}%${effect.alone ? '（會客室只有自己工作時）' : ''}`;
     case 'contact': return `聯絡速度 +${effect.value}%${effect.perDormLevel ? '／宿舍每級' : ''}`;
     case 'training': return `${effect.professions ? effect.professions.join('、') : ''}專精訓練 +${effect.value}%${effect.atMastery ? `（訓練至專精 ${effect.atMastery}）` : ''}`;
     case 'byproduct': return `副產品機率 +${effect.value}%（${{ elite: '精英材料', skill: '技巧概要', base: '基建材料', any: '任意材料' }[effect.category]}）`;
-    case 'global': return `所有${effect.product === 'gold' ? '赤金' : ''}${effect.target === 'MANUFACTURE' ? '製造站生產力' : '貿易站訂單效率'} ${signed(effect.value)}${effect.maxOnly ? '（取最高）' : ''}`;
+    case 'global': return `所有${effect.product === 'gold' ? '赤金' : ''}${{ MANUFACTURE: '製造站生產力', TRADING: '貿易站訂單效率', MEETING: '會客室線索速度', HIRE: '辦公室聯絡速度' }[effect.target]} ${signed(effect.value)}${effect.maxOnly ? '（取最高）' : ''}`;
     case 'moodRoom': return `同設施所有人心情 ${effect.value < 0 ? `恢復 +${-effect.value}` : `消耗 +${effect.value}`}/時`;
     case 'orderMod': return { qualityAlpha: '提高高品質訂單（α）', qualityBeta: '提高高品質訂單（β）', pepe: '特別獨佔訂單', closure: '可露希爾特別訂單', twoGold: '赤金交付數固定為 2', breach: '交付數小於 4 視為違約訂單', breachBonus: `違約訂單赤金 +${effect.amount}`, invest: `4 赤金訂單龍門幣 +${effect.amount}` }[effect.mod];
     case 'remote': return `${effect.target === 'MANUFACTURE' ? '製造站' : '貿易站'}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
+    default: return '';
   }
 }
 
