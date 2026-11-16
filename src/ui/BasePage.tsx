@@ -29,6 +29,8 @@ function effectText(effect: SkillEffect): string {
     case 'drone': return `無人機充能 ${signed(effect.value)}`;
     case 'moodRecoverSelf': return `自身心情恢復 ${signed(effect.value, '/時')}`;
     case 'moodRecoverAll': return `全宿舍心情恢復 ${signed(effect.value, '/時')}（取最高）`;
+    case 'perGroup': return `${effect.scope === 'room' ? '同設施' : '基建內'}每名${effect.group}：${effectText(effect.per)}${effect.max ? `（最多 ${effect.max} 名）` : ''}`;
+    case 'remote': return `${effect.target === 'MANUFACTURE' ? '製造站' : '貿易站'}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
   }
 }
 
@@ -77,6 +79,7 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
       {facility.type === 'manufacturing' && <label><span>產品</span><select className="filter" value={facility.product ?? ''} disabled={busy} onChange={event => onChange({ product: event.currentTarget.value as Facility['product'] })}><option value="" disabled>選擇產品</option><option value="gold">{PRODUCT_LABEL.gold}</option><option value="record">{PRODUCT_LABEL.record}</option></select></label>}
     </div>
     {metrics.length > 0 && <dl className="facility-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}{(roomType === 'MANUFACTURE' || roomType === 'TRADING') && <div><dt>其中基礎</dt><dd>{signed(result.totals.basic)}</dd></div>}</dl>}
+    {result.remote.length > 0 && <p className="facility-remote">控制中樞加成：{result.remote.map(item => `${item.from}「${item.skill}」${item.text} ${item.value >= 0 ? '+' : ''}${item.value}%`).join('；')}</p>}
     {incomplete > 0 && <p className="facility-warning"><Icon name="alert" size={14}/>有 {incomplete} 個技能未計入或待核對，合計不完整。</p>}
     {result.issues.map(issue => <p key={issue} className="facility-issue">{issue}</p>)}
     <ul className="facility-slots">

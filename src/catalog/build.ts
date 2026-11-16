@@ -6,7 +6,7 @@ import { sealDataset, type Dataset, type OperatorDefinition } from '../domain/mo
 
 // 上游資料只作欄位投影；不執行遊戲標記、HTML 或動態程式。
 type Row = Record<string, any>;
-export interface GameDataTables { characters: Row; patches: Row; skills: Row; modules: Row; stages: Row; activities: Row; battleEquip?: Row; items?: Row; favor?: Row; building?: Row }
+export interface GameDataTables { characters: Row; patches: Row; skills: Row; modules: Row; stages: Row; activities: Row; battleEquip?: Row; items?: Row; favor?: Row; building?: Row; teams?: Row }
 export interface GameDataStatus {
   version: string; sourceUpdatedAt: string; syncedAt: string;
   counts: { operators: number; stages: number; events: number };
@@ -14,7 +14,7 @@ export interface GameDataStatus {
 }
 export interface GameDataSnapshot { dataset: Dataset; stages: Row[]; events: Row[]; status: GameDataStatus; base?: BaseCatalog }
 export const DATA_REPO = 'arkntools/arknights-data-tw-for-maa';
-export const CATALOG_REVISION = 5;
+export const CATALOG_REVISION = 6;
 export const MODULE_DATA_REPO = 'ArknightsAssets/ArknightsGamedata';
 export const MODULE_DATA_COMMIT = '624d3fa212dabc40bdbc2a873d87d0c7dbdf4fe5';
 export const MODULE_DATA_DATE = '2026-11-02T09:23:25Z';
@@ -68,6 +68,15 @@ export async function buildGameData(tables: GameDataTables, source: { commit: st
   const stages = Object.entries(rows(tables.stages.stages, '關卡表')).map(([id, row]) => ({ id, code: String(row.code ?? id), name: String(row.name ?? '未提供名稱'), type: String(row.stageType ?? ''), zoneId: String(row.zoneId ?? ''), apCost: typeof row.apCost === 'number' ? row.apCost : null, description: renderGameText(row.description, {}), dangerLevel: String(row.dangerLevel ?? ''), drops: (row.stageDropInfo?.displayDetailRewards ?? []).map((drop: Row) => ({ id: String(drop.id), type: String(drop.type), dropType: String(drop.dropType), occurrence: String(drop.occPercent ?? '') })) }));
   const events = Object.entries(rows(tables.activities.basicInfo, '活動表')).map(([id, row]) => ({ id, name: String(row.name ?? '未提供名稱'), type: String(row.type ?? ''), startTime: Number.isFinite(row.startTime) ? new Date(row.startTime * 1000).toISOString() : null, endTime: Number.isFinite(row.endTime) ? new Date(row.endTime * 1000).toISOString() : null, rewardEndTime: Number.isFinite(row.rewardEndTime) ? new Date(row.rewardEndTime * 1000).toISOString() : null, hasStage: row.hasStage === true, isRerun: row.isReplicate === true }));
   if (!stages.length || !events.length) throw new Error('關卡或活動資料為空，拒絕取代既有快取。');
-  const base = tables.building ? buildBaseCatalog(tables.building, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} building_data.json`, tables.items) : undefined;
+  // 陣營名稱取自 handbook_team_table；轉職形態（如阿米婭）以 char_patch_table 對應回同一角色。
+  const teamName = (code: unknown) => typeof code === 'string' ? tables.teams?.[code]?.powerName : undefined;
+  const patchOwner = new Map<string, string>();
+  for (const [owner, info] of Object.entries((tables.patches?.infos ?? {}) as Row)) for (const id of info?.tmplIds ?? []) patchOwner.set(id, info.default ?? owner);
+  const operatorMeta = Object.fromEntries(operators.map(op => {
+    const char = characters[op.id] ?? {};
+    const ids = [char.nationId, char.groupId, char.teamId].filter((value): value is string => typeof value === 'string');
+    return [op.id, { ids, groups: ids.map(teamName).filter((value): value is string => typeof value === 'string'), ...(char.isSpChar ? { alter: true } : {}), ...(patchOwner.get(op.id) ? { character: patchOwner.get(op.id) } : {}) }];
+  }));
+  const base = tables.building ? buildBaseCatalog(tables.building, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} building_data.json`, tables.items, operatorMeta) : undefined;
   return { dataset, stages, events, ...(base ? { base } : {}), status: { catalogRevision: CATALOG_REVISION, ...(tables.battleEquip ? { moduleSource: { version: MODULE_DATA_COMMIT, sourceUrl: `https://github.com/${MODULE_DATA_REPO}/tree/${MODULE_DATA_COMMIT}/tw/gamedata/excel`, sourceUpdatedAt: MODULE_DATA_DATE } } : {}), version: source.commit, sourceUpdatedAt: source.sourceUpdatedAt, syncedAt: source.syncedAt, counts: { operators: operators.length, stages: stages.length, events: events.length }, sourceKind: 'public-mirror', sourceUrl: `https://github.com/${DATA_REPO}/tree/${source.commit}` } };
 }

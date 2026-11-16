@@ -19,7 +19,14 @@ export type SkillEffect =
   | { kind: 'orderLimit'; value: number }
   | { kind: 'drone'; value: number }
   | { kind: 'moodRecoverSelf'; value: number }
-  | { kind: 'moodRecoverAll'; value: number };
+  | { kind: 'moodRecoverAll'; value: number }
+  /** 依陣營人數倍增：scope=room 為同一設施、base 為整個基建（可有上限）。 */
+  | { kind: 'perGroup'; scope: 'room' | 'base'; group: string; max?: number; per: SkillEffect }
+  /** 控制中樞對其他設施中某陣營幹員的加成：每名符合者在其所在設施各給一次。 */
+  | { kind: 'remote'; target: 'MANUFACTURE' | 'TRADING'; group: string; effects: SkillEffect[] };
+/** 單純數值效果的值；倍增與跨設施效果需另依配置計算，這裡回傳 0。 */
+export const scalar = (effect: SkillEffect): number => 'value' in effect ? effect.value : 0;
+
 export interface ParsedSkill {
   supported: boolean;
   /** 無條件生效的效果。 */
@@ -36,7 +43,7 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'productivity', value: Number(m[1]) }) },
   { pattern: new RegExp(`^(作戰記錄|貴金屬|源石)類配方的生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'productivity', value: Number(m[2]), product: m[1] === '作戰記錄' ? 'record' : m[1] === '貴金屬' ? 'gold' : 'originium' }) },
   { pattern: new RegExp(`^倉庫容量上限${NUM}$`, 'u'), effect: m => ({ kind: 'capacity', value: Number(m[1]) }) },
-  { pattern: new RegExp(`^心情每小時消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodCost', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^(?:自身)?心情每小時消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodCost', value: Number(m[1]) }) },
   { pattern: new RegExp(`^訂單(?:獲取|獲得)效率${NUM}%$`, 'u'), effect: m => ({ kind: 'order', value: Number(m[1]) }) },
   { pattern: new RegExp(`^且?訂單上限${NUM}$`, 'u'), effect: m => ({ kind: 'orderLimit', value: Number(m[1]) }) },
   { pattern: new RegExp(`^無人機充能速度${NUM}%$`, 'u'), effect: m => ({ kind: 'drone', value: Number(m[1]) }) },
@@ -44,15 +51,40 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^該宿舍內所有幹員的心情每小時恢復${NUM}（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'moodRecoverAll', value: Number(m[1]) }) },
 ];
 
+function parseClause(raw: string): SkillEffect | null {
+  // 搭配條件中的「額外」只是語氣；「當前／目前貿易站」只是指本設施。
+  const clause = raw.trim().replace(/額外(?=[+-])/u, '').replace(/^(?:當前|目前)(?:貿易站|製造站)/u, '');
+  const rule = CLAUSES.map(item => ({ item, match: clause.match(item.pattern) })).find(entry => entry.match);
+  return rule?.match ? rule.item.effect(rule.match) : null;
+}
+
 function parseClauses(text: string): SkillEffect[] | null {
   const effects: SkillEffect[] = [];
-  for (const raw of text.split('，')) {
-    // 搭配條件中的「額外」只是語氣，數值與一般句型相同。
-    const clause = raw.trim().replace(/額外(?=[+-])/u, '');
-    if (!clause) continue;
-    const rule = CLAUSES.map(item => ({ item, match: clause.match(item.pattern) })).find(entry => entry.match);
-    if (!rule?.match) return null;
-    effects.push(rule.item.effect(rule.match));
+  const parts = text.split(/[，；]/u).map(part => part.trim()).filter(Boolean);
+  for (let index = 0; index < parts.length; index++) {
+    const part = parts[index];
+    // 控制中樞：「每個進駐在製造站的某陣營幹員(，)生產力+N%(，……)」，其後子句都是對該陣營幹員的效果。
+    const remote = part.match(/^每個進駐在(製造站|貿易站)的(.+?)幹員(.*)$/u);
+    if (remote) {
+      const rest = [remote[3], ...parts.slice(index + 1)].map(item => item.replace(/^，/u, '').trim()).filter(Boolean);
+      const each = rest.map(parseClause);
+      if (!each.length || each.some(effect => !effect)) return null;
+      effects.push({ kind: 'remote', target: remote[1] === '製造站' ? 'MANUFACTURE' : 'TRADING', group: remote[2], effects: each as SkillEffect[] });
+      return effects;
+    }
+    // 同設施或全基建的陣營人數：只倍增緊接的下一個子句。
+    const room = part.match(/^同個(?:貿易站|製造站)中每有1名(.+?)幹員$/u);
+    const base = part.match(/^基建內（[^）]*）每有1名(.+?)幹員（最多(\d+)名）$/u);
+    if (room || base) {
+      const per = parts[index + 1] ? parseClause(parts[index + 1]) : null;
+      if (!per) return null;
+      effects.push(room ? { kind: 'perGroup', scope: 'room', group: room[1], per } : { kind: 'perGroup', scope: 'base', group: base![1], max: Number(base![2]), per });
+      index++;
+      continue;
+    }
+    const effect = parseClause(part);
+    if (!effect) return null;
+    effects.push(effect);
   }
   return effects;
 }
@@ -140,6 +172,8 @@ export interface FacilityResult {
   unsupported: { operatorId: string; skill: BaseSkill }[];
   /** 搭配技能的搭檔不在同一設施，條件效果沒有計入。 */
   comboMissing: { operatorId: string; skill: BaseSkill; partner: string }[];
+  /** 來自控制中樞的跨設施加成。 */
+  remote: { from: string; skill: string; text: string; value: number; kind: 'productivity' | 'order' }[];
   /** 解鎖狀態未知的技能。 */
   uncertain: { operatorId: string; skill: BaseSkill }[];
   /** 生效但不適用目前產品的技能（例如生產作戰記錄時的赤金技能）。 */
@@ -157,14 +191,20 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
   const rows = new Map(roster.map(row => [row.operatorId, row]));
   const rooms = new Map(catalog.rooms.map(room => [room.id, room]));
   const issues: string[] = [];
-  const seen = new Map<string, string>();
+  const seen = new Map<string, { label: string; operatorId: string }>();
   let produced = 0, consumed = 0;
+  // 陣營判斷：名稱需真的出現在某位幹員的陣營清單中；騎士等隱藏標籤沒有成員資料，視為無法計算。
+  const groupsOf = (id: string) => catalog.meta?.[id]?.groups ?? [];
+  const knownGroups = new Set(Object.values(catalog.meta ?? {}).flatMap(meta => meta.groups));
+  const characterOf = (id: string) => catalog.meta?.[id]?.character ?? id;
+  const allAssigned = [...new Set(Object.values(base.assignments ?? {}).flat())];
+  const baseMembers = (group: string) => new Set(allAssigned.filter(id => groupsOf(id).includes(group)).map(characterOf)).size;
   const counts = new Map<BaseRoomType, number>();
   const facilities = base.facilities.map((facility, index): FacilityResult => {
     const roomType = ROOM_OF[facility.type], room = rooms.get(roomType);
     const label = `${FACILITY_LABEL[facility.type]} ${base.facilities.slice(0, index + 1).filter(item => item.type === facility.type).length}`;
     counts.set(roomType, (counts.get(roomType) ?? 0) + 1);
-    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [] }, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], issues: [] };
+    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [] }, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], remote: [], issues: [] };
     if (!room) { result.issues.push('資料包沒有此設施的資料。'); return result; }
     const phase = room.phases[facility.level - 1];
     if (!phase) { result.issues.push(`等級超過資料上限（最高 ${room.phases.length} 級）。`); }
@@ -180,8 +220,10 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
       const row = rows.get(operatorId), definition = definitions.get(operatorId);
       const name = definition?.displayName ?? operatorId;
       if (!row) { result.issues.push(`${name} 不在目前幹員庫。`); continue; }
-      const previous = seen.get(operatorId);
-      if (previous) issues.push(`${name} 同時被安排在「${previous}」與「${label}」。`); else seen.set(operatorId, label);
+      const previous = seen.get(characterOf(operatorId));
+      if (!previous) seen.set(characterOf(operatorId), { label, operatorId });
+      else if (previous.operatorId === operatorId) issues.push(`${name} 同時被安排在「${previous.label}」與「${label}」。`);
+      else issues.push(`${name}的不同形態是同一位幹員，不能同時進駐「${previous.label}」與「${label}」。`);
       const slots = catalog.operators[operatorId] ?? [];
       const skills: OperatorInRoom['skills'] = slots.map(slot => {
         const resolved = slotResult(slot, row, catalog);
@@ -198,7 +240,13 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
         const comboActive = !!partner && partner !== name && roomNames.has(partner);
         if (partner) skill.combo = { partner, active: comboActive };
         const candidates = [...skill.parsed.effects, ...(comboActive ? skill.parsed.conditional!.effects : [])];
-        skill.applied = candidates.filter(effect => productMatches(effect, facility));
+        if (candidates.some(effect => (effect.kind === 'perGroup' || effect.kind === 'remote') && !knownGroups.has(effect.group))) { result.unsupported.push({ operatorId, skill: skill.active }); skill.applied = []; continue; }
+        // 陣營倍增換算成目前配置下的實際數值。
+        skill.applied = candidates.map(effect => {
+          if (effect.kind !== 'perGroup' || !('value' in effect.per)) return effect;
+          const count = effect.scope === 'room' ? assigned.filter(id => groupsOf(id).includes(effect.group)).length : Math.min(effect.max ?? Infinity, baseMembers(effect.group));
+          return { ...effect.per, value: round(effect.per.value * count) } as SkillEffect;
+        }).filter(effect => effect.kind !== 'perGroup' && productMatches(effect, facility));
         let applied = false;
         for (const effect of skill.applied) {
           applied = true;
@@ -220,6 +268,24 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     result.totals.drone = round(result.totals.drone);
     return result;
   });
+  // 第二輪：控制中樞對其他設施中特定陣營幹員的加成，記在被加成的設施上。
+  for (const control of facilities.filter(result => result.facility.type === 'control')) {
+    for (const op of control.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
+      if (effect.kind !== 'remote') continue;
+      for (const target of facilities.filter(result => ROOM_OF[result.facility.type] === effect.target)) {
+        const members = target.operators.filter(member => groupsOf(member.operatorId).includes(effect.group)).length;
+        if (!members) continue;
+        for (const each of effect.effects) {
+          if (!('value' in each) || !productMatches(each, target.facility)) continue;
+          const value = round(each.value * members);
+          if (each.kind === 'productivity') target.totals.productivity = round(target.totals.productivity + value);
+          else if (each.kind === 'order') target.totals.order = round(target.totals.order + value);
+          else continue;
+          target.remote.push({ from: op.name, skill: skill.active!.name, text: `${effect.group} ${members} 名`, value, kind: each.kind });
+        }
+      }
+    }
+  }
   for (const [roomType, count] of counts) {
     const room = rooms.get(roomType);
     if (room && room.maxCount && count > room.maxCount) issues.push(`${room.name}最多 ${room.maxCount} 座，目前設定 ${count} 座。`);
@@ -237,8 +303,10 @@ export interface Candidate { operatorId: string; name: string; score: number; st
 export function candidatesFor(facility: Facility, catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, exclude: ReadonlySet<string>): Candidate[] {
   const roomType = ROOM_OF[facility.type];
   const list: Candidate[] = [];
+  const characterOf = (id: string) => catalog.meta?.[id]?.character ?? id;
+  const excludedCharacters = new Set([...exclude].map(characterOf));
   for (const row of roster) {
-    if (exclude.has(row.operatorId)) continue;
+    if (exclude.has(row.operatorId) || excludedCharacters.has(characterOf(row.operatorId))) continue;
     const owned = row.fields.owned;
     if (owned?.status === 'known' && owned.value === false) continue;
     const name = definitions.get(row.operatorId)?.displayName ?? row.operatorId;
@@ -295,7 +363,7 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
       if (!active || active.roomType !== ROOM_OF[facility.type]) continue;
       const parsed = parseSkill(active);
       const effects = [...parsed.effects, ...(parsed.conditional && partnerName && parsed.conditional.partner === partnerName ? parsed.conditional.effects : [])];
-      for (const effect of effects) if (productMatches(effect, facility) && ['productivity', 'order', 'drone', 'moodRecoverAll', 'moodRecoverSelf'].includes(effect.kind)) total += effect.value;
+      for (const effect of effects) if (productMatches(effect, facility) && ['productivity', 'order', 'drone', 'moodRecoverAll', 'moodRecoverSelf'].includes(effect.kind)) total += scalar(effect);
     }
     return round(total);
   };
@@ -322,7 +390,10 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
   });
   options.sort((a, b) => b.perSeat - a.perSeat || b.score - a.score || a.order - b.order || a.name.localeCompare(b.name, 'zh-Hant'));
   const assignments: Record<string, string[]> = Object.fromEntries(base.facilities.map(facility => [facility.id, []]));
-  const used = new Set<string>();
+  // 以「角色」記錄已安排者：同一角色的不同形態（如阿米婭）只能排一處。
+  const characterKey = (id: string) => catalog.meta?.[id]?.character ?? id;
+  const usedCharacters = new Set<string>();
+  const used = { has: (id: string) => usedCharacters.has(characterKey(id)), add: (id: string) => { usedCharacters.add(characterKey(id)); }, get size() { return usedCharacters.size; } };
   const picks = new Map<string, RecommendationPick[]>();
   // 「全宿舍恢復」為同種效果取最高，同一間宿舍放第二位不會增加效果，因此每間只放一位。
   const allDorm = (operatorId: string) => {
@@ -381,7 +452,7 @@ function skillValue(skill: BaseSkill | undefined): number | undefined {
   if (!skill) return 0;
   const parsed = parseSkill(skill);
   if (!parsed.supported) return undefined;
-  return parsed.effects.reduce((sum, effect) => sum + (['productivity', 'order', 'drone', 'moodRecoverAll', 'moodRecoverSelf'].includes(effect.kind) ? effect.value : 0), 0);
+  return parsed.effects.reduce((sum, effect) => sum + (['productivity', 'order', 'drone', 'moodRecoverAll', 'moodRecoverSelf'].includes(effect.kind) ? scalar(effect) : 0), 0);
 }
 
 export function trainingAdvice(catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { ownedOnly: boolean; rooms?: ReadonlySet<BaseRoomType> }): { entries: TrainingEntry[]; domains: DomainAnalysis[] } {

@@ -137,7 +137,7 @@ export function createGameDataStore(options: {
       if (previous && !recovered && previous.status.version === commit.sha && previous.status.catalogRevision === CATALOG_REVISION && previous.status.moduleSource?.version === MODULE_DATA_COMMIT) { await images(previous); await refreshTrading().catch(() => undefined); lastError = undefined; delete previous.status.lastError; return previous; }
       const tables = {} as GameDataTables;
       for (const [key, filename] of Object.entries(TABLES)) tables[key as keyof GameDataTables] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${DATA_REPO}/${commit.sha}/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
-      for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json' })) tables[key as 'battleEquip' | 'favor'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
+      for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json', teams: 'handbook_team_table.json' })) tables[key as 'battleEquip' | 'favor' | 'teams'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       const published = await publish(tables, { commit: commit.sha, sourceUpdatedAt: commit.commit.committer.date, syncedAt: new Date().toISOString() });
       await refreshTrading().catch(() => undefined);
       return published;

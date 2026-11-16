@@ -233,3 +233,35 @@ test('推薦配置：搭檔組合整組排進同一座設施', async () => {
   const rec = recommendBase({ facilities: [{ id: 't', type: 'trading', level: 3 }, { id: 't2', type: 'trading', level: 1 }], onlineSlots: [] }, catalog, state.roster, definitions);
   assert.ok(rec.assignments.t.includes('demo-2') && rec.assignments.t.includes('demo-7'), JSON.stringify(rec.assignments));
 });
+
+test('陣營：同設施、全基建（含上限）與控制中樞跨設施加成依目前配置計算；隱藏標籤不計', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.meta = { 'demo-1': { groups: ['甲團'] }, 'demo-2': { groups: ['甲團'] }, 'demo-4': { groups: ['甲團'] }, 'demo-7': { groups: ['乙團'] } };
+  catalog.skills['g-room'] = { id: 'g-room', name: '示範・同伴', roomType: 'TRADING', description: '進駐貿易站時，同個貿易站中每有1名甲團幹員，當前貿易站訂單獲取效率+20%' };
+  catalog.skills['g-base'] = { id: 'g-base', name: '示範・人脈', roomType: 'MANUFACTURE', description: '進駐製造站時，基建內（不包含副手及活動室使用者）每有1名甲團幹員（最多2名），貴金屬類配方的生產力+3%' };
+  catalog.skills['g-ctrl'] = { id: 'g-ctrl', name: '示範・指揮', roomType: 'CONTROL', description: '進駐控制中樞時，自身心情每小時消耗+0.5；每個進駐在貿易站的乙團幹員，訂單獲得效率+5%' };
+  catalog.skills['g-tag'] = { id: 'g-tag', name: '示範・旗手', roomType: 'CONTROL', description: '進駐控制中樞時，每個進駐在製造站的騎士幹員生產力+7%' };
+  catalog.operators['demo-2'] = [[{ buffId: 'g-room', elite: 0, level: 1 }]];
+  catalog.operators['demo-3'] = [[{ buffId: 'g-base', elite: 0, level: 1 }]];
+  catalog.operators['demo-5'] = [[{ buffId: 'g-ctrl', elite: 0, level: 1 }]];
+  catalog.operators['demo-6'] = [[{ buffId: 'g-tag', elite: 0, level: 1 }]];
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 't', type: 'trading', level: 3 }, { id: 'm', type: 'manufacturing', level: 3, product: 'gold' }];
+  const ev = evaluateBase({ facilities, onlineSlots: [], assignments: { c: ['demo-5', 'demo-6'], t: ['demo-2', 'demo-1', 'demo-7'], m: ['demo-3', 'demo-4'] } }, catalog, state.roster, definitions);
+  const [control, trade, manu] = ev.facilities;
+  assert.equal(trade.totals.order, 40 + 20 + 5, '同站甲團 2 名×20（含自身）＋demo-7 原有長單 +20＋中樞對乙團 1 名 +5');
+  assert.equal(trade.remote[0].value, 5);
+  assert.equal(manu.totals.productivity, 6, '基建內甲團 3 名但上限 2 名 → +6');
+  assert.ok(control.unsupported.some(item => item.skill.id === 'g-tag'), '騎士是隱藏標籤，沒有成員資料 → 未計入');
+});
+
+test('同一角色的不同形態不能同時進駐，推薦也只排一處', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.meta = { 'demo-8': { groups: [], character: 'demo-1' }, 'demo-1': { groups: [] } };
+  const ev = evaluateBase({ facilities: [{ id: 'a', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'b', type: 'manufacturing', level: 3, product: 'gold' }], onlineSlots: [], assignments: { a: ['demo-1'], b: ['demo-8'] } }, catalog, state.roster, definitions);
+  assert.match(ev.issues.join(), /不同形態是同一位幹員/);
+  const rec = recommendBase({ facilities: [{ id: 'a', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'b', type: 'manufacturing', level: 3, product: 'gold' }], onlineSlots: [] }, catalog, state.roster, definitions);
+  const all = Object.values(rec.assignments).flat();
+  assert.ok(!(all.includes('demo-1') && all.includes('demo-8')));
+});

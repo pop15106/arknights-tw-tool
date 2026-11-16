@@ -22,10 +22,14 @@ export interface BaseCatalog {
   /** 製造站各等級倉庫容量。 */
   outputCapacity?: number[];
   /** 心情：上限與各設施各等級的基礎每小時消耗（皆換算成遊戲顯示單位）。 */
+  /** 幹員的陣營名稱、是否異格、所屬角色（同一角色的不同形態不能同時進駐）。 */
+  meta?: Record<string, BaseOperatorMeta>;
   /** 貿易站訂單參數（PRTS 同步結果）；未同步時由畫面使用內建值。 */
   trading?: TradingParams;
   mood?: { max: number; costPerHour: Partial<Record<BaseRoomType, number[]>>; maxByOperator?: Record<string, number> };
 }
+export interface BaseOperatorMeta { groups: string[]; alter?: boolean; character?: string }
+export interface OperatorMetaInput { ids: string[]; groups: string[]; alter?: boolean; character?: string }
 export interface BaseFormula { itemId: string; name: string; seconds: number; weight: number }
 
 /** 移除 <@cc.vup>、<$cc.bd_b1>、</> 等遊戲標記，只保留文字。 */
@@ -38,7 +42,7 @@ function obj(value: unknown, label: string): Row {
   return value as Row;
 }
 
-export function buildBaseCatalog(building: unknown, operatorIds: readonly string[], version: string, source: string, items?: unknown): BaseCatalog {
+export function buildBaseCatalog(building: unknown, operatorIds: readonly string[], version: string, source: string, items?: unknown, operatorMeta?: Record<string, OperatorMetaInput>): BaseCatalog {
   const data = obj(building, '基建表');
   const roomsRaw = obj(data.rooms, '設施表'), buffsRaw = obj(data.buffs, '技能表'), charsRaw = obj(data.chars, '幹員基建表');
   const rooms = BASE_ROOM_TYPES.map(id => {
@@ -75,6 +79,15 @@ export function buildBaseCatalog(building: unknown, operatorIds: readonly string
     costPerHour: Object.fromEntries(BASE_ROOM_TYPES.map(id => [id, (roomsRaw[id]?.phases ?? []).map((phase: Row) => Math.round((Number(phase.manpowerCost) || 0) * 3600 / factor * 1000) / 1000)])),
     maxByOperator: Object.fromEntries(operatorIds.filter(id => Number(charsRaw[id]?.maxManpower) > 0 && Math.abs(Number(charsRaw[id].maxManpower) / factor - 24) > 1e-6).map(id => [id, Number(charsRaw[id].maxManpower) / factor])),
   } : undefined;
+  // 技能標記 <$cc.g.代碼>名稱 直接帶陣營代碼（例如「歲」= sui）；代碼與幹員的 nation/group/team 相同時補上該名稱。
+  const markupGroups = new Map<string, string>();
+  for (const buff of Object.values(buffsRaw) as Row[]) for (const match of String(buff.description ?? '').matchAll(/<\$cc\.g\.([A-Za-z0-9_]+)><@cc\.kw>([^<]+)<\/>/gu)) markupGroups.set(match[1], match[2].replace(/幹員$/u, ''));
+  const meta = operatorMeta ? Object.fromEntries(Object.entries(operatorMeta).filter(([id]) => operators[id] || operatorIds.includes(id)).map(([id, info]) => {
+    const groups = new Set(info.groups);
+    for (const code of info.ids) { const name = markupGroups.get(code); if (name) groups.add(name); }
+    if (info.alter) groups.add('異格');
+    return [id, { groups: [...groups].sort(), ...(info.alter ? { alter: true } : {}), ...(info.character && info.character !== id ? { character: info.character } : {}) }];
+  })) : undefined;
   const formulaRows = Object.values(data.manufactFormulas ?? {}) as Row[];
   const formula = (row: Row | undefined): BaseFormula | undefined => row && Number(row.costPoint) > 0 ? { itemId: String(row.itemId), name: plainGameText((items as Row | undefined)?.items?.[row.itemId]?.name) || String(row.itemId), seconds: Number(row.costPoint), weight: Number(row.weight) || 1 } : undefined;
   const gold = formula(formulaRows.find(row => row.formulaType === 'F_GOLD'));
@@ -83,5 +96,5 @@ export function buildBaseCatalog(building: unknown, operatorIds: readonly string
     .map(row => ({ ...formula(row)!, level: Number(row.requireRooms?.[0]?.roomLevel) || 1, exp: Number(expItems[row.itemId].gainExp) })).sort((a, b) => a.level - b.level);
   const capacity = Array.isArray(data.manufactData?.phases) ? data.manufactData.phases.map((phase: Row) => Number(phase.outputCapacity) || 0) : undefined;
   return { source, version, rooms, basicSpeedPercent: { MANUFACTURE: percent(data.manufactData?.basicSpeedBuff), TRADING: percent(data.tradingData?.basicSpeedBuff) }, skills, operators,
-    ...(gold && records.length ? { formulas: { gold, records } } : {}), ...(capacity ? { outputCapacity: capacity } : {}), ...(mood ? { mood } : {}) };
+    ...(gold && records.length ? { formulas: { gold, records } } : {}), ...(capacity ? { outputCapacity: capacity } : {}), ...(mood ? { mood } : {}), ...(meta ? { meta } : {}) };
 }
