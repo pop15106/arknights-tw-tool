@@ -108,3 +108,17 @@ test('集成戰略：主題分析（敵人加權、領袖、地塊、藏品）�
   assert.ok(caster.reasons.some(reason => /高防禦/.test(reason.text)));
   assert.equal(fitLevel(100, [100, 50, 40, 30, 20, 10, 5]), '高');
 });
+
+test('保全派駐（每座塔、戰術裝備卡）與生息演算主題投影，契合度點名陣營', async () => {
+  const { buildSecurityThemes, buildReclamationThemes } = await import('../src/catalog/rogue.ts');
+  const { themeFit } = await import('../src/domain/rogueFit.ts');
+  const security = buildSecurityThemes({ towers: { tower_tr_01: { id: 'tower_tr_01', name: '訓練場', towerType: 'TRAINING', levels: ['t'] }, tower_n_05: { id: 'tower_n_05', name: '工地', towerType: 'NORMAL', levels: ['a'], hardLevels: ['b'] } },
+    levels: { t: { id: 't', levelId: 'Obt/Legion/LTTR/level_t' }, a: { id: 'a', code: 'LT-1', name: '一', levelId: 'Obt/Legion/LT05/level_a' }, b: { id: 'b', code: 'LT-1H', name: '一（高難）', levelId: 'Obt/Legion/LT05/level_b' } },
+    mainCards: { c: { id: 'c', name: '示波器', desc: '深海獵人幹員攻擊力+20%' } }, subCards: {} });
+  assert.deepEqual(security.map(theme => [theme.id, theme.stages.length, theme.relics.length]), [['tower_n_05', 2, 1]], '訓練場不列入，含高難關卡');
+  const reclamation = buildReclamationThemes({ basicInfo: { sandbox_1: { topicId: 'sandbox_1', topicName: '沙洲遺聞' } }, detail: { x: { levelId: 'Obt/Sandbox/sandbox_1/level_sandbox1_01', y: 'Obt/Sandbox/sandbox_1/level_sandbox1_01' } } });
+  assert.deepEqual(reclamation.map(theme => [theme.name, theme.stages.length]), [['沙洲遺聞', 1]]);
+  const analysis = { id: 'tower_n_05', name: '工地', stageCount: 2, analyzedStages: 2, enemy: { spawns: 10, fly: 0, highDef: 0, highRes: 0, magic: 0, elite: 0 }, topEnemies: [], bosses: [], tiles: { melee: 1, ranged: 1, both: 0 }, relics: security[0].relics };
+  const fit = themeFit({ id: 'x', displayName: 'x', branch: '', profession: '近衛', skills: [], modules: [], talents: [] } as never, { operators: { x: { tags: [], position: 'MELEE' } } } as never, analysis, [], [], ['深海獵人']);
+  assert.ok(fit.reasons.some(reason => /示波器.*深海獵人/.test(reason.text)));
+});

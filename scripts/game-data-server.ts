@@ -107,11 +107,11 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
       if (url.pathname === '/api/game-data/rogue') {
         if (!snapshot.rogue) throw new ApiError(503, 'ROGUE_UNAVAILABLE', '目前的遊戲資料沒有集成戰略資料，請到設定按「更新遊戲資料」。');
-        json(res, 200, snapshot.rogue.map(theme => ({ id: theme.id, name: theme.name, stages: theme.stages.length, relics: theme.relics.length }))); return;
+        json(res, 200, snapshot.rogue.map(theme => ({ id: theme.id, name: theme.name, mode: theme.mode ?? 'roguelike', stages: theme.stages.length, relics: theme.relics.length }))); return;
       }
       if (url.pathname === '/api/game-data/rogue-analysis') {
         const theme = url.searchParams.get('theme') ?? '';
-        if (!/^rogue_\d{1,2}$/u.test(theme)) throw new ApiError(400, 'QUERY', '主題 ID 無效。');
+        if (!/^(?:rogue_\d{1,2}|tower_[a-z]{1,3}_\d{1,3}|sandbox_\d{1,2})$/u.test(theme)) throw new ApiError(400, 'QUERY', '主題 ID 無效。');
         let analysis: Awaited<ReturnType<typeof rogueAnalysis>>;
         try { analysis = await rogueAnalysis(theme); } catch { throw new ApiError(502, 'ROGUE_FAILED', '主題關卡下載失敗，請稍後再試。'); }
         if (!analysis) throw new ApiError(404, 'ROGUE_NOT_FOUND', '找不到此主題的資料。');

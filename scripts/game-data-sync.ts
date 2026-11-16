@@ -6,7 +6,7 @@ import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DA
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
 import { parseTradingWikitext, PRTS_TRADING_API, validateTradingParams, type TradingParams } from '../src/catalog/trading.ts';
 import { parseLevelEnemies } from '../src/catalog/enemies.ts';
-import { analyzeRogueTheme, type RogueAnalysis } from '../src/catalog/rogue.ts';
+import { analyzeRogueTheme, MODE_THEME_ID, type RogueAnalysis } from '../src/catalog/rogue.ts';
 import { parsePenguinMatrix, PENGUIN_MATRIX_API, validateDropRates, type DropRates } from '../src/catalog/drops.ts';
 export type { GameDataSnapshot } from '../src/catalog/build.ts';
 
@@ -146,7 +146,7 @@ export function createGameDataStore(options: {
   }
   // 集成戰略主題分析：下載該主題所有關卡檔（固定版本、本機快取），彙整敵人、首領與地塊。
   async function rogueAnalysis(themeId: string): Promise<RogueAnalysis | null> {
-    if (!/^rogue_\d{1,2}$/u.test(themeId)) return null;
+    if (!MODE_THEME_ID.test(themeId)) return null;
     const snapshot = await load();
     const theme = snapshot?.rogue?.find(item => item.id === themeId);
     if (!theme || !snapshot?.enemies) return null;
@@ -211,6 +211,8 @@ export function createGameDataStore(options: {
       for (const [key, filename] of Object.entries(TABLES)) tables[key as keyof GameDataTables] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${DATA_REPO}/${commit.sha}/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json', teams: 'handbook_team_table.json' })) tables[key as 'battleEquip' | 'favor' | 'teams'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       // 敵人圖鑑與資料庫（依關卡推薦用）：同一固定版本；資料庫較大，只在建置時投影成精簡摘要。
+      tables.tower = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/climb_tower_table.json`, 16 * 1024 * 1024)).toString('utf8'));
+      tables.sandbox = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/sandbox_perm_table.json`, 24 * 1024 * 1024)).toString('utf8'));
       tables.rogue = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/roguelike_topic_table.json`, 40 * 1024 * 1024)).toString('utf8'));
       tables.enemyHandbook = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/enemy_handbook_table.json`, 24 * 1024 * 1024)).toString('utf8'));
       tables.enemyDatabase = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/levels/enemydata/enemy_database.json`, 32 * 1024 * 1024)).toString('utf8'));

@@ -5,7 +5,9 @@ type Row = Record<string, any>;
 
 export interface RogueStage { id: string; code: string; name: string; levelId: string; boss: boolean; elite: boolean }
 export interface RogueRelic { id: string; name: string; usage: string; rarity: string }
-export interface RogueTheme { id: string; name: string; stages: RogueStage[]; relics: RogueRelic[] }
+export type ModeKind = 'roguelike' | 'security' | 'reclamation';
+export interface RogueTheme { id: string; name: string; mode?: ModeKind; stages: RogueStage[]; relics: RogueRelic[] }
+export const MODE_THEME_ID = /^(?:rogue_\d{1,2}|tower_[a-z]{1,3}_\d{1,3}|sandbox_\d{1,2})$/u;
 
 const plain = (text: unknown) => typeof text === 'string' ? text.replace(/<[@$][^>]*>|<\/>/gu, '').trim() : '';
 
@@ -22,9 +24,32 @@ export function buildRogueThemes(table: unknown): RogueTheme[] | undefined {
       .map((stage: Row) => ({ id: String(stage.id), code: String(stage.code ?? ''), name: plain(stage.name), levelId: String(stage.levelId), boss: !!stage.isBoss, elite: !!stage.isElite }));
     const relics = Object.values((detail.items ?? {}) as Row).filter((item: Row) => item?.type === 'RELIC' && plain(item.usage))
       .map((item: Row) => ({ id: String(item.id), name: plain(item.name), usage: plain(item.usage), rarity: String(item.rarity ?? '') }));
-    themes.push({ id, name: plain(topic?.name) || id, stages, relics });
+    themes.push({ id, name: plain(topic?.name) || id, mode: 'roguelike', stages, relics });
   }
   return themes.length ? themes.sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true })) : undefined;
+}
+
+const validLevel = (levelId: unknown): levelId is string => typeof levelId === 'string' && /^[A-Za-z0-9_/-]{1,120}$/u.test(levelId) && !levelId.includes('..');
+/** 保全派駐：每座戰鬥塔（不含訓練場）一個主題；一般與高難關卡都納入；主卡／副卡（戰術裝備）視同藏品。 */
+export function buildSecurityThemes(table: unknown): RogueTheme[] {
+  const data = table as Row | undefined;
+  const levels = (data?.levels ?? {}) as Row;
+  const cards = [...Object.values((data?.mainCards ?? {}) as Row), ...Object.values((data?.subCards ?? {}) as Row)].map((card: Row) => ({ id: String(card.id), name: plain(card.name), usage: plain(card.desc).replace(/\n+/gu, ' '), rarity: String(card.type ?? '') })).filter(card => card.usage);
+  return Object.values((data?.towers ?? {}) as Row).filter((tower: Row) => tower?.towerType !== 'TRAINING' && Array.isArray(tower?.levels)).map((tower: Row) => ({
+    id: String(tower.id), name: plain(tower.name), mode: 'security' as const, relics: cards,
+    stages: [...tower.levels, ...(Array.isArray(tower.hardLevels) ? tower.hardLevels : [])].map((id: string) => levels[id]).filter((level: Row) => validLevel(level?.levelId))
+      .map((level: Row) => ({ id: String(level.id), code: String(level.code ?? ''), name: plain(level.name), levelId: String(level.levelId), boss: false, elite: false })),
+  })).filter(theme => theme.stages.length && /^tower_[a-z]{1,3}_\d{1,3}$/u.test(theme.id));
+}
+/** 生息演算：每個主題一組，關卡檔路徑取自 sandbox_perm_table 內出現的 Obt/Sandbox/<主題>/ 路徑。 */
+export function buildReclamationThemes(table: unknown): RogueTheme[] {
+  const data = table as Row | undefined;
+  const text = JSON.stringify(data?.detail ?? {});
+  return Object.values((data?.basicInfo ?? {}) as Row).filter((info: Row) => /^sandbox_\d{1,2}$/u.test(String(info?.topicId))).map((info: Row) => {
+    const id = String(info.topicId);
+    const paths = [...new Set([...text.matchAll(new RegExp(`Obt/Sandbox/${id}/level_[A-Za-z0-9_-]+`, 'gu'))].map(match => match[0]))].filter(validLevel);
+    return { id, name: plain(info.topicName) || id, mode: 'reclamation' as const, relics: [], stages: paths.map(levelId => ({ id: levelId.split('/').at(-1)!, code: levelId.split('/').at(-1)!.replace(/^level_/u, ''), name: '', levelId, boss: false, elite: false })) };
+  }).filter(theme => theme.stages.length);
 }
 
 /* ------------------------------------------------------------------ */

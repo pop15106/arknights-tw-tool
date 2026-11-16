@@ -12,7 +12,7 @@ export interface FitReason { points: number; text: string }
 export interface ThemeFit { score: number; reasons: FitReason[]; relics: string[] }
 const pct = (value: number) => `${Math.round(value * 100)}%`;
 
-export function themeFit(definition: OperatorDefinition, growth: GrowthCatalog, analysis: RogueAnalysis, debuffs: readonly DebuffLink[], themeTexts: readonly string[]): ThemeFit {
+export function themeFit(definition: OperatorDefinition, growth: GrowthCatalog, analysis: RogueAnalysis, debuffs: readonly DebuffLink[], themeTexts: readonly string[], groups: readonly string[] = []): ThemeFit {
   const op = growth.operators[definition.id];
   const tags = op?.tags ?? [], position = op?.position;
   const reasons: FitReason[] = [];
@@ -36,9 +36,12 @@ export function themeFit(definition: OperatorDefinition, growth: GrowthCatalog, 
   if (position === 'RANGED') add((0.4 - meleeShare) * 40, `高台可部署格佔 ${pct(1 - meleeShare)}：遠程位置多`);
   // 藏品：點名分支、召喚物、站位的才有區辨力；各職業各一件的通用藏品不加分。
   const relics: string[] = [];
+  const groupPoints = new Map<string, number>();
   for (const relic of analysis.relics) {
     const usage = relic.usage;
     if (definition.branch && usage.includes(`【${definition.branch}】`)) { relics.push(`${relic.name}：${usage}`); add(8, `藏品「${relic.name}」點名【${definition.branch}】`); continue; }
+    const group = groups.find(name => name.length >= 2 && (usage.includes(`【${name}】`) || usage.includes(`${name}幹員`)));
+    if (group) { relics.push(`${relic.name}：${usage}`); const used = groupPoints.get(group) ?? 0, points = Math.min(6, 10 - used); groupPoints.set(group, used + points); add(points, `「${relic.name}」點名${group}幹員${points < 6 ? '（同陣營加分上限 10）' : ''}`); continue; }
     if (tags.includes('召喚') && usage.includes('【召喚物】')) { relics.push(`${relic.name}：${usage}`); add(5, `藏品「${relic.name}」強化召喚物`); continue; }
     if ((position === 'MELEE' && usage.includes('【近戰】')) || (position === 'RANGED' && usage.includes('【遠程】'))) { relics.push(`${relic.name}：${usage}`); add(3, `藏品「${relic.name}」點名${position === 'MELEE' ? '近戰' : '遠程'}`); }
   }

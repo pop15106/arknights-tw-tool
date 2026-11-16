@@ -20,7 +20,7 @@ const KIND_LABEL: Record<SynergyLink['target']['kind'], string> = { operator: '�
 
 export function TeamPage({ state, isDemo, onSaveNotes }: { state: AppState; isDemo: boolean; onSaveNotes?: (notes: NonNullable<AppState['settings']['reviewNotes']>) => void }) {
   const [tab, setTab] = useState<'synergy' | 'squad' | 'stage' | 'review' | 'rogue'>('synergy');
-  const tabs = <div className="segmented" role="tablist">{([['synergy', '幹員相性'], ['squad', '編隊建議'], ['stage', '依關卡推薦'], ['review', '幹員簡評'], ['rogue', '集成戰略主題']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
+  const tabs = <div className="segmented" role="tablist">{([['synergy', '幹員相性'], ['squad', '編隊建議'], ['stage', '依關卡推薦'], ['review', '幹員簡評'], ['rogue', '模式分析']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
   return <div className="team-page">
     {tab === 'synergy' && <SynergyTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'squad' && <SquadTab state={state} isDemo={isDemo} tabs={tabs}/>}
@@ -240,8 +240,12 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
             const fit = rogue?.fits.get(theme.theme)?.get(definition.id), scores = rogue?.scores.get(theme.theme);
             body = <>{fit && scores ? <FitView fit={fit} level={fitLevel(fit.score, scores)}/> : <p className="fine-print">{rogue ? '此主題的關卡資料尚未分析。' : '分析主題關卡中…（首次需下載關卡檔）'}</p>}{items.length > 0 && list(items)}</>;
           }
-          else if (mode.key === 'reclamation') body = review.reclamation.length ? list(review.reclamation) : <p className="fine-print">資料沒有生息演算的專屬效果。</p>;
-          else body = review.security.length ? list(review.security) : <p className="fine-print">資料沒有保全派駐的專屬效果；保全派駐的表現取決於關卡與招募組合，本工具不評分。</p>;
+          else {
+            const kind = mode.key === 'reclamation' ? 'reclamation' : 'security';
+            const ranked = (rogue?.analyses ?? []).filter(item => item.mode === kind).map(item => ({ name: item.name, fit: rogue!.fits.get(item.name)?.get(definition.id), scores: rogue!.scores.get(item.name) ?? [] })).filter(item => item.fit).sort((a, b) => b.fit!.score - a.fit!.score);
+            const explicit = kind === 'reclamation' ? review.reclamation : review.security;
+            body = <>{ranked.length ? <>{ranked.slice(0, kind === 'security' ? 3 : 1).map(item => <div key={item.name}><strong className="fine-print">{kind === 'security' ? `最契合的塔：${item.name}` : item.name}</strong><FitView fit={item.fit!} level={fitLevel(item.fit!.score, item.scores)}/></div>)}{kind === 'security' && ranked.length > 3 && <p className="fine-print">最不契合：{ranked.at(-1)!.name}（{fitLevel(ranked.at(-1)!.fit!.score, ranked.at(-1)!.scores)}）</p>}</> : <p className="fine-print">{rogue ? '此模式的關卡資料尚未分析。' : '分析模式關卡中…'}</p>}{explicit.length > 0 && list(explicit)}</>;
+          }
           return <article key={mode.key} className="synergy-card review-card"><header><strong>{mode.label}</strong></header>{body}{noteBox(mode.key)}</article>;
         })}
       </div>
@@ -251,16 +255,17 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
 
 /** 各主題的分析與全部幹員的契合度（主題關卡分析由資料服務快取）。 */
 function useRogueFits(isDemo: boolean, state: AppState, growth: ReturnType<typeof useGrowthCatalog>['catalog'], base: ReturnType<typeof useBaseCatalog>['catalog']) {
-  const [analyses, setAnalyses] = useState<RogueAnalysis[] | null>(null);
+  const [analyses, setAnalyses] = useState<(RogueAnalysis & { mode?: string })[] | null>(null);
   useEffect(() => {
     if (isDemo) return;
     const controller = new AbortController();
     void (async () => {
       try {
-        const list = await fetch('/api/game-data/rogue', { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }).then(response => response.ok ? response.json() : []) as { id: string }[];
-        const results: RogueAnalysis[] = [];
-        for (const theme of list) { const response = await fetch(`/api/game-data/rogue-analysis?theme=${encodeURIComponent(theme.id)}`, { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }); if (response.ok) results.push(await response.json()); }
-        if (!controller.signal.aborted) setAnalyses(results);
+        const list = await fetch('/api/game-data/rogue', { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }).then(response => response.ok ? response.json() : []) as { id: string; mode: string }[];
+        // 平行讀取（分析結果由資料服務快取；首次會下載關卡檔），全部完成後一次計算契合度。
+        const queue = [...list]; const results: (RogueAnalysis & { mode?: string })[] = [];
+        await Promise.all(Array.from({ length: 4 }, async () => { while (queue.length) { const theme = queue.shift()!; const response = await fetch(`/api/game-data/rogue-analysis?theme=${encodeURIComponent(theme.id)}`, { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }); if (response.ok) results.push({ ...(await response.json()), mode: theme.mode }); } }));
+        if (!controller.signal.aborted) setAnalyses(list.map(theme => results.find(item => item.id === theme.id)).filter((item): item is RogueAnalysis & { mode?: string } => !!item));
       } catch { /* 資料服務沒有集成戰略資料時不顯示 */ }
     })();
     return () => controller.abort();
@@ -271,7 +276,7 @@ function useRogueFits(isDemo: boolean, state: AppState, growth: ReturnType<typeo
     const debuffs = analyzeSynergies(state.dataset.operators, id => base?.meta?.[id]?.groups ?? []).debuffs;
     const fits = new Map<string, Map<string, ThemeFit>>(), scores = new Map<string, number[]>();
     for (const analysis of analyses) {
-      const map = new Map(definitions.map(def => [def.id, themeFit(def, growth, analysis, debuffs, operatorTexts(def).filter(text => text.description.includes(`【${analysis.name}】`)).map(text => text.description))]));
+      const map = new Map(definitions.map(def => [def.id, themeFit(def, growth, analysis, debuffs, operatorTexts(def).filter(text => text.description.includes(`【${analysis.name}】`)).map(text => text.description), base?.meta?.[def.id]?.groups ?? [])]));
       fits.set(analysis.name, map); scores.set(analysis.name, [...map.values()].map(item => item.score));
     }
     return { analyses, fits, scores };
@@ -290,9 +295,13 @@ function RogueTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
   const { catalog: base } = useBaseCatalog(isDemo, 0);
   const rogue = useRogueFits(isDemo, state, growth, base);
   const [themeName, setThemeName] = useState('');
-  const head = <header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>集成戰略主題分析</h2></div>{tabs}</header>;
-  if (!rogue) return <section className="panel">{head}<p className="fine-print">分析各主題關卡中…（首次需下載所有關卡檔，約需 1～2 分鐘）</p></section>;
-  const analysis = rogue.analyses.find(item => item.name === themeName) ?? rogue.analyses.at(-1)!;
+  const [mode, setMode] = useState<'roguelike' | 'security' | 'reclamation'>('roguelike');
+  const head = <header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>模式分析：集成戰略／保全派駐／生息演算</h2></div>{tabs}</header>;
+  if (!rogue || !rogue.analyses.length) return <section className="panel">{head}<p className="fine-print">分析各模式關卡中…（首次需下載所有關卡檔，約需數分鐘）</p></section>;
+  const inMode = rogue.analyses.filter(item => (item.mode ?? 'roguelike') === mode);
+  const analysis = inMode.find(item => item.name === themeName) ?? (mode === 'roguelike' ? inMode.at(-1) : inMode[0]);
+  const modeTabs = <div className="segmented">{([['roguelike', '集成戰略'], ['security', '保全派駐'], ['reclamation', '生息演算']] as const).map(([key, label]) => <button key={key} type="button" className={mode === key ? 'active' : ''} onClick={() => { setMode(key); setThemeName(''); }}>{label}</button>)}</div>;
+  if (!analysis) return <section className="panel">{head}{modeTabs}<p className="fine-print">此模式的關卡資料還在分析中或尚未同步。</p></section>;
   const owned = new Set(state.roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false)).map(row => row.operatorId));
   const fits = rogue.fits.get(analysis.name)!, scores = rogue.scores.get(analysis.name)!;
   const name = (id: string) => state.dataset.operators.find(def => def.id === id)?.displayName ?? id;
@@ -303,8 +312,9 @@ function RogueTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
   return <>
     <section className="panel">
       {head}
-      <p className="fine-print">讀取該主題全部關卡的敵人名單、數值與地塊（繁中服關卡檔，固定版本），以出現次數加權統計；藏品取自主題資料。契合度＝主題內容對幹員有利的程度，每一分都列出理由，不是強度排行。</p>
-      <div className="segmented">{rogue.analyses.map(item => <button key={item.id} type="button" className={item.name === analysis.name ? 'active' : ''} onClick={() => setThemeName(item.name)}>{item.name}</button>)}</div>
+      <p className="fine-print">讀取該主題（保全派駐為每座塔、含高難關卡）全部關卡的敵人名單、數值與地塊（繁中服關卡檔，固定版本），以出現次數加權統計；集成戰略的藏品、保全派駐的戰術裝備卡取自模式資料。契合度＝內容對幹員有利的程度，每一分都列出理由，不是強度排行。生息演算的建築與資源機制沒有納入。</p>
+      {modeTabs}
+      <div className="segmented theme-list">{inMode.map(item => <button key={item.id} type="button" className={item.name === analysis.name ? 'active' : ''} onClick={() => setThemeName(item.name)}>{item.name}</button>)}</div>
     </section>
     <section className="panel" aria-label="主題概況">
       <h3>{analysis.name}：{analysis.analyzedStages} 關、敵人 {analysis.enemy.spawns.toLocaleString('zh-TW')} 隻次</h3>
@@ -320,7 +330,7 @@ function RogueTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
       <div className="table-scroll"><table className="stats-table"><thead><tr><th>領袖</th><th>出現關卡</th><th>生命</th><th>攻擊</th><th>防禦</th><th>法抗</th><th>特性</th></tr></thead><tbody>
         {analysis.bosses.map(boss => <tr key={boss.name}><td>{boss.name}</td><td>{boss.stage}</td><td>{boss.hp.toLocaleString('zh-TW')}</td><td>{boss.atk}</td><td className={boss.def >= 800 ? 'hot' : ''}>{boss.def}</td><td className={boss.res >= 50 ? 'hot' : ''}>{boss.res}</td><td>{[boss.fly ? '飛行' : '', boss.magic ? '法術攻擊' : '', ...boss.abilities.slice(0, 2)].filter(Boolean).join('；')}</td></tr>)}
       </tbody></table></div>
-      {special.length > 0 && <details className="plain-details"><summary>點名特定分支／機制的藏品（{special.length}）</summary><ul className="gap-list">{special.map(relic => <li key={relic.id}><strong>{relic.name}</strong>：{relic.usage}</li>)}</ul></details>}
+      {special.length > 0 && <details className="plain-details"><summary>點名特定分支／陣營／機制的{mode === 'security' ? '戰術裝備卡' : '藏品'}（{special.length}）</summary><ul className="gap-list">{special.map(relic => <li key={relic.id}><strong>{relic.name}</strong>：{relic.usage}</li>)}</ul></details>}
     </section>
     <section className="panel" aria-label="你的契合幹員">
       <h3>你持有的幹員中契合度最高</h3>
