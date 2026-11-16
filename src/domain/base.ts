@@ -1,6 +1,6 @@
 import type { BaseCatalog, BaseRoom, BaseRoomType, BaseSkill, BaseSkillSlot } from '../catalog/base.ts';
 import type { OperatorDefinition, OwnedOperator, Settings } from './model.ts';
-import { DEFAULT_TRADING, expectedOrder } from '../catalog/trading.ts';
+import { DEFAULT_TRADING, NO_MODS, orderModel, type OrderMods } from '../catalog/trading.ts';
 
 export type Facility = Settings['base']['facilities'][number];
 export type FacilityType = Facility['type'];
@@ -23,9 +23,29 @@ export type SkillEffect =
   /** 依陣營人數倍增：scope=room 為同一設施、base 為整個基建（可有上限）。 */
   | { kind: 'perGroup'; scope: 'room' | 'base'; group: string; max?: number; per: SkillEffect }
   /** 控制中樞對其他設施中某陣營幹員的加成：每名符合者在其所在設施各給一次。 */
-  | { kind: 'remote'; target: 'MANUFACTURE' | 'TRADING'; group: string; effects: SkillEffect[] };
+  | { kind: 'remote'; target: 'MANUFACTURE' | 'TRADING'; group: string; effects: SkillEffect[] }
+  /** 改變貿易站訂單內容的技能（品質、特殊訂單、違約、投資），數值依 PRTS 同步的訂單參數計算。 */
+  | { kind: 'orderMod'; mod: 'qualityAlpha' | 'qualityBeta' | 'pepe' | 'closure' | 'twoGold' | 'breach' | 'breachBonus' | 'invest'; amount?: number };
 /** 單純數值效果的值；倍增與跨設施效果需另依配置計算，這裡回傳 0。 */
 export const scalar = (effect: SkillEffect): number => 'value' in effect ? effect.value : 0;
+
+/** 訂單技能換算成「龍門幣／時」相對常規 3 級貿易站的提升百分點，讓推薦能與訂單效率比較。 */
+export function orderModScore(effects: SkillEffect[], catalog: Pick<BaseCatalog, 'trading'>): number {
+  const mods: OrderMods = { ...NO_MODS };
+  let any = false;
+  for (const effect of effects) {
+    if (effect.kind !== 'orderMod') continue;
+    any = true;
+    if (effect.mod === 'qualityAlpha') mods.alpha++; else if (effect.mod === 'qualityBeta') mods.beta++;
+    else if (effect.mod === 'breachBonus') mods.breachBonus = Math.max(mods.breachBonus, effect.amount ?? 0);
+    else if (effect.mod === 'invest') mods.invest = Math.max(mods.invest, effect.amount ?? 0);
+    else mods[effect.mod] = true;
+  }
+  if (!any) return 0;
+  const params = catalog.trading ?? DEFAULT_TRADING, level = params.probability.length;
+  const rate = (m: OrderMods) => { const order = orderModel(level, m, params); return order.lmd / order.seconds; };
+  return Math.round((rate(mods) / rate(NO_MODS) - 1) * 1000) / 10;
+}
 
 export interface ParsedSkill {
   supported: boolean;
@@ -89,7 +109,19 @@ function parseClauses(text: string): SkillEffect[] | null {
   return effects;
 }
 
+// 訂單類技能的完整句型（台服原文）；比對成功才視為可計算。
+const ORDER_SKILLS: { pattern: RegExp; effects: (m: RegExpMatchArray) => SkillEffect[] }[] = [
+  { pattern: /^進駐貿易站時，(小幅)?提升當前貿易站高品質貴金屬訂單的出現機率（工作時長影響機率），心情每小時消耗([+-][\d.]+)$/u, effects: m => [{ kind: 'orderMod', mod: m[1] ? 'qualityAlpha' : 'qualityBeta' }, { kind: 'moodCost', value: Number(m[2]) }] },
+  { pattern: /^進駐貿易站時，固定獲取特別獨佔訂單（不視作違約訂單），且該類訂單不受任何訂單獲取效率的影響$/u, effects: () => [{ kind: 'orderMod', mod: 'pepe' }] },
+  { pattern: /^進駐貿易站時，訂單(?:獲得|獲取)效率\+(\d+)%，固定獲得可露希爾特別訂單（不視作違約訂單）$/u, effects: m => [{ kind: 'order', value: Number(m[1]) }, { kind: 'orderMod', mod: 'closure' }] },
+  { pattern: /^進駐貿易站時，訂單(?:獲得|獲取)效率\+(\d+)%，當前貿易站赤金訂單的赤金交付數必定為2（不視作違約訂單）$/u, effects: m => [{ kind: 'order', value: Number(m[1]) }, { kind: 'orderMod', mod: 'twoGold' }] },
+  { pattern: /^進駐貿易站時，如果下筆赤金訂單交付數小於4，則視為違約訂單$/u, effects: () => [{ kind: 'orderMod', mod: 'breach' }] },
+  { pattern: /^進駐貿易站時，如果下筆赤金訂單是違約訂單，則赤金交付數額外\+(\d+)$/u, effects: m => [{ kind: 'orderMod', mod: 'breachBonus', amount: Number(m[1]) }] },
+  { pattern: /^進駐貿易站後，如果下筆赤金訂單交付數大於3（違約訂單不視作赤金訂單），則其龍門幣收益\+(\d+)，心情每小時消耗([+-][\d.]+)$/u, effects: m => [{ kind: 'orderMod', mod: 'invest', amount: Number(m[1]) }, { kind: 'moodCost', value: Number(m[2]) }] },
+];
+
 export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): ParsedSkill {
+  if (skill.roomType === 'TRADING') for (const rule of ORDER_SKILLS) { const match = skill.description.match(rule.pattern); if (match) return { supported: true, effects: rule.effects(match) }; }
   const prefix = ROOM_PREFIX[skill.roomType];
   const unsupported = { supported: false, effects: [] };
   if (!prefix) return unsupported;
@@ -312,6 +344,8 @@ export function candidatesFor(facility: Facility, catalog: BaseCatalog, roster: 
     const name = definitions.get(row.operatorId)?.displayName ?? row.operatorId;
     let score = 0, state: Candidate['state'] = 'none';
     const names: string[] = [];
+    // 訂單技能可能分在不同技能欄（如但書的合約法＋違約索賠），合起來才算得出效果。
+    const orderEffects: SkillEffect[] = [];
     for (const slot of catalog.operators[row.operatorId] ?? []) {
       const resolved = slotResult(slot, row, catalog);
       const skill = resolved.active ?? resolved.maybeUpgraded;
@@ -320,8 +354,10 @@ export function candidatesFor(facility: Facility, catalog: BaseCatalog, roster: 
         state = 'ready'; names.push(skill.name);
         const parsed = parseSkill(skill);
         for (const effect of parsed.effects) if (productMatches(effect, facility) && (effect.kind === 'productivity' || effect.kind === 'order' || effect.kind === 'drone' || effect.kind === 'moodRecoverAll' || effect.kind === 'moodRecoverSelf')) score += effect.value;
+        if (roomType === 'TRADING') orderEffects.push(...parsed.effects);
       } else if (resolved.state === 'unknown') { if (state === 'none') state = 'unknown'; names.push(`${skill.name}（解鎖待核對）`); }
     }
+    if (orderEffects.length) score += orderModScore(orderEffects, catalog);
     list.push({ operatorId: row.operatorId, name, score: round(score), state, summary: names.join('、') });
   }
   const rank = { ready: 0, unknown: 1, locked: 2, none: 3 } as const;
@@ -358,13 +394,16 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
   // 某幹員在設施中的可計算數值；partnerName 存在時一併計入「與該幹員同房」的條件效果。
   const value = (row: OwnedOperator, facility: Facility, partnerName?: string) => {
     let total = 0;
+    const orderEffects: SkillEffect[] = [];
     for (const slot of catalog.operators[row.operatorId] ?? []) {
       const active = slotResult(slot, row, catalog).active;
       if (!active || active.roomType !== ROOM_OF[facility.type]) continue;
       const parsed = parseSkill(active);
       const effects = [...parsed.effects, ...(parsed.conditional && partnerName && parsed.conditional.partner === partnerName ? parsed.conditional.effects : [])];
       for (const effect of effects) if (productMatches(effect, facility) && ['productivity', 'order', 'drone', 'moodRecoverAll', 'moodRecoverSelf'].includes(effect.kind)) total += scalar(effect);
+      if (ROOM_OF[facility.type] === 'TRADING') orderEffects.push(...effects);
     }
+    if (orderEffects.length) total += orderModScore(orderEffects, catalog);
     return round(total);
   };
   base.facilities.forEach((facility, order) => {
@@ -506,7 +545,7 @@ const BASE_ORDER: BaseRoomType[] = ['MANUFACTURE', 'TRADING', 'POWER', 'DORMITOR
 /* 換班＝心情上限 ÷（設施基礎消耗＋技能的自身消耗調整）。                   */
 /* ------------------------------------------------------------------ */
 export interface ManufactureStat { facilityId: string; label: string; product: 'gold' | 'record'; itemName: string; productivity: number; perDay: number; goldPerDay: number; expPerDay: number; storageItems: number; hoursToFull: number }
-export interface TradingStat { facilityId: string; label: string; efficiency: number; ordersPerDay: number; lmdPerDay: number; goldPerDay: number; hoursToFull: number; qualitySkills: number }
+export interface TradingStat { facilityId: string; label: string; efficiency: number; ordersPerDay: number; lmdPerDay: number; goldPerDay: number; hoursToFull: number; notes: string[] }
 export interface ShiftStat { facilityId: string; label: string; hours: number; operator: string; rate: number }
 export interface BaseStatistics {
   available: boolean;
@@ -544,11 +583,18 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
       // 訂單效率＝每名工作幹員 1%＋可解析技能；一筆訂單的期望時間與報酬依等級機率加權（PRTS 數據）。
       const efficiency = round(result.totals.basic + result.totals.order);
       const params = catalog.trading ?? DEFAULT_TRADING;
-      const order = expectedOrder(facility.level, params);
-      const ordersPerDay = 86400 * (1 + efficiency / 100) / order.seconds;
-      const qualitySkills = result.unsupported.filter(item => item.skill.description.includes('訂單的出現機率')).length;
+      const mods: OrderMods = { ...NO_MODS };
+      for (const op of result.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
+        if (effect.kind !== 'orderMod') continue;
+        if (effect.mod === 'qualityAlpha') mods.alpha++; else if (effect.mod === 'qualityBeta') mods.beta++;
+        else if (effect.mod === 'breachBonus') mods.breachBonus = Math.max(mods.breachBonus, effect.amount ?? 0);
+        else if (effect.mod === 'invest') mods.invest = Math.max(mods.invest, effect.amount ?? 0);
+        else mods[effect.mod] = true;
+      }
+      const order = orderModel(facility.level, mods, params);
+      const ordersPerDay = 86400 * (order.fixedTime ? 1 : 1 + efficiency / 100) / order.seconds;
       trading.push({ facilityId: facility.id, label: result.label, efficiency, ordersPerDay: round(ordersPerDay), lmdPerDay: Math.round(ordersPerDay * order.lmd), goldPerDay: round(ordersPerDay * order.gold),
-        hoursToFull: round((params.limits[facility.level - 1] ?? params.limits[params.limits.length - 1]) / (ordersPerDay / 24)), qualitySkills });
+        hoursToFull: round((params.limits[facility.level - 1] ?? params.limits[params.limits.length - 1]) / (ordersPerDay / 24)), notes: order.notes });
     }
     const base = catalog.mood.costPerHour[roomType]?.[facility.level - 1] ?? 0;
     if (base <= 0 || !result.operators.length) continue;

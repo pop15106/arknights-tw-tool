@@ -30,6 +30,7 @@ function effectText(effect: SkillEffect): string {
     case 'moodRecoverSelf': return `自身心情恢復 ${signed(effect.value, '/時')}`;
     case 'moodRecoverAll': return `全宿舍心情恢復 ${signed(effect.value, '/時')}（取最高）`;
     case 'perGroup': return `${effect.scope === 'room' ? '同設施' : '基建內'}每名${effect.group}：${effectText(effect.per)}${effect.max ? `（最多 ${effect.max} 名）` : ''}`;
+    case 'orderMod': return { qualityAlpha: '提高高品質訂單（α）', qualityBeta: '提高高品質訂單（β）', pepe: '特別獨佔訂單', closure: '可露希爾特別訂單', twoGold: '赤金交付數固定為 2', breach: '交付數小於 4 視為違約訂單', breachBonus: `違約訂單赤金 +${effect.amount}`, invest: `4 赤金訂單龍門幣 +${effect.amount}` }[effect.mod];
     case 'remote': return `${effect.target === 'MANUFACTURE' ? '製造站' : '貿易站'}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
   }
 }

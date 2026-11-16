@@ -265,3 +265,17 @@ test('同一角色的不同形態不能同時進駐，推薦也只排一處', as
   const all = Object.values(rec.assignments).flat();
   assert.ok(!(all.includes('demo-1') && all.includes('demo-8')));
 });
+
+test('訂單技能：台服原文可解析，並進入龍門幣與赤金消耗計算', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.skills['q-b'] = { id: 'q-b', name: '裁縫·β', roomType: 'TRADING', description: '進駐貿易站時，提升當前貿易站高品質貴金屬訂單的出現機率（工作時長影響機率），心情每小時消耗-0.25' };
+  catalog.operators['demo-2'] = [[{ buffId: 'q-b', elite: 0, level: 1 }]];
+  assert.deepEqual(parseSkill(catalog.skills['q-b']).effects, [{ kind: 'orderMod', mod: 'qualityBeta' }, { kind: 'moodCost', value: -0.25 }]);
+  const ev = evaluateBase({ facilities: [{ id: 't', type: 'trading', level: 3 }], onlineSlots: [], assignments: { t: ['demo-2'] } }, catalog, state.roster, definitions);
+  const stats = baseStatistics(ev, catalog);
+  // 效率 +1%：86400×1.01÷(0.05×8640+0.1×12600+0.85×16560) 筆 × 1900
+  const seconds = 0.05 * 8640 + 0.1 * 12600 + 0.85 * 16560;
+  assert.equal(stats.lmdPerDay, Math.round(86400 * 1.01 / seconds * 1900));
+  assert.equal(stats.shifts[0].rate, 0.75);
+});
