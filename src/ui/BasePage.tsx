@@ -35,6 +35,10 @@ function effectText(effect: SkillEffect): string {
     case 'byproduct': return `副產品機率 +${effect.value}%（${{ elite: '精英材料', skill: '技巧概要', base: '基建材料', any: '任意材料' }[effect.category]}）`;
     case 'global': return `所有${effect.product === 'gold' ? '赤金' : ''}${{ MANUFACTURE: '製造站生產力', TRADING: '貿易站訂單效率', MEETING: '會客室線索速度', HIRE: '辦公室聯絡速度' }[effect.target]} ${signed(effect.value)}${effect.maxOnly ? '（取最高）' : ''}`;
     case 'moodRoom': return `同設施所有人心情 ${effect.value < 0 ? `恢復 +${-effect.value}` : `消耗 +${effect.value}`}/時`;
+    case 'whenMood': return `${effect.cond === 'high' ? '心情 > 12 時' : '心情 ≤ 12 時'}：${effectText(effect.effect)}`;
+    case 'perMoodDrop': return `每 ${effect.per} 點心情落差：${effectText(effect.effect)}`;
+    case 'perOtherWorking': return `同設施每名其他工作中幹員：${effectText(effect.effect)}`;
+    case 'workingMood': return `其他設施工作中幹員心情恢復 +${-effect.value}/時`;
     case 'orderMod': return { qualityAlpha: '提高高品質訂單（α）', qualityBeta: '提高高品質訂單（β）', pepe: '特別獨佔訂單', closure: '可露希爾特別訂單', twoGold: '赤金交付數固定為 2', breach: '交付數小於 4 視為違約訂單', breachBonus: `違約訂單赤金 +${effect.amount}`, invest: `4 赤金訂單龍門幣 +${effect.amount}` }[effect.mod];
     case 'remote': return `${effect.target === 'MANUFACTURE' ? '製造站' : '貿易站'}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
     default: return '';
@@ -336,7 +340,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
         <button type="button" className="button primary" disabled={busy || !dirty || draft.facilities.length > 20} onClick={() => onSave(draft)}>{dirty ? '保存配置' : '已保存'}</button>
       </div>
     </div>
-    {draft.facilities.length > 0 && <BaseStats evaluation={evaluation} catalog={catalog}/>}
+    {draft.facilities.length > 0 && <BaseStats evaluation={evaluation} catalog={catalog} base={draft} state={state}/>}
     <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApplyLayout={(facilities, assignments) => update({ ...draft, facilities, assignments })} onApply={(assignments, products) => update({ ...draft, facilities: draft.facilities.map(f => products?.[f.id] ? { ...f, product: products[f.id] } : f), assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
     {evaluation.issues.length > 0 && <div className="callout danger" role="status"><strong>配置有 {evaluation.issues.length} 個問題</strong><ul>{evaluation.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
     {!draft.facilities.length && <section className="empty-inline base-empty"><strong>先建立設施配置</strong><span>選一個常見布局作為起點，或逐一新增設施；之後可以再調整等級與數量。</span>

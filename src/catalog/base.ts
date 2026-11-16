@@ -26,7 +26,8 @@ export interface BaseCatalog {
   meta?: Record<string, BaseOperatorMeta>;
   /** 貿易站訂單參數（PRTS 同步結果）；未同步時由畫面使用內建值。 */
   trading?: TradingParams;
-  mood?: { max: number; costPerHour: Partial<Record<BaseRoomType, number[]>>; maxByOperator?: Record<string, number> };
+  /** dormRecover：宿舍各等級基礎恢復／時（dormData.manpowerRecover 換算）；氛圍另加 0.0004×氛圍（PRTS「罗德岛基建/宿舍」）。 */
+  mood?: { max: number; costPerHour: Partial<Record<BaseRoomType, number[]>>; maxByOperator?: Record<string, number>; dormRecover?: number[] };
 }
 export interface BaseOperatorMeta { groups: string[]; alter?: boolean; character?: string }
 export interface OperatorMetaInput { ids: string[]; groups: string[]; alter?: boolean; character?: string }
@@ -77,6 +78,7 @@ export function buildBaseCatalog(building: unknown, operatorIds: readonly string
   const mood = factor > 0 ? {
     max: 24,
     costPerHour: Object.fromEntries(BASE_ROOM_TYPES.map(id => [id, (roomsRaw[id]?.phases ?? []).map((phase: Row) => Math.round((Number(phase.manpowerCost) || 0) * 3600 / factor * 1000) / 1000)])),
+    dormRecover: (data.dormData?.phases ?? []).map((phase: Row) => Math.round((Number(phase.manpowerRecover) || 0) * 3600 / factor * 1000) / 1000),
     maxByOperator: Object.fromEntries(operatorIds.filter(id => Number(charsRaw[id]?.maxManpower) > 0 && Math.abs(Number(charsRaw[id].maxManpower) / factor - 24) > 1e-6).map(id => [id, Number(charsRaw[id].maxManpower) / factor])),
   } : undefined;
   // 技能標記 <$cc.g.代碼>名稱 直接帶陣營代碼（例如「歲」= sui）；代碼與幹員的 nation/group/team 相同時補上該名稱。

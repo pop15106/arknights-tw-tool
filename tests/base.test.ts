@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseCatalog, plainGameText } from '../src/catalog/base.ts';
-import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, optimizeBase, baseObjective, compareLayout, layoutFacilities, LAYOUTS, unlockState, type Facility } from '../src/domain/base.ts';
+import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, optimizeBase, baseObjective, compareLayout, layoutFacilities, LAYOUTS, simulateShift, unlockState, type Facility } from '../src/domain/base.ts';
 import { createDemoBaseCatalog, createDemoDataset, createDemoImport } from '../src/demo.ts';
 import { createEmptyState, known, unknown, validateAppState, type OwnedOperator } from '../src/domain/model.ts';
 import { applyImport, previewImport } from '../src/domain/import.ts';
@@ -409,4 +409,36 @@ test('通用資源：產生→轉化→依數量／門檻加成，含招募位�
   assert.equal(m2.totals.productivity, 10, '工程機器人 20 個 → floor(20/8)=2 → +10%');
   assert.equal(trade.totals.order, 15, '無聲共鳴 30 → floor(30/2) → +15%');
   assert.equal(meeting.totals.clue, 5, '沒有情報儲備時只有基礎 5%');
+});
+
+test('心情條件：落差、心情門檻、除自身以外工作中人數依目前心情計算；心情 0 視為停工', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const add = (id: string, roomType: string, description: string, operator: string) => { catalog.skills[id] = { id, name: id, roomType, description }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('drop', 'MANUFACTURE', '進駐製造站時，生產力+30%，自身每有4點心情落差，生產力-5%', 'demo-3');
+  add('low', 'MANUFACTURE', '進駐製造站時，當自身心情落差大於12時，生產力+10%，倉庫容量+6', 'demo-4');
+  add('others', 'TRADING', '進駐貿易站時，貿易站內除自身以外每名處於工作狀態的幹員+15%訂單獲取效率', 'demo-2');
+  const facilities: Facility[] = [{ id: 'm', type: 'manufacturing', level: 3, product: 'gold' }, { id: 't', type: 'trading', level: 3 }];
+  const base = { facilities, onlineSlots: [], assignments: { m: ['demo-3', 'demo-4'], t: ['demo-2', 'demo-1', 'demo-7'] } };
+  const full = evaluateBase(base, catalog, state.roster, definitions);
+  assert.equal(full.facilities[0].totals.productivity, 30, '滿心情：無落差、未達門檻');
+  assert.equal(full.facilities[1].totals.order, 30 + 20, '其他工作中 2 名 ×15＋demo-7 長單 20');
+  const tired = evaluateBase(base, catalog, state.roster, definitions, { 'demo-3': 10, 'demo-4': 8, 'demo-1': 0 });
+  assert.equal(tired.facilities[0].totals.productivity, 30 - 15 + 10, '落差 14 → floor(14/4)=3 → −15；demo-4 落差 16 > 12 → +10');
+  assert.equal(tired.facilities[1].operators.length, 2, 'demo-1 心情 0 停工');
+  assert.equal(tired.facilities[1].totals.order, 15 + 20);
+});
+
+test('班次模擬：心情逐步下降、歸零時間、整班平均產量與宿舍休息可行性', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.skills['tired'] = { id: 'tired', name: '示範・加班', roomType: 'MANUFACTURE', description: '進駐製造站時，生產力+30%，心情每小時消耗+1' };
+  catalog.operators['demo-3'] = [[{ buffId: 'tired', elite: 0, level: 1 }]];
+  const facilities: Facility[] = [{ id: 'm', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'd', type: 'dormitory', level: 5 }];
+  const sim = simulateShift({ facilities, onlineSlots: [], assignments: { m: ['demo-3'], d: [] } }, catalog, state.roster, definitions, { hours: 16, step: 0.5 });
+  assert.equal(sim.zeroAt[0]?.hours, 12, '每小時消耗 2 → 12 小時歸零');
+  assert.ok(sim.average.goldPerDay < sim.start.goldPerDay, '歸零後停工，整班平均低於開班時');
+  assert.equal(Math.round(sim.average.goldPerDay / sim.start.goldPerDay * 100), 75, '16 小時中工作 12 小時');
+  // 宿舍 5 級：2.0＋0.0004×5000＝4.0／時；消耗 24 → 6 小時；兩班輪替可休息 16 小時以上
+  assert.equal(sim.rest?.dormRate, 4); assert.equal(sim.rest?.restHours, 6); assert.ok(sim.rest?.feasible);
 });
