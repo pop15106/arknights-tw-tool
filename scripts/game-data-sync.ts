@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DATA_COMMIT, type GameDataSnapshot, type GameDataTables } from '../src/catalog/build.ts';
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
 import { parseTradingWikitext, PRTS_TRADING_API, validateTradingParams, type TradingParams } from '../src/catalog/trading.ts';
+import { parsePenguinMatrix, PENGUIN_MATRIX_API, validateDropRates, type DropRates } from '../src/catalog/drops.ts';
 export type { GameDataSnapshot } from '../src/catalog/build.ts';
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -95,6 +96,22 @@ export function createGameDataStore(options: {
     await writeFile(temporary, JSON.stringify(params), { flag: 'wx' }); await rename(temporary, tradingFile);
     return params;
   }
+  // 企鵝物流掉落統計另存一檔：先試台服，沒有資料時用陸服；失敗保留舊檔，不影響主資料。
+  const dropsFile = path.join(cache, 'penguin-drops.json');
+  async function loadDrops(): Promise<DropRates | null> {
+    try { return validateDropRates(JSON.parse(await readFile(dropsFile, 'utf8'))); } catch { return null; }
+  }
+  async function refreshDrops(): Promise<DropRates> {
+    let drops: DropRates | undefined;
+    for (const server of ['TW', 'CN']) {
+      try { drops = parsePenguinMatrix(JSON.parse((await bytes(PENGUIN_MATRIX_API(server), 24 * 1024 * 1024)).toString('utf8')), server, new Date().toISOString()); break; } catch { /* 試下一個伺服器 */ }
+    }
+    if (!drops) throw new Error('企鵝物流掉落統計無法取得。');
+    await mkdir(cache, { recursive: true });
+    const temporary = `${dropsFile}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(drops), { flag: 'wx' }); await rename(temporary, dropsFile);
+    return drops;
+  }
   async function images(snapshot: GameDataSnapshot): Promise<void> {
     await mkdir(assets, { recursive: true });
     const queue = [...snapshot.dataset.operators];
@@ -134,12 +151,12 @@ export function createGameDataStore(options: {
       if (!validVersion(commit.sha) || !Number.isFinite(Date.parse(commit.commit?.committer?.date))) throw new Error('來源版本無效。');
       // 快取損壞不能阻止重新同步；改用備援快照時一律重建以修好指標。
       const previous = await load().catch(() => null);
-      if (previous && !recovered && previous.status.version === commit.sha && previous.status.catalogRevision === CATALOG_REVISION && previous.status.moduleSource?.version === MODULE_DATA_COMMIT) { await images(previous); await refreshTrading().catch(() => undefined); lastError = undefined; delete previous.status.lastError; return previous; }
+      if (previous && !recovered && previous.status.version === commit.sha && previous.status.catalogRevision === CATALOG_REVISION && previous.status.moduleSource?.version === MODULE_DATA_COMMIT) { await images(previous); await refreshTrading().catch(() => undefined); await refreshDrops().catch(() => undefined); lastError = undefined; delete previous.status.lastError; return previous; }
       const tables = {} as GameDataTables;
       for (const [key, filename] of Object.entries(TABLES)) tables[key as keyof GameDataTables] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${DATA_REPO}/${commit.sha}/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json', teams: 'handbook_team_table.json' })) tables[key as 'battleEquip' | 'favor' | 'teams'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       const published = await publish(tables, { commit: commit.sha, sourceUpdatedAt: commit.commit.committer.date, syncedAt: new Date().toISOString() });
-      await refreshTrading().catch(() => undefined);
+      await refreshTrading().catch(() => undefined); await refreshDrops().catch(() => undefined);
       return published;
     } catch { lastError = '遊戲資料更新失敗；上一版資料已保留。'; throw new Error(lastError); }
   }
@@ -147,7 +164,7 @@ export function createGameDataStore(options: {
     if (!active) active = update().finally(() => { active = undefined; });
     return active;
   }
-  return { load, sync, seed: publish, loadTrading, refreshTrading };
+  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops };
 }
 
 const defaultStore = createGameDataStore();
@@ -155,3 +172,4 @@ export const loadGameData = defaultStore.load;
 export const syncGameData = defaultStore.sync;
 export const seedGameData = defaultStore.seed;
 export const loadTradingData = defaultStore.loadTrading;
+export const loadDropsData = defaultStore.loadDrops;

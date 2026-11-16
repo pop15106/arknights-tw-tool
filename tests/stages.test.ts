@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { eventPhase, materialSources, sanityEstimate, stagesOfEvent, type GameEvent, type Stage } from '../src/domain/stages.ts';
+import { parsePenguinMatrix, validateDropRates } from '../src/catalog/drops.ts';
+
+const now = Date.parse('2026-11-10T00:00:00Z');
+const event = (id: string, start: string, end: string, reward = end): GameEvent => ({ id, name: id, type: 'X', startTime: start, endTime: end, rewardEndTime: reward, hasStage: true, isRerun: false });
+const drop = (id: string, occurrence: string, dropType = 'NORMAL') => ({ id, type: 'MATERIAL', dropType, occurrence });
+const stages: Stage[] = [
+  { id: 'main_01-07', code: '1-7', name: '暴君', type: 'MAIN', zoneId: 'main_1', apCost: 6, drops: [drop('30012', 'ALWAYS'), drop('30011', 'SOMETIMES', 'ADDITIONAL')] },
+  { id: 'main_04-06', code: '4-6', name: 'x', type: 'MAIN', zoneId: 'main_4', apCost: 18, drops: [drop('30012', 'OFTEN')] },
+  { id: 'act9_01', code: 'AC-1', name: 'y', type: 'ACTIVITY', zoneId: 'act9_zone1', apCost: 15, drops: [drop('30012', 'ALMOST')] },
+  { id: 'act8_01', code: 'OL-1', name: 'z', type: 'ACTIVITY', zoneId: 'act8_zone1', apCost: 15, drops: [drop('30012', 'ALWAYS')] },
+  { id: 'tower_1', code: 'T', name: 't', type: 'CLIMB_TOWER', zoneId: 'tower', apCost: 0, drops: [drop('30012', 'ALWAYS')] },
+];
+const events = [event('act9', '2026-11-01T00:00:00Z', '2026-11-15T00:00:00Z'), event('act8', '2026-10-01T00:00:00Z', '2026-10-15T00:00:00Z', '2026-10-22T00:00:00Z'), event('act10', '2026-12-01T00:00:00Z', '2026-12-15T00:00:00Z')];
+
+test('活動狀態與活動關卡對應', () => {
+  assert.deepEqual(events.map(item => eventPhase(item, now)), ['ongoing', 'ended', 'upcoming']);
+  assert.deepEqual(stagesOfEvent(events[0], stages).map(stage => stage.code), ['AC-1']);
+});
+
+test('材料來源：常駐＋進行中活動；無掉率時依機率等級，有掉率時依理智／件', () => {
+  assert.deepEqual(materialSources('30012', stages, events, now).map(item => item.stage.code), ['1-7', 'AC-1', '4-6']);
+  const drops = parsePenguinMatrix({ matrix: [
+    { stageId: 'main_01-07', itemId: '30012', quantity: 1000, times: 1000, start: 0, end: null },
+    { stageId: 'main_04-06', itemId: '30012', quantity: 1500, times: 1000, start: 0, end: null },
+    { stageId: 'act9_01', itemId: '30012', quantity: 50, times: 50, start: 0, end: null },
+    { stageId: 'old', itemId: '30012', quantity: 1, times: 1, start: 0, end: 1 },
+    { stageId: 'bad id!', itemId: '30012', quantity: 1, times: 1 },
+  ] }, 'CN', '2026-11-10T00:00:00Z');
+  assert.equal(validateDropRates(JSON.parse(JSON.stringify(drops))).server, 'CN');
+  assert.ok(!drops.stages.old && !drops.stages['bad id!']);
+  const sources = materialSources('30012', stages, events, now, drops);
+  assert.deepEqual(sources.map(item => [item.stage.code, item.apPerItem]), [['1-7', 6], ['4-6', 12], ['AC-1', undefined]], '樣本不足 100 的活動關卡不給掉率');
+  assert.equal(sanityEstimate(10, sources[0]), 60);
+  assert.throws(() => parsePenguinMatrix({ matrix: [] }, 'CN', '2026-11-10T00:00:00Z'));
+});

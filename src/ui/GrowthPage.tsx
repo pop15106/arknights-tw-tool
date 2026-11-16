@@ -4,12 +4,14 @@ import type { AppState, OperatorDefinition, Settings } from '../domain/model';
 import { currentState, emptyTarget, expandRecipes, expToRecords, growthCost, LMD_ITEM, type GrowthCost, type GrowthState } from '../domain/growth';
 import { OperatorPortrait } from '../OperatorEncyclopedia';
 import { Icon } from './Icon';
+import { useStageData } from './gameData';
+import { materialSources, OCCURRENCE, sanityEstimate } from '../domain/stages';
 
 type Growth = NonNullable<Settings['growth']>;
 const fmt = (value: number) => value.toLocaleString('zh-TW');
 const ELITE = ['精零', '精一', '精二'];
 
-function useGrowthCatalog(isDemo: boolean) {
+export function useGrowthCatalog(isDemo: boolean) {
   const [catalog, setCatalog] = useState<GrowthCatalog | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -44,6 +46,8 @@ function stateText(state: GrowthState, definition: OperatorDefinition): string {
 
 export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; isDemo: boolean; busy: boolean; onSave: (growth: Growth) => void }) {
   const { catalog, error } = useGrowthCatalog(isDemo);
+  const { data: stageData } = useStageData(isDemo);
+  const now = useMemo(() => Date.now(), [stageData]);
   const [draft, setDraft] = useState<Growth>(state.settings.growth ?? { plans: [] });
   const [query, setQuery] = useState('');
   const definitions = useMemo(() => new Map(state.dataset.operators.map(op => [op.id, op])), [state.dataset]);
@@ -73,6 +77,16 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
   const list = Object.entries(items).map(([id, count]) => ({ id, count, item: catalog.items[id], have: inventory[id] ?? 0 }))
     .sort((a, b) => (b.item?.rarity ?? 0) - (a.item?.rarity ?? 0) || (a.item?.sortId ?? 0) - (b.item?.sortId ?? 0));
   const short = list.filter(entry => entry.count > entry.have).length;
+  // 缺的材料去哪刷：取理智／件最低的關卡（沒有掉率時取機率等級最高者）。
+  const best = new Map(stageData ? list.filter(entry => entry.count > entry.have).map(entry => [entry.id, materialSources(entry.id, stageData.stages, stageData.events, now, stageData.drops)[0]] as const) : []);
+  const farmText = (entry: { id: string; count: number; have: number }) => {
+    const source = best.get(entry.id);
+    if (!source) return entry.count > entry.have ? (stageData ? (catalog.recipes[entry.id] ? '合成' : '無關卡掉落') : '…') : '';
+    // 沒有掉率、且只有小概率／罕見掉落時，可合成的材料建議合成。
+    if (source.apPerItem === undefined && (OCCURRENCE[source.drop.occurrence]?.rank ?? 9) >= 3 && catalog.recipes[entry.id]) return `合成（或 ${source.stage.code}・${OCCURRENCE[source.drop.occurrence]?.label}）`;
+    return `${source.stage.code}${source.apPerItem !== undefined && Number.isFinite(source.apPerItem) ? `・${fmt(Math.round(source.apPerItem * 10) / 10)} 理智／件` : `・${OCCURRENCE[source.drop.occurrence]?.label ?? ''}`}`;
+  };
+  const sanity = list.reduce((sum, entry) => { const value = entry.count > entry.have ? sanityEstimate(entry.count - entry.have, best.get(entry.id)) : 0; return value === undefined ? NaN : sum + value; }, 0);
   const setHave = (id: string, value: string) => setDraft(current => { const next = { ...(current.inventory ?? {}) }; const count = Math.max(0, Math.min(10_000_000, Math.round(Number(value) || 0))); if (count) next[id] = count; else delete next[id]; return { ...current, inventory: next }; });
 
   return <div className="growth-page">
@@ -94,15 +108,16 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
         <div className="stats-card lmd"><span>龍門幣</span><strong>{fmt(lmd)}</strong><small>{expanded ? `含合成 ${fmt(expanded.lmd)}` : '不含加工合成'}</small></div>
         <div className="stats-card exp"><span>經驗</span><strong>{fmt(total.exp)}</strong><small>{records.map(record => `約 ${fmt(record.count)} 張${catalog.items[record.id]?.name ?? '作戰記錄'}`).join('')}</small></div>
         <div className="stats-card gold"><span>材料種類</span><strong>{list.length}</strong><small>{short ? `${short} 種庫存不足` : '庫存足夠'}</small></div>
-        <div className="stats-card shift"><span>計畫幹員</span><strong>{costs.length}</strong><small>名</small></div>
+        <div className="stats-card shift"><span>預估理智</span><strong>{stageData?.drops && Number.isFinite(sanity) ? fmt(sanity) : '—'}</strong><small>{!stageData ? '讀取關卡中' : !stageData.drops ? '需企鵝物流掉率' : Number.isFinite(sanity) ? `缺口照最佳關卡刷・${costs.length} 名幹員` : '部分材料沒有可刷關卡'}</small></div>
       </div>
       <div className="inline-actions">
         <label className="checkbox-line"><input type="checkbox" checked={!!draft.expand} disabled={busy} onChange={event => setDraft(current => ({ ...current, expand: event.currentTarget.checked || undefined }))}/><span>把精英材料展開成可合成的低階材料（加工站配方，不計副產品）</span></label>
       </div>
-      <table className="stats-table growth-items"><thead><tr><th>材料</th><th>需要</th><th>庫存</th><th>缺</th></tr></thead><tbody>
-        {list.map(entry => <tr key={entry.id} className={entry.count > entry.have ? 'short' : ''}><td><span className={`rarity r${entry.item?.rarity ?? 0}`}>{entry.item?.name ?? entry.id}</span></td><td>{fmt(entry.count)}</td>
+      <table className="stats-table growth-items"><thead><tr><th>材料</th><th>需要</th><th>庫存</th><th>缺</th><th>去哪刷</th></tr></thead><tbody>
+        {list.map(entry => <tr key={entry.id} className={entry.count > entry.have ? 'short' : ''}><td><span className={`rarity r${entry.item?.rarity ?? 0}`}>{entry.item?.name ?? entry.id}</span>{farmText(entry) && <small className="growth-farm-inline">{farmText(entry)}</small>}</td><td>{fmt(entry.count)}</td>
           <td><input className="text-input small" type="number" min={0} value={entry.have || ''} placeholder="0" aria-label={`${entry.item?.name ?? entry.id}庫存`} disabled={busy} onInput={event => setHave(entry.id, event.currentTarget.value)}/></td>
-          <td>{entry.count > entry.have ? fmt(entry.count - entry.have) : '—'}</td></tr>)}
+          <td>{entry.count > entry.have ? fmt(entry.count - entry.have) : '—'}</td>
+          <td className="growth-farm">{farmText(entry)}</td></tr>)}
       </tbody></table>
       {expanded && Object.keys(expanded.crafted).length > 0 && <p className="fine-print">需要合成：{Object.entries(expanded.crafted).map(([id, count]) => `${catalog.items[id]?.name ?? id}×${count}`).join('、')}。</p>}
     </section>}

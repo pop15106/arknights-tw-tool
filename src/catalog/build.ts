@@ -79,6 +79,7 @@ export async function buildGameData(tables: GameDataTables, source: { commit: st
     return [op.id, { name: op.displayName, ids, groups: ids.map(teamName).filter((value): value is string => typeof value === 'string'), ...(char.isSpChar ? { alter: true } : {}), ...(patchOwner.get(op.id) ? { character: patchOwner.get(op.id) } : {}) }];
   }));
   const base = tables.building ? buildBaseCatalog(tables.building, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} building_data.json`, tables.items, operatorMeta, tables.constants) : undefined;
-  const growth = buildGrowthCatalog(tables, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} character_table／gamedata_const／item_table`);
+  const dropItems = [...new Set(stages.flatMap(stage => stage.drops.filter((drop: Row) => drop.type === 'MATERIAL' || drop.type === 'CARD_EXP').map((drop: Row) => String(drop.id))))];
+  const growth = buildGrowthCatalog(tables, operators.map(op => op.id), source.commit, `繁中公開鏡像 ${DATA_REPO} character_table／gamedata_const／item_table`, dropItems);
   return { dataset, stages, events, ...(base ? { base } : {}), ...(growth ? { growth } : {}), status: { catalogRevision: CATALOG_REVISION, ...(tables.battleEquip ? { moduleSource: { version: MODULE_DATA_COMMIT, sourceUrl: `https://github.com/${MODULE_DATA_REPO}/tree/${MODULE_DATA_COMMIT}/tw/gamedata/excel`, sourceUpdatedAt: MODULE_DATA_DATE } } : {}), version: source.commit, sourceUpdatedAt: source.sourceUpdatedAt, syncedAt: source.syncedAt, counts: { operators: operators.length, stages: stages.length, events: events.length }, sourceKind: 'public-mirror', sourceUrl: `https://github.com/${DATA_REPO}/tree/${source.commit}` } };
 }

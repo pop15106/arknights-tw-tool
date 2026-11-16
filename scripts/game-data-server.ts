@@ -14,6 +14,7 @@ interface ServerOptions {
   load?: () => Promise<GameDataSnapshot | null>;
   sync?: () => Promise<GameDataSnapshot>;
   loadTrading?: () => Promise<TradingParams | null>;
+  loadDrops?: () => Promise<import('../src/catalog/drops.ts').DropRates | null>;
 }
 class ApiError extends Error {
   status: number;
@@ -61,8 +62,9 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const load = options.load ?? (async () => (await import('./game-data-sync.ts')).loadGameData());
   const sync = options.sync ?? (async () => (await import('./game-data-sync.ts')).syncGameData());
   const loadTrading = options.loadTrading ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadTradingData());
+  const loadDrops = options.loadDrops ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadDropsData());
   let origin = '', host = '';
-  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'sync'].map(name => `/api/game-data/${name}`));
+  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     try {
       if (req.headers.host !== host && !isLoopbackHost(req.headers.host)) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
@@ -97,6 +99,11 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (!snapshot) throw new ApiError(503, 'DATA_UNAVAILABLE', '尚未同步公開遊戲資料。');
       if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
+      if (url.pathname === '/api/game-data/drops') {
+        const drops = await loadDrops().catch(() => null);
+        if (!drops) throw new ApiError(503, 'DROPS_UNAVAILABLE', '尚未同步企鵝物流掉落統計；在設定按「更新遊戲資料」時會一併取得。');
+        json(res, 200, drops); return;
+      }
       if (url.pathname === '/api/game-data/growth') {
         if (!snapshot.growth) throw new ApiError(503, 'GROWTH_UNAVAILABLE', '目前的遊戲資料沒有養成成本資料，請到設定按「更新遊戲資料」。');
         json(res, 200, snapshot.growth); return;

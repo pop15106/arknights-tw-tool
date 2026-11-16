@@ -529,12 +529,12 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
   .page-title p, .prototype-tag, .hide-sm { display: none; }
   .content { padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
   .mobile-nav {
-    position: fixed; inset: auto 0 0; z-index: 30; display: grid; grid-template-columns: repeat(6, 1fr);
+    position: fixed; inset: auto 0 0; z-index: 30; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
     padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line);
     background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
   .mobile-nav .nav-item { display: grid; grid-template-columns: 1fr; justify-items: center; gap: 2px; padding: 6px 0; min-height: 52px; }
-  .mobile-nav .nav-label { font-size: 11px; font-weight: 600; }
+  .mobile-nav .nav-label { font-size: 10.5px; font-weight: 600; white-space: nowrap; }
   .stat-strip { gap: 8px; }
   .stat { flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; }
   .stat-value { font-size: 22px; }
@@ -859,7 +859,7 @@ h2 { font-weight: 800; }
 .growth-summary { margin: 0; font-size: 14px; }
 .fine-print.amber { color: var(--amber); }
 .growth-items td:nth-child(n+2), .growth-items th:nth-child(n+2) { text-align: right; font-family: var(--font-mono); }
-.growth-items tr.short td:last-child { color: var(--danger); font-weight: 700; }
+.growth-items tr.short td:nth-child(4) { color: var(--danger); font-weight: 700; }
 .growth-items .text-input.small { width: 96px; min-height: 32px; padding: 4px 8px; text-align: right; }
 .rarity { font-weight: 600; }
 .rarity.r5 { color: var(--amber); }
@@ -871,6 +871,28 @@ h2 { font-weight: 800; }
 .growth-card-head .portrait-placeholder { width: 100%; height: 100%; display: grid; place-items: center; }
 .growth-card-head .portrait-placeholder small, .growth-card-head .portrait-retry { display: none; }
 .stats-table.growth-items { width: 100%; min-width: 0; table-layout: fixed; }
-.growth-items th:nth-child(1) { width: 44%; } .growth-items th:nth-child(2) { width: 16%; } .growth-items th:nth-child(3) { width: 24%; } .growth-items th:nth-child(4) { width: 16%; }
+.growth-items th:nth-child(1) { width: 30%; } .growth-items th:nth-child(2) { width: 12%; } .growth-items th:nth-child(3) { width: 18%; } .growth-items th:nth-child(4) { width: 12%; } .growth-items th:nth-child(5) { width: 28%; }
+.growth-items td.growth-farm { font-family: inherit; font-size: 12px; text-align: left; color: var(--muted); }
+.growth-items th:nth-child(5) { text-align: left; }
 .growth-items td:first-child { overflow-wrap: anywhere; }
 @media (max-width: 640px) { .growth-items .text-input.small { width: 100%; min-width: 0; } .growth-items td, .growth-items th { padding-left: 4px; padding-right: 4px; } }
+
+/* 關卡與活動 */
+.stage-page { display: grid; gap: 16px; }
+.stage-page select.filter { width: 100%; max-width: 420px; margin-top: 8px; }
+.event-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); margin-top: 10px; }
+.event-card { display: grid; gap: 6px; align-content: start; padding: 14px; border: 2px solid var(--edge); border-radius: 14px; background: var(--surface-2); box-shadow: var(--pop-sm); }
+.event-card header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.event-card header strong { font-size: 15px; margin-right: auto; }
+.event-card.phase-ongoing { border-color: var(--accent); }
+.event-left { margin: 0; font-weight: 800; color: var(--accent); }
+.event-card .stats-table { min-width: 0; }
+.stage-sources td:nth-child(n+3), .stage-sources th:nth-child(n+3) { white-space: nowrap; }
+@media (max-width: 640px) { .stage-page section[aria-label=掉落來源] { overflow-x: auto; } .stage-sources { min-width: 560px; } }
+
+.growth-farm-inline { display: none; }
+@media (max-width: 640px) {
+  .growth-items th:nth-child(5), .growth-items td.growth-farm { display: none; }
+  .growth-items th:nth-child(1) { width: 44%; } .growth-items th:nth-child(2) { width: 16%; } .growth-items th:nth-child(3) { width: 24%; } .growth-items th:nth-child(4) { width: 16%; }
+  .growth-farm-inline { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+}

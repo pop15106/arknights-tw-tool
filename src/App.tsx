@@ -15,20 +15,21 @@ import { useTheme } from './ui/theme';
 import { RosterPage } from './ui/RosterPage';
 import { BasePage } from './ui/BasePage';
 import { GrowthPage } from './ui/GrowthPage';
+import { StagePage } from './ui/StagePage';
 import { PlannedPage, SettingsPage, type PlannedName } from './ui/pages';
 import { DetailPanel, ImportPanel, PreviewPanel, RestorePanel, SwitchPanel, type Decisions } from './ui/panels';
 import './styles.css';
 
-type Page = '幹員庫' | '批次修正' | PlannedName | '設定';
+type Page = '幹員庫' | '批次修正' | PlannedName | '關卡' | '設定';
 type Panel = 'import' | 'preview' | 'detail' | 'restore' | 'switch' | null;
 const NAV: { label: Page; icon: IconName; hint: string }[] = [
   { label: '幹員庫', icon: 'roster', hint: '查詢與檢視' }, { label: '批次修正', icon: 'edit', hint: '逐列核對欄位' },
-  { label: '基建', icon: 'base', hint: '設施配置與技能' }, { label: '養成', icon: 'grow', hint: '材料與龍門幣計算' }, { label: '搭配', icon: 'link', hint: '尚未實作' },
+  { label: '基建', icon: 'base', hint: '設施配置與技能' }, { label: '養成', icon: 'grow', hint: '材料與龍門幣計算' }, { label: '關卡', icon: 'database', hint: '活動與材料掉落' }, { label: '搭配', icon: 'link', hint: '尚未實作' },
   { label: '設定', icon: 'settings', hint: '保存、備份與來源' },
 ];
 const SUBTITLE: Record<Page, string> = {
   幹員庫: '整理養成進度、核對資料缺口。', 批次修正: '左側勾選角色，右側直接改欄位；預覽確認後才保存。',
-  基建: '設施配置、進駐名單與可追溯的技能加成。', 養成: '精英化、技能、專精與模組的材料計算。', 搭配: '待建立可追溯規則。', 設定: '來源與版本、本機保存及備份。',
+  基建: '設施配置、進駐名單與可追溯的技能加成。', 養成: '精英化、技能、專精與模組的材料計算。', 關卡: '台服活動時間表與材料掉落來源。', 搭配: '待建立可追溯規則。', 設定: '來源與版本、本機保存及備份。',
 };
 
 export default function App() {
@@ -212,6 +213,7 @@ export default function App() {
           onUndo={() => void run(async () => { await persist(undoLastImport(state), state.revision); setNotice({ text: '最後匯入批次已撤銷，復原結果已保存。撤銷紀錄已保留。', error: false }); })}/>}
         {page === '基建' && <BasePage key={namespace} state={state} isDemo={isDemo} busy={busy} onSave={base => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, base } }, state.revision); setNotice({ text: '基建配置已保存至本機。', error: false }); })}/>}
         {page === '養成' && <GrowthPage key={namespace} state={state} isDemo={isDemo} busy={busy} onSave={growth => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, growth } }, state.revision); setNotice({ text: '養成計畫已保存至本機。', error: false }); })}/>}
+        {page === '關卡' && <StagePage key={namespace} isDemo={isDemo}/>}
         {page === '搭配' && <PlannedPage name={page} onRoster={() => goto('幹員庫')} onSettings={() => goto('設定')}/>}
       </main>
     </div>

@@ -32,7 +32,7 @@ const tier = (value: unknown) => Number(String(value ?? '').replace(/\D/gu, ''))
 const costs = (list: unknown): Cost[] => Array.isArray(list) ? list.filter((item: Row) => typeof item?.id === 'string' && Number(item.count) > 0).map((item: Row) => ({ id: item.id, count: Number(item.count) })) : [];
 const values = (row: unknown): number[] => Array.isArray((row as Row)?.values) ? (row as Row).values.map((value: unknown) => Number(value)).filter((value: number) => value >= 0) : [];
 
-export function buildGrowthCatalog(tables: { characters: Row; skills?: Row; constants?: Row; items?: Row; building?: Row }, operatorIds: readonly string[], version: string, source: string): GrowthCatalog | undefined {
+export function buildGrowthCatalog(tables: { characters: Row; skills?: Row; constants?: Row; items?: Row; building?: Row }, operatorIds: readonly string[], version: string, source: string, extraItems: readonly string[] = []): GrowthCatalog | undefined {
   const constants = tables.constants;
   if (!constants?.characterExpMap || !constants?.characterUpgradeCostMap || !constants?.evolveGoldCost) return undefined;
   const operators: Record<string, GrowthOperator> = {};
@@ -63,6 +63,7 @@ export function buildGrowthCatalog(tables: { characters: Row; skills?: Row; cons
   const expItems = Object.fromEntries(Object.entries((tables.items?.expItems ?? {}) as Row).filter(([, row]) => Number(row?.gainExp) > 0).map(([itemId, row]) => [itemId, Number(row.gainExp)]));
   for (const itemId of Object.keys(expItems)) usedItems.add(itemId);
   usedItems.add('4001');
+  for (const itemId of extraItems) usedItems.add(itemId);
   // 模組升級材料（模組數據塊等）在模組表，名稱一併收錄。
   for (const itemId of Object.keys(itemRows)) if (/^mod_/u.test(itemId)) usedItems.add(itemId);
   const items = Object.fromEntries([...usedItems].filter(itemId => itemRows[itemId]).map(itemId => {
