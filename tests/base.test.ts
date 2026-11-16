@@ -21,7 +21,7 @@ test('白名單句型解析；任一子句不支援即整個技能不計入', ()
   assert.deepEqual(parseSkill({ roomType: 'TRADING', description: '進駐貿易站時，訂單獲取效率+20%，且訂單上限+4' }).effects, [{ kind: 'order', value: 20 }, { kind: 'orderLimit', value: 4 }]);
   assert.deepEqual(parseSkill({ roomType: 'DORMITORY', description: '進駐宿舍時，該宿舍內所有幹員的心情每小時恢復+0.2（同種效果取最高）' }).effects, [{ kind: 'moodRecoverAll', value: 0.2 }]);
   for (const description of [
-    '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每個發電站為當前製造站+5%的生產力',
+    '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每有1個標準化類技能為當前製造站+5%的生產力',
     '進駐製造站時，當前製造站內每個標準化類技能為自身+5%的生產力',
     '進駐製造站時，如果有2台以上作業平台進駐在發電站，則生產力+2%',
     '進駐控制中樞時，較容易獲得線索板上尚未擁有的線索，但控制中樞內除自身以外的其餘幹員心情每小時消耗+0.25',
@@ -484,4 +484,27 @@ test('第 4 階段：產品條件、他人在場、同房陣營、設施數量�
   assert.equal(stats.manufacture.find(item => item.product === 'record')?.storageItems, Math.floor((54 + 12) / 5), '生產作戰記錄時倉庫 +12');
   const sim = simulateShift(base, catalog, state.roster, definitions, { hours: 12 });
   assert.equal(sim.rest?.dormRate, 2 + 2 + 0.05, '宿舍：基礎 2.0＋氛圍 2.0＋所有宿舍恢復 0.05');
+});
+
+test('其他幹員加成歸零：只留持有者本人與依設施數量的加成', () => {
+  const zero = parseSkill({ roomType: 'MANUFACTURE', description: '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每個發電站為當前製造站+5%的生產力' });
+  assert.equal(zero.supported, true);
+  assert.deepEqual(zero.effects[0], { kind: 'zeroOthers', stat: 'productivity' });
+  const wulian = parseSkill({ roomType: 'TRADING', description: '進駐貿易站時，當前貿易站內其他幹員提供的訂單獲取效率全部歸零，且每人為自身+45%訂單獲取效率，同時全體心情每小時消耗+0.25' });
+  assert.equal(wulian.supported, true);
+  assert.equal(wulian.effects.length, 3);
+});
+
+test('消除心情消耗、訂單上限與赤金生產線句型', () => {
+  const p = (roomType: string, description: string) => parseSkill({ roomType, description });
+  assert.deepEqual(p('MANUFACTURE', '進駐製造站時，消除當前製造站內所有幹員自身心情消耗的影響').effects, [{ kind: 'moodNeutral', scope: 'room' }]);
+  assert.deepEqual(p('CONTROL', '進駐控制中樞時，消除當前控制中樞內所有歲幹員自身心情消耗的影響').effects, [{ kind: 'moodNeutral', scope: 'room', group: '歲' }]);
+  assert.deepEqual(p('CONTROL', '當與豐川祥子一起進駐控制中樞時，消除自身心情消耗的影響').effects, [{ kind: 'ifPresent', name: '豐川祥子', where: 'CONTROL', effect: { kind: 'moodNeutral', scope: 'self' } }]);
+  assert.deepEqual(p('TRADING', '進駐貿易站時，當前貿易站每級+1個訂單上限').effects, [{ kind: 'scaleBy', by: 'roomLevel', per: 1, effect: { kind: 'orderLimit', value: 1 } }]);
+  assert.deepEqual(p('TRADING', '進駐貿易站時，訂單取得效率+20%，且訂單上限-2（訂單最少為1）').effects, [{ kind: 'order', value: 20 }, { kind: 'orderLimit', value: -2 }]);
+  assert.deepEqual(p('TRADING', '進駐貿易站時，當前貿易站內幹員提升的每5個訂單上限，提供25%訂單取得效率，最多提供100%效率').effects, [{ kind: 'perOrderLimit', per: 5, value: 25, max: 100 }]);
+  assert.deepEqual(p('TRADING', '進駐貿易站時，每有1條赤金生產線，則當前貿易站訂單獲取效率+5%').effects, [{ kind: 'perGoldLines', per: 1, effect: { kind: 'order', value: 5 } }]);
+  assert.deepEqual(p('TRADING', '進駐貿易站時，訂單獲取效率+5%，每有2條赤金生產線，則為當前貿易站額外提供2條赤金生產線').effects, [{ kind: 'order', value: 5 }, { kind: 'perGoldLines', per: 2, effect: { kind: 'goldLine', value: 2 } }]);
+  // 依當下訂單數變動的技能仍不計入
+  assert.equal(p('TRADING', '進駐貿易站時，當前訂單數與訂單上限每差1筆訂單，則訂單獲取效率+4%').supported, false);
 });
