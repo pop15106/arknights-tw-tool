@@ -508,3 +508,19 @@ test('消除心情消耗、訂單上限與赤金生產線句型', () => {
   // 依當下訂單數變動的技能仍不計入
   assert.equal(p('TRADING', '進駐貿易站時，當前訂單數與訂單上限每差1筆訂單，則訂單獲取效率+4%').supported, false);
 });
+
+test('中樞同伴條件、訓練陣營、宿舍目標條件與疊加型加成', () => {
+  const p = (roomType: string, description: string) => parseSkill({ roomType, description });
+  assert.deepEqual(p('CONTROL', '當與龍門近衛局幹員進駐控制中樞一起工作時，所有製造站生產力+3%（同種效果取最高）').effects, [{ kind: 'ifGroupInRoom', group: '龍門近衛局', effect: { kind: 'global', target: 'MANUFACTURE', value: 3, maxOnly: true } }]);
+  assert.deepEqual(p('CONTROL', '當與阿進駐控制中樞一起工作時，控制中樞內所有幹員心情每小時恢復+0.25').effects, [{ kind: 'ifPresent', name: '阿', where: 'CONTROL', effect: { kind: 'moodRoom', value: -0.25 } }]);
+  assert.deepEqual(p('MANUFACTURE', '進駐製造站時，目前製造站內所有幹員心情每小時消耗-0.1').effects, [{ kind: 'moodRoom', value: -0.1 }]);
+  assert.deepEqual(p('TRAINING', '進駐訓練室協助位時，基建內（不包含副手及活動室使用者）每名薩米幹員為目前幹員的專精技能訓練速度+10%（最多生效3名）').effects, [{ kind: 'perGroup', scope: 'base', group: '薩米', max: 3, per: { kind: 'training', value: 10 } }]);
+  const branch = p('TRAINING', '進駐訓練室協助位時，近衛幹員的專精技能訓練速度+30%，如果訓練位幹員分支為鬥士，則訓練速度額外+45%');
+  assert.deepEqual(branch.effects, [{ kind: 'training', value: 30, professions: ['近衛'] }]);
+  assert.ok(branch.ignoredCondition?.includes('鬥士'));
+  const dorm = p('DORMITORY', '進駐宿舍時，該宿舍內所有幹員的心情每小時恢復+0.15，如果目標是萊歐斯小隊幹員，則恢復效果額外+0.15（同種效果取最高）');
+  assert.deepEqual(dorm.effects, [{ kind: 'moodRecoverAll', value: 0.15 }]);
+  assert.deepEqual(p('TRADING', '進駐貿易站時，當前貿易站內幹員提供的每5%訂單獲取效率，額外提供5%效率，最多提供25%效率').effects, [{ kind: 'perRoomStat', stat: 'order', per: 5, value: 5, max: 25, others: false }]);
+  assert.deepEqual(p('TRAINING', '進駐訓練室協助近衛幹員訓練專精技能至3級時，心情每小時消耗+1').effects, [{ kind: 'whenTraining', professions: ['近衛'], atMastery: 3, effect: { kind: 'moodCost', value: 1 } }]);
+  assert.deepEqual(p('HIRE', '進駐人力辦公室時，每個招募位（不包含初始招募位）+10%人脈資源的聯絡速度').effects, [{ kind: 'scaleBy', by: 'recruitSlots', per: 1, effect: { kind: 'contact', value: 10 } }]);
+});

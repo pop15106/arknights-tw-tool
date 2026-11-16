@@ -40,7 +40,9 @@ function effectText(effect: SkillEffect): string {
     case 'perOtherWorking': return `同設施每名其他工作中幹員：${effectText(effect.effect)}`;
     case 'workingMood': return `其他設施工作中幹員心情恢復 +${-effect.value}/時`;
     case 'dormSingle': return `宿舍內某位心情未滿者恢復 +${effect.value}/時（取最高）`;
-    case 'scaleBy': return `${{ recruitSlots: '每個招募位', powerPlants: `每 ${effect.per} 間發電站`, roomLevel: '本設施每級', dormLevels: '宿舍每級', tradingPosts: '每個貿易站', meetingLevel: '會客室每級', trainingLevel: '訓練室每級', roomOccupants: '同站每人' }[effect.by]}：${effectText(effect.effect)}${effect.max ? `（最多 ${effect.max}%）` : ''}`;
+    case 'scaleBy': return `${{ recruitSlots: '每個招募位', powerPlants: `每 ${effect.per} 間發電站`, roomLevel: '本設施每級', dormLevels: '宿舍每級', tradingPosts: '每個貿易站', meetingLevel: '會客室每級', trainingLevel: '訓練室每級', roomOccupants: '同站每人', productTypes: '製造站每類配方' }[effect.by]}：${effectText(effect.effect)}${effect.max ? `（最多 ${effect.max}%）` : ''}`;
+    case 'perRoomStat': return `同站${effect.others ? '其他' : ''}幹員的${effect.stat === 'order' ? '訂單效率' : '生產力'}每 ${effect.per}% 再＋${effect.value}%（最多 ${effect.max}%）`;
+    case 'whenTraining': return `協助${effect.professions?.join('、') ?? ''}幹員專精至 ${effect.atMastery} 級時：${effectText(effect.effect)}`;
     case 'moodNeutral': return effect.scope === 'self' ? '消除自身心情消耗的影響' : `消除同站${effect.group ? `${effect.group}幹員` : '所有幹員'}自身心情消耗的影響`;
     case 'perOrderLimit': return `同站幹員提升的每 ${effect.per} 個訂單上限＋${effect.value}% 訂單效率${effect.max ? `（最多 ${effect.max}%）` : ''}`;
     case 'goldLine': return `提供 ${effect.value} 條赤金生產線`;
