@@ -27,12 +27,19 @@ function json(res: ServerResponse, status: number, value: unknown): void {
   });
   res.end(content);
 }
+// 只比對字串值，不比對屬性名稱，避免 q=id 之類查詢命中全部資料。
+function containsText(value: unknown, q: string, depth = 0): boolean {
+  if (typeof value === 'string') return value.includes(q);
+  if (depth > 8 || !value || typeof value !== 'object') return false;
+  return Object.values(value).some(item => containsText(item, q, depth + 1));
+}
 function publicStatus(snapshot: GameDataSnapshot) {
   const status = snapshot.status;
   return {
     version: status.version, sourceUpdatedAt: status.sourceUpdatedAt, syncedAt: status.syncedAt,
     counts: { operators: status.counts.operators, stages: status.counts.stages, events: status.counts.events },
     sourceKind: status.sourceKind, sourceUrl: status.sourceUrl,
+    ...(status.moduleSource ? { moduleSource: { version: status.moduleSource.version, sourceUrl: status.moduleSource.sourceUrl, sourceUpdatedAt: status.moduleSource.sourceUpdatedAt } } : {}),
     ...(status.lastError ? { lastError: '最近一次同步失敗；目前保留先前資料。' } : {}),
   };
 }
@@ -85,7 +92,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
       const rows = url.pathname === '/api/game-data/stages' ? snapshot.stages : snapshot.events;
-      const filtered = q ? rows.filter(row => (JSON.stringify(row) ?? '').includes(q)) : rows;
+      const filtered = q ? rows.filter(row => containsText(row, q)) : rows;
       json(res, 200, { items: filtered.slice(offset, offset + limit), total: filtered.length, offset, limit, version: snapshot.status.version });
     } catch (error) {
       if (error instanceof ApiError) json(res, error.status, { error: { code: error.code, message: error.message } });

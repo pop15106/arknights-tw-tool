@@ -39,7 +39,7 @@ function FieldControl({ value, info, label, busy, onChange }: { value: Draft; in
   if (info.options) return <select className="filter" aria-label={label} disabled={busy} value={value.status === 'known' ? value.value : `__${value.status}`} onChange={event => { const next = event.currentTarget.value; onChange(next.startsWith('__') ? { status: next.slice(2) as Draft['status'], value: '' } : { status: 'known', value: next }); }}>
     <option value="" disabled>選擇新值</option><option value="__unknown">未知</option><option value="__not-applicable">不適用</option>{info.options.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
   </select>;
-  return <div className="batch-number-control"><input className="text-input" type="number" inputMode="numeric" aria-label={label} min={info.min} max={info.max} step="1" placeholder={value.status === 'not-applicable' ? '不適用' : `未知 · ${info.min}–${info.max}`} disabled={busy} value={value.status === 'known' ? value.value : ''} onInput={event => onChange({ status: event.currentTarget.value === '' ? 'unknown' : 'known', value: event.currentTarget.value })}/><select className="filter batch-value-status" aria-label={`${label}資料狀態`} value={value.status} disabled={busy} onChange={event => onChange({ status: event.currentTarget.value as Draft['status'], value: value.value })}><option value="known">已知</option><option value="unknown">未知</option><option value="not-applicable">不適用</option></select></div>;
+  return <div className="batch-number-control"><input className="text-input" type="number" inputMode="numeric" aria-label={label} min={info.min} max={info.max} step="1" placeholder={value.status === 'not-applicable' ? '不適用' : `未知 · ${info.min}–${info.max}`} disabled={busy} value={value.status === 'known' ? value.value : ''} onInput={event => onChange({ status: 'known', value: event.currentTarget.value })}/><select className="filter batch-value-status" aria-label={`${label}資料狀態`} value={value.status} disabled={busy} onChange={event => onChange({ status: event.currentTarget.value as Draft['status'], value: value.value })}><option value="known">已知</option><option value="unknown">未知</option><option value="not-applicable">不適用</option></select></div>;
 }
 
 export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { state: AppState; initialId: string | null; onInitialHandled: () => void; onSave: (preview: ImportPreview) => Promise<void> }) {
@@ -73,6 +73,8 @@ export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { st
   const hiddenSelected = selected.filter(id => !filtered.some(item => item.row.operatorId === id)).length;
   const usesModule = [moduleUnlocked, moduleLevel, moduleEquipped].some(value => value !== 'keep');
   const invalidModules = usesModule ? rows.filter(item => selectedSet.has(item.row.operatorId) && matchingModules(item.definition, moduleKind).length !== 1) : [];
+  const latestRevision = useRef(state.revision);
+  latestRevision.current = state.revision;
   useEffect(() => { setPreview(null); setAgreed(false); }, [state.revision]);
   useEffect(() => { if (initialId) { setSelected(current => current.includes(initialId) ? current : [...current, initialId]); onInitialHandled(); } }, [initialId]);
   useEffect(() => { if (preview) { previewRef.current?.focus(); previewRef.current?.scrollIntoView({ block: 'start' }); } }, [preview]);
@@ -125,7 +127,10 @@ export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { st
     setBusy(true); setMessage('');
     try {
       const changes = Object.fromEntries(changedIds.map(id => [id, Object.fromEntries(Object.entries(drafts[id]).map(([field, draft]) => [field, convert(draft, fieldInfo(field, definitions.get(id)!))]))]));
-      setPreview(await previewImport(state, createGridEdit(state, changes))); setAgreed(false);
+      const base = state.revision, next = await previewImport(state, createGridEdit(state, changes));
+      // 預覽期間若其他操作已保存，捨棄這份過期預覽，避免保存時才被拒絕。
+      if (latestRevision.current !== base) { setMessage('資料已在預覽期間更新，請重新預覽。'); return; }
+      setPreview(next); setAgreed(false);
     } catch (error) { setPreview(null); setMessage(error instanceof Error ? error.message : '無法產生預覽。'); }
     finally { setBusy(false); }
   }

@@ -106,7 +106,7 @@ export function OperatorEncyclopedia({ definition, row }: { definition: Operator
   const originalModulesOnly = definition.modules.length > 0 && definition.modules.every(module => module.type === 'original' || module.kind.toUpperCase() === 'ORIGINAL');
   const confirmed = ['elite', 'level', 'potential'].every(field => row.fields[field]?.manuallyConfirmed);
   return <section className="operator-encyclopedia" aria-label="幹員資料與能力說明">
-    <div className="encyclopedia-profile"><OperatorPortrait definition={definition} large/><div><span className="operator-rarity" aria-label={`${definition.rarity} 星`}>{'✦'.repeat(definition.rarity)}</span><h3>{definition.displayName}</h3><p>{definition.profession} · {definition.branch}<br/>{definition.faction}</p></div></div>
+    <div className="encyclopedia-profile"><OperatorPortrait definition={definition} large/><div><span className="operator-rarity" role="img" aria-label={`${definition.rarity} 星`}>{'✦'.repeat(definition.rarity)}</span><h3>{definition.displayName}</h3><p>{definition.profession} · {definition.branch}<br/>{definition.faction}</p></div></div>
     <h3>技能說明</h3><p className="fine-print">選擇等級可查看資料包的中文說明；切換說明不會改變你的養成紀錄，也不代表已解鎖或已專精。</p>
     <div className="encyclopedia-list">{definition.skills.map(skill => <SkillDescription key={`${row.operatorId}-${skill.id}`} skill={skill} row={row}/>)}</div>
     <h3 className="encyclopedia-subheading">天賦與解鎖條件</h3><p className="fine-print">以下保留資料包中的各條件版本，不代表全部同時生效或可相加。條件依目前紀錄比對；未知養成值不視為已達成。</p>
@@ -163,7 +163,7 @@ export function GameDataSettings() {
       const next = statusValue(JSON.parse(body));
       if (active.current) { setStatus(next); if (sync) setMessage({ text: '圖鑑已更新，重新開啟幹員詳情即可查看最新說明；養成紀錄不變。', error: false }); }
     } catch (error) {
-      if (active.current) setMessage({ text: current.signal.aborted ? '等待已逾時；既有資料保留。可稍後重新查詢同步狀態。' : error instanceof Error && !(error instanceof SyntaxError) ? error.message : '遊戲資料狀態暫不可用；既有資料保留。', error: true });
+      if (active.current) setMessage({ text: current.signal.aborted ? '等待已逾時；既有資料保留。可稍後重新查詢同步狀態。' : error instanceof Error && error.constructor === Error ? error.message : '遊戲資料狀態暫不可用，請確認本機資料服務已啟動；既有資料保留。', error: true });
     } finally {
       window.clearTimeout(timeout); pending.current = false;
       if (active.current) setBusy(false);
