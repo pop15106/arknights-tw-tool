@@ -316,3 +316,13 @@ test('整體最佳化：結果不比起點差、不重複排人、不超過容�
   const objective = baseObjective(noGold, catalog);
   assert.equal(objective.goldFactor, 0); assert.equal(objective.trading, -100);
 });
+
+test('權重：整體效益依各產出權重加總，權重為 0 時不計該項', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const ev = evaluateBase({ facilities: [{ id: 'g', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'r', type: 'manufacturing', level: 3, product: 'record' }], onlineSlots: [], assignments: { g: ['demo-3'], r: ['demo-4'] } }, catalog, state.roster, definitions);
+  const equal = baseObjective(ev, catalog);
+  assert.equal(equal.gold, 31); assert.equal(equal.record, 31); assert.equal(equal.total, 62);
+  assert.equal(baseObjective(ev, catalog, { gold: 0, record: 2, trading: 1, power: 1 }).total, 62);
+  assert.equal(baseObjective(ev, catalog, { gold: 3, record: 0, trading: 1, power: 1 }).total, 93);
+});

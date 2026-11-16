@@ -669,15 +669,18 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
 /* 赤金收支）計算整體效益，從推薦配置出發逐格替換／交換，直到無法再提升。    */
 /* 屬於局部搜尋，不保證全域最佳；不模擬心情與換班。                         */
 /* ------------------------------------------------------------------ */
-export interface BaseObjective { total: number; manufacture: number; trading: number; power: number; goldFactor: number }
+export interface BaseObjective { total: number; manufacture: number; gold: number; record: number; trading: number; power: number; goldFactor: number }
+/** 各產出的權重（1 為標準）；整體效益＝赤金站生產力×gold＋記錄站生產力×record＋龍門幣提升×trading＋無人機×power。 */
+export interface ObjectiveWeights { gold: number; record: number; trading: number; power: number }
+export const DEFAULT_WEIGHTS: ObjectiveWeights = { gold: 1, record: 1, trading: 1, power: 1 };
 
-export function baseObjective(evaluation: BaseEvaluation, catalog: BaseCatalog): BaseObjective {
+export function baseObjective(evaluation: BaseEvaluation, catalog: BaseCatalog, weights: ObjectiveWeights = DEFAULT_WEIGHTS): BaseObjective {
   const stats = baseStatistics(evaluation, catalog);
   const params = catalog.trading ?? DEFAULT_TRADING;
-  let manufacture = 0, power = 0;
+  let gold = 0, record = 0, power = 0;
   for (const result of evaluation.facilities) {
     if (!result.operators.length) continue;
-    if (result.facility.type === 'manufacturing') manufacture += result.totals.basic + result.totals.productivity;
+    if (result.facility.type === 'manufacturing') { const value = result.totals.basic + result.totals.productivity; if (result.facility.product === 'record') record += value; else gold += value; }
     if (result.facility.type === 'power') power += result.totals.drone;
   }
   // 貿易站：龍門幣相對「常規訂單、效率 0」的提升；赤金不足時按供應比例打折（佩佩等不耗赤金的訂單不受影響）。
@@ -690,13 +693,13 @@ export function baseObjective(evaluation: BaseEvaluation, catalog: BaseCatalog):
     const goldShare = item.goldPerDay > 0 ? goldFactor : 1;
     trading += (item.lmdPerDay * goldShare / baseline - 1) * 100;
   }
-  const total = round(manufacture + trading + power);
-  return { total, manufacture: round(manufacture), trading: round(trading), power: round(power), goldFactor: round(goldFactor) };
+  const total = round(gold * weights.gold + record * weights.record + trading * weights.trading + power * weights.power);
+  return { total, manufacture: round(gold + record), gold: round(gold), record: round(record), trading: round(trading), power: round(power), goldFactor: round(goldFactor) };
 }
 
-export interface OptimizeResult { assignments: Record<string, string[]>; objective: BaseObjective; start: BaseObjective; moves: number; evaluations: number; timedOut: boolean }
+export interface OptimizeResult { assignments: Record<string, string[]>; products: Record<string, 'gold' | 'record'>; objective: BaseObjective; start: BaseObjective; moves: number; evaluations: number; timedOut: boolean }
 
-export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { timeBudgetMs?: number; start?: Record<string, string[]> } = {}): OptimizeResult {
+export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { timeBudgetMs?: number; start?: Record<string, string[]>; weights?: ObjectiveWeights } = {}): OptimizeResult {
   const deadline = Date.now() + (options.timeBudgetMs ?? 4000);
   const owned = roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false));
   const rooms = new Map(catalog.rooms.map(room => [room.id, room]));
@@ -707,7 +710,10 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
   const start = options.start ?? recommendBase(base, catalog, owned, definitions).assignments;
   let current: Record<string, string[]> = Object.fromEntries(base.facilities.map(facility => [facility.id, [...(start[facility.id] ?? [])].slice(0, capacity(facility))]));
   let evaluations = 0;
-  const score = (assignments: Record<string, string[]>) => { evaluations++; return baseObjective(evaluateBase({ ...base, assignments }, catalog, owned, definitions), catalog); };
+  // 製造站產品也是搜尋的一部分：權重偏重龍門幣時可能多開赤金站，偏重經驗時則相反。
+  let products: Record<string, 'gold' | 'record'> = Object.fromEntries(base.facilities.filter(f => f.type === 'manufacturing').map(f => [f.id, f.product === 'record' ? 'record' : 'gold']));
+  const withProducts = (map: Record<string, 'gold' | 'record'>) => ({ ...base, facilities: base.facilities.map(f => f.type === 'manufacturing' ? { ...f, product: map[f.id] } : f) });
+  const score = (assignments: Record<string, string[]>, map = products) => { evaluations++; return baseObjective(evaluateBase({ ...withProducts(map), assignments }, catalog, owned, definitions), catalog, options.weights); };
   // 候選池：有該設施（含控制中樞）已解鎖技能者，加上任何技能提到的陣營成員；產出設施另外允許任何人（基礎加成）。
   const referencedGroups = new Set<string>();
   for (const skill of Object.values(catalog.skills)) for (const effect of parseSkill(skill).effects) {
@@ -725,6 +731,11 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
   const usedCharacters = (assignments: Record<string, string[]>) => new Set(Object.values(assignments).flat().map(characterOf));
   while (improved && !timedOut) {
     improved = false;
+    for (const facilityId of Object.keys(products)) {
+      const next = { ...products, [facilityId]: products[facilityId] === 'gold' ? 'record' as const : 'gold' as const };
+      const value = score(current, next);
+      if (value.total > best.total + 0.001) { best = value; products = next; moves++; improved = true; }
+    }
     for (const facility of searchable) {
       const slots = capacity(facility);
       for (let slot = 0; slot < slots && !timedOut; slot++) {
@@ -747,5 +758,5 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
       }
     }
   }
-  return { assignments: current, objective: best, start: startObjective, moves, evaluations, timedOut };
+  return { assignments: current, products, objective: best, start: startObjective, moves, evaluations, timedOut };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { AppState, Settings } from '../domain/model';
 import type { BaseCatalog } from '../catalog/base';
-import { candidatesFor, evaluateBase, optimizeBase, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
+import { candidatesFor, DEFAULT_WEIGHTS, evaluateBase, optimizeBase, type ObjectiveWeights, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -121,23 +121,26 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
 }
 
 /** 整體最佳化結果與警語。 */
-function OptimizedView({ result, base, catalog, state }: { result: OptimizeResult; base: Base; catalog: BaseCatalog; state: AppState }) {
+function OptimizedView({ result, base, catalog, state, weights }: { result: OptimizeResult; base: Base; catalog: BaseCatalog; state: AppState; weights: ObjectiveWeights }) {
   const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
-  const evaluation = evaluateBase({ ...base, assignments: result.assignments }, catalog, state.roster, definitions);
+  const optimizedBase = { ...base, facilities: base.facilities.map(f => result.products[f.id] ? { ...f, product: result.products[f.id] } : f) };
+  const evaluation = evaluateBase({ ...optimizedBase, assignments: result.assignments }, catalog, state.roster, definitions);
+  const changed = base.facilities.filter(f => result.products[f.id] && f.product !== result.products[f.id]);
   const gain = Math.round((result.objective.total - result.start.total) * 10) / 10;
   return <div className="recommend-result optimized">
     <div className="callout warning optimize-warning" role="note">
       <strong>警語：這是近似最佳，不是保證最佳</strong>
       <ul>
         <li>從單人推薦出發，逐格替換或交換幹員，只要整體效益變高就採用，直到無法再提升（局部搜尋）；不同起點可能得到不同結果。</li>
-        <li>整體效益＝製造站生產力％＋貿易站龍門幣提升％（赤金不足時按供應比例打折）＋發電站無人機％；赤金、作戰記錄、龍門幣視為同等重要。</li>
+        <li>整體效益＝赤金站生產力％×{weights.gold}＋記錄站生產力％×{weights.record}＋貿易站龍門幣提升％×{weights.trading}（赤金不足時按供應比例打折）＋發電站無人機％×{weights.power}；權重可在上方調整。</li>
         <li>不模擬心情與換班；訂單品質技能以累積工作達峰值計；PRTS 為陸服資料；說明文字無法解析的技能不計入。</li>
         <li>宿舍沿用單人推薦，不參與最佳化。</li>
       </ul>
     </div>
-    <p className="recommend-verdict"><strong>整體效益 {result.start.total} → {result.objective.total}（{gain >= 0 ? '+' : ''}{gain}）</strong>：製造 {result.objective.manufacture}%、貿易 {result.objective.trading}%、發電 {result.objective.power}%{result.objective.goldFactor < 1 ? `；赤金只夠 ${Math.round(result.objective.goldFactor * 100)}% 的訂單` : '；赤金足夠交付訂單'}。共替換 {result.moves} 次、評估 {result.evaluations.toLocaleString()} 種配置{result.timedOut ? '（達到時間上限而停止，可再按一次繼續）' : ''}。</p>
+    <p className="recommend-verdict"><strong>整體效益 {result.start.total} → {result.objective.total}（{gain >= 0 ? '+' : ''}{gain}）</strong>：赤金站 {result.objective.gold}%、記錄站 {result.objective.record}%、貿易 {result.objective.trading}%、發電 {result.objective.power}%{result.objective.goldFactor < 1 ? `；赤金只夠 ${Math.round(result.objective.goldFactor * 100)}% 的訂單` : '；赤金足夠交付訂單'}。共替換 {result.moves} 次、評估 {result.evaluations.toLocaleString()} 種配置{result.timedOut ? '（達到時間上限而停止，可再按一次繼續）' : ''}。</p>
+    {changed.length > 0 && <p className="callout">建議調整製造站產品：{changed.map(f => `${evaluation.facilities.find(item => item.facility.id === f.id)?.label} 改做${result.products[f.id] === 'gold' ? '赤金' : '作戰記錄'}`).join('、')}（套用時一併變更）。</p>}
     <div className="recommend-grid">{evaluation.facilities.filter(item => item.operators.length).map(item => <article key={item.facility.id} className="recommend-card">
-      <h3>{item.label}</h3>
+      <h3>{item.label}{item.facility.type === 'manufacturing' && <span className="tag muted">{item.facility.product === 'gold' ? '赤金' : '作戰記錄'}</span>}</h3>
       <ol className="recommend-picks">{item.operators.map(op => <li key={op.operatorId}><strong>{op.name}</strong><small>{op.skills.filter(skill => skill.applies && skill.active).map(skill => skill.active!.name).join('、') || '基礎加成'}</small></li>)}</ol>
       {item.remote.length > 0 && <p className="fine-print">{item.remote.map(r => `${r.from}「${r.skill}」${r.value >= 0 ? '+' : ''}${r.value}%`).join('；')}</p>}
     </article>)}</div>
@@ -148,7 +151,7 @@ interface DataStatus { version: string; sourceUpdatedAt: string; syncedAt: strin
 
 /** 推薦前先確認目前的繁中服資料版本與可用幹員，再用已持有幹員產生配置。 */
 function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefreshed }: {
-  state: AppState; isDemo: boolean; busy: boolean; catalog: BaseCatalog; base: Base; onApply: (assignments: Record<string, string[]>) => void; onRefreshed: () => void;
+  state: AppState; isDemo: boolean; busy: boolean; catalog: BaseCatalog; base: Base; onApply: (assignments: Record<string, string[]>, products?: Record<string, 'gold' | 'record'>) => void; onRefreshed: () => void;
 }) {
   const [status, setStatus] = useState<DataStatus | null>(null);
   const [message, setMessage] = useState('');
@@ -156,11 +159,16 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefresh
   const [result, setResult] = useState<BaseRecommendation | null>(null);
   const [optimized, setOptimized] = useState<OptimizeResult | null>(null);
   const [running, setRunning] = useState(false);
+  // 權重只存在這台裝置；讀寫失敗時用預設值。
+  const [weights, setWeights] = useState<ObjectiveWeights>(() => { try { const saved = JSON.parse(localStorage.getItem('arknights-tw-base-weights') ?? 'null'); return saved && ['gold', 'record', 'trading', 'power'].every(key => typeof saved[key] === 'number') ? saved : DEFAULT_WEIGHTS; } catch { return DEFAULT_WEIGHTS; } });
+  const updateWeight = (key: keyof ObjectiveWeights, value: number) => { const next = { ...weights, [key]: value }; setWeights(next); try { localStorage.setItem('arknights-tw-base-weights', JSON.stringify(next)); } catch { /* 不影響使用 */ } };
+  const [optimizedWeights, setOptimizedWeights] = useState<ObjectiveWeights | null>(null);
   const generate = () => {
+    setOptimizedWeights(weights);
     const recommendation = recommendBase(base, catalog, state.roster, definitions);
     setResult(recommendation); setOptimized(null); setRunning(true);
     // 讓畫面先顯示「計算中」，再進行整體最佳化（約數秒）。
-    window.setTimeout(() => { try { setOptimized(optimizeBase(base, catalog, state.roster, definitions, { start: recommendation.assignments, timeBudgetMs: 6000 })); } finally { setRunning(false); } }, 30);
+    window.setTimeout(() => { try { setOptimized(optimizeBase(base, catalog, state.roster, definitions, { start: recommendation.assignments, timeBudgetMs: 6000, weights })); } finally { setRunning(false); } }, 30);
   };
   const loadStatus = async (sync = false) => {
     if (isDemo) return;
@@ -197,12 +205,22 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefresh
     </div>
     {ageDays !== undefined && ageDays > 30 && <p className="callout warning">資料來源已 {ageDays} 天未更新，新幹員或技能調整可能尚未反映。建議先按「檢查繁中服更新」。</p>}
     {message && <p className="fine-print" role="status">{message}</p>}
+    <fieldset className="weight-panel">
+      <legend>你比較重視哪一項？（整體最佳化的權重）</legend>
+      {([['gold', '赤金'], ['record', '作戰記錄'], ['trading', '龍門幣'], ['power', '無人機']] as const).map(([key, label]) => <label key={key} className="weight-row">
+        <span>{label}</span>
+        <input type="range" min="0" max="3" step="0.5" value={weights[key]} aria-label={`${label}權重`} onInput={event => updateWeight(key, Number(event.currentTarget.value))}/>
+        <b>{weights[key] === 0 ? '不考慮' : `×${weights[key]}`}</b>
+      </label>)}
+      <button type="button" className="button ghost small" onClick={() => { setWeights(DEFAULT_WEIGHTS); try { localStorage.removeItem('arknights-tw-base-weights'); } catch { /* 不影響使用 */ } }}>恢復等重</button>
+      <p className="fine-print">調整後按「產生推薦」重新計算。權重只影響最佳化如何取捨，不改變各設施的實際數值；設定只存在這台裝置。</p>
+    </fieldset>
     <div className="inline-actions">
       <button type="button" className="button primary" disabled={busy || syncing || !base.facilities.length} onClick={generate}>{running ? '最佳化計算中…' : result ? '重新產生推薦' : '產生推薦'}</button>
-      {result && <button type="button" className="button secondary" disabled={busy || running} onClick={() => onApply(optimized?.assignments ?? result.assignments)}>套用到配置草稿</button>}
+      {result && <button type="button" className="button secondary" disabled={busy || running} onClick={() => onApply(optimized?.assignments ?? result.assignments, optimized?.products)}>套用到配置草稿</button>}
       {!base.facilities.length && <span className="fine-print">請先在下方選一個常見布局或新增設施。</span>}
     </div>
-    {optimized && <OptimizedView result={optimized} base={base} catalog={catalog} state={state}/>}
+    {optimized && <OptimizedView result={optimized} base={base} catalog={catalog} state={state} weights={optimizedWeights ?? weights}/>}
     {result && <div className="recommend-result">
       {optimized && <h3 className="recommend-subhead">第一階段：單人分數推薦（最佳化的起點）</h3>}
       <p className="recommend-verdict"><strong>從 {result.pool} 名持有幹員中選出 {result.picked} 名。</strong>只比較已解鎖且數值可追溯的技能；套用後仍可逐格調整，保存前不會寫入。</p>
@@ -269,7 +287,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
       </div>
     </div>
     {draft.facilities.length > 0 && <BaseStats evaluation={evaluation} catalog={catalog}/>}
-    <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApply={assignments => update({ ...draft, assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
+    <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApply={(assignments, products) => update({ ...draft, facilities: draft.facilities.map(f => products?.[f.id] ? { ...f, product: products[f.id] } : f), assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
     {evaluation.issues.length > 0 && <div className="callout danger" role="status"><strong>配置有 {evaluation.issues.length} 個問題</strong><ul>{evaluation.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
     {!draft.facilities.length && <section className="empty-inline base-empty"><strong>先建立設施配置</strong><span>選一個常見布局作為起點，或逐一新增設施；之後可以再調整等級與數量。</span>
       <div className="inline-actions center">{TEMPLATES.map((template, index) => <button type="button" key={template.label} className="button secondary small" disabled={busy} onClick={() => applyTemplate(index)}>{template.label}</button>)}</div>

@@ -824,3 +824,9 @@ h2 { font-weight: 800; }
 .optimize-warning ul { margin: 6px 0 0; display: grid; gap: 4px; font-size: 13px; }
 .recommend-subhead { font-size: 14px; color: var(--muted); margin-top: 8px; }
 .recommend-result.optimized { border-bottom: 2px dashed var(--line); padding-bottom: 14px; }
+.weight-panel { display: grid; gap: 8px; margin: 0; padding: 12px 14px; border: 2px solid var(--line-strong); border-radius: 14px; }
+.weight-panel legend { padding: 0 6px; font-size: 13px; font-weight: 800; }
+.weight-row { display: grid; grid-template-columns: 72px minmax(0, 1fr) 60px; align-items: center; gap: 10px; font-size: 13.5px; }
+.weight-row input { width: 100%; accent-color: var(--accent); min-height: 28px; }
+.weight-row b { font-family: var(--font-mono); font-size: 13px; text-align: right; }
+.weight-panel .button { justify-self: start; }
