@@ -509,6 +509,8 @@ export interface FacilityResult {
   /** 生效但不適用目前產品的技能（例如生產作戰記錄時的赤金技能）。 */
   notApplicable: { operatorId: string; skill: BaseSkill }[];
   issues: string[];
+  /** 說明性的計算註記（例如加成歸零、心情消耗被消除），不是配置問題。 */
+  notes: string[];
 }
 export interface BaseEvaluation { facilities: FacilityResult[]; electricity: { produced: number; consumed: number }; issues: string[]; resources: { name: string; high: number; low: number; used: number; sources: string[] }[] }
 
@@ -544,7 +546,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     const roomType = ROOM_OF[facility.type], room = rooms.get(roomType);
     const label = `${FACILITY_LABEL[facility.type]} ${base.facilities.slice(0, index + 1).filter(item => item.type === facility.type).length}`;
     counts.set(roomType, (counts.get(roomType) ?? 0) + 1);
-    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [], clue: 0, contact: 0, training: 0, byproduct: 0, dormSingle: 0, orderLimit: 0 }, allByOp: {}, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], remote: [], issues: [] };
+    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [], clue: 0, contact: 0, training: 0, byproduct: 0, dormSingle: 0, orderLimit: 0 }, allByOp: {}, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], remote: [], issues: [], notes: [] };
     if (!room) { result.issues.push('資料包沒有此設施的資料。'); return result; }
     const phase = room.phases[facility.level - 1];
     if (!phase) { result.issues.push(`等級超過資料上限（最高 ${room.phases.length} 級）。`); }
@@ -646,7 +648,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     if (neutral.size) {
       for (const op of result.operators) if (neutral.has(op.operatorId)) for (const skill of op.skills) if (skill.applied) skill.applied = skill.applied.filter(effect => effect.kind !== 'moodCost');
       result.totals.moodCost = result.operators.flatMap(op => op.skills.flatMap(skill => (skill.applied ?? []).filter(effect => effect.kind === 'moodCost').map(effect => (effect as { value: number }).value)));
-      result.issues.push(`${[...neutral].map(id => definitions.get(id)?.displayName ?? id).join('、')}的技能心情消耗調整被消除。`);
+      result.notes.push(`${[...neutral].map(id => definitions.get(id)?.displayName ?? id).join('、')}的技能心情消耗調整被消除。`);
     }
     // 赤金生產線＝生產赤金的製造站數量＋技能提供的生產線（先算基礎線數，再算「每有 N 條額外提供」，最後算依線數的效率）。
     const goldLines = base.facilities.filter(item => item.type === 'manufacturing' && item.product === 'gold').length + extraLines;
@@ -657,7 +659,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
       if (effect.kind === 'perGoldLines' && effect.effect.kind === 'order') addOrder(operatorId, round(Math.floor((goldLines + bonusLines) / effect.per) * effect.effect.value));
       if (effect.kind === 'perOrderLimit') addOrder(operatorId, round(Math.min(effect.max ?? Infinity, Math.floor(raisedLimit / effect.per) * effect.value)));
     }
-    if (deferred.some(item => item.effect.kind === 'perGoldLines')) result.issues.push(`赤金生產線 ${goldLines + bonusLines} 條（生產赤金的製造站 ${goldLines - extraLines} 座${extraLines + bonusLines ? `＋技能提供 ${extraLines + bonusLines} 條` : ''}；估計）。`);
+    if (deferred.some(item => item.effect.kind === 'perGoldLines')) result.notes.push(`赤金生產線 ${goldLines + bonusLines} 條（生產赤金的製造站 ${goldLines - extraLines} 座${extraLines + bonusLines ? `＋技能提供 ${extraLines + bonusLines} 條` : ''}；估計）。`);
     // 「每 N% 額外提供 M%」：以其他技能提供的加成計算（配合意識不含依設施數量的加成），彼此不疊算。
     const before = [...contributions];
     for (const { operatorId, effect } of stacked) {
@@ -670,7 +672,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     for (const zero of zeroers) {
       const kept = contributions.filter(item => item.stat === zero.stat && (item.operatorId === zero.operatorId || item.countBased)).reduce((sum, item) => sum + item.value, 0);
       if (zero.stat === 'productivity') result.totals.productivity = kept; else result.totals.order = kept;
-      result.issues.push(`${definitions.get(zero.operatorId)?.displayName ?? zero.operatorId}使同站其他幹員的${zero.stat === 'productivity' ? '生產力' : '訂單效率'}加成歸零。`);
+      result.notes.push(`${definitions.get(zero.operatorId)?.displayName ?? zero.operatorId}使同站其他幹員的${zero.stat === 'productivity' ? '生產力' : '訂單效率'}加成歸零。`);
     }
     const basic = roomType === 'MANUFACTURE' ? catalog.basicSpeedPercent.MANUFACTURE : roomType === 'TRADING' ? catalog.basicSpeedPercent.TRADING : 0;
     result.totals.basic = round(basic * result.operators.length);

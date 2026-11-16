@@ -110,6 +110,7 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
     {result.remote.length > 0 && <p className="facility-remote">控制中樞加成：{result.remote.map(item => `${item.from}「${item.skill}」${item.text} ${item.value >= 0 ? '+' : ''}${item.value}%`).join('；')}</p>}
     {incomplete > 0 && <p className="facility-warning"><Icon name="alert" size={14}/>有 {incomplete} 個技能未計入或待核對，合計不完整。</p>}
     {result.issues.map(issue => <p key={issue} className="facility-issue">{issue}</p>)}
+    {result.notes.map(note => <p key={note} className="fine-print">{note}</p>)}
     <ul className="facility-slots">
       {result.operators.map(op => <li key={op.operatorId}>
         <div className="slot-head"><strong>{op.name}</strong><button type="button" className="button ghost small" disabled={busy} onClick={() => onUnassign(op.operatorId)} aria-label={`將${op.name}移出${result.label}`}>移出</button></div>

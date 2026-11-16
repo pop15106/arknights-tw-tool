@@ -37,7 +37,7 @@ function RoomTile({ result, definitions, onOpen }: { result: FacilityResult; def
       <span className="map-pips" aria-label={`${facility.level} 級`}>{Array.from({ length: pips }, (_, index) => <i key={index} className={index < facility.level ? 'on' : ''}/>)}</span>
       {facility.type === 'manufacturing' && facility.product && <span className="map-product">{facility.product === 'gold' ? '赤金' : '作戰記錄'}</span>}
     </span>
-    <span className={`map-room-status ${problems ? 'bad' : ''}`}>{problems ? result.issues[0] : value ?? (result.operators.length ? (facility.type === 'dormitory' ? `已進駐 ${result.operators.length} 人（自身恢復不加總）` : `${FACILITY_LABEL[facility.type]}技能不計分`) : '等待排班')}{!problems && incomplete > 0 && <em> · {incomplete} 個未計入</em>}</span>
+    <span className={`map-room-status ${problems ? 'bad' : ''}`}>{problems ? result.issues[0] : value ?? (result.operators.length ? (facility.type === 'dormitory' ? `已進駐 ${result.operators.length} 人（自身恢復不加總）` : facility.type === 'control' ? '中樞效果計入各設施' : `${FACILITY_LABEL[facility.type]}技能不計分`) : '等待排班')}{!problems && incomplete > 0 && <em> · {incomplete} 個未計入</em>}</span>
     <span className="map-slots">{Array.from({ length: slots }, (_, index) => {
       const op = result.operators[index];
       const definition = op && definitions.get(op.operatorId);
