@@ -94,7 +94,12 @@ export interface BatchRecord {
   revertedBatchId?: string;
 }
 export interface Settings {
-  base: { facilities: { id: string; type: 'control' | 'manufacturing' | 'trading' | 'power' | 'dormitory'; level: number; product?: 'gold' | 'record' | 'lmd'; atmosphere?: number }[]; onlineSlots: string[] };
+  base: {
+    facilities: { id: string; type: 'control' | 'manufacturing' | 'trading' | 'power' | 'dormitory'; level: number; product?: 'gold' | 'record' | 'lmd'; atmosphere?: number }[];
+    onlineSlots: string[];
+    /** 設施 ID → 進駐幹員 ID。只是配置草稿，不代表遊戲內現況。 */
+    assignments?: Record<string, string[]>;
+  };
   analysis: { mode: 'story' | 'integrated-strategies' | 'reclamation' | 'stationary-security' | 'defense'; goal: string; budget: number };
   lastBackupAt?: string;
 }
@@ -325,12 +330,18 @@ export function parseImportText(textValue: string): ImportDocument { return vali
 
 function validateSettings(value: unknown): void {
   const settings = object(value, ['base', 'analysis', 'lastBackupAt'], ['base', 'analysis']);
-  const base = object(settings.base, ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
+  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
   for (const item of base.facilities) {
     const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
     if (facility.product !== undefined) choice(facility.product, ['gold', 'record', 'lmd'], '產品'); if (facility.atmosphere !== undefined) integer(facility.atmosphere, 0, 10000, '氛圍');
   }
   unique((base.facilities as { id: string }[]).map(f => f.id), '設施');
+  if (base.assignments !== undefined) {
+    // 幹員是否仍在幹員庫由基建頁提示，不在此阻擋，避免撤銷匯入後整庫無法保存。
+    const facilityIds = (base.facilities as { id: string }[]).map(f => f.id);
+    const assignments = object(base.assignments, facilityIds, []);
+    for (const ids of Object.values(assignments)) { list(ids, 5, '設施進駐幹員'); ids.forEach(value => id(value, '進駐幹員 ID')); unique(ids as string[], '設施進駐幹員'); }
+  }
   for (const slot of base.onlineSlots) if (typeof slot !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/u.test(slot)) throw new Error('可上線時段必須為 HH:mm。');
   const analysis = object(settings.analysis, ['mode', 'goal', 'budget']); choice(analysis.mode, ['story', 'integrated-strategies', 'reclamation', 'stationary-security', 'defense'], '分析模式'); text(analysis.goal, '目標'); integer(analysis.budget, 0, 1_000_000_000, '預算');
   if (settings.lastBackupAt !== undefined) timestamp(settings.lastBackupAt);

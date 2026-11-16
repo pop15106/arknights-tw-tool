@@ -13,6 +13,7 @@ import { Notice } from './ui/Modal';
 import { friendlyError, taipeiDate } from './ui/format';
 import { useTheme } from './ui/theme';
 import { RosterPage } from './ui/RosterPage';
+import { BasePage } from './ui/BasePage';
 import { PlannedPage, SettingsPage, type PlannedName } from './ui/pages';
 import { DetailPanel, ImportPanel, PreviewPanel, RestorePanel, SwitchPanel, type Decisions } from './ui/panels';
 import './styles.css';
@@ -21,12 +22,12 @@ type Page = '幹員庫' | '批次修正' | PlannedName | '設定';
 type Panel = 'import' | 'preview' | 'detail' | 'restore' | 'switch' | null;
 const NAV: { label: Page; icon: IconName; hint: string }[] = [
   { label: '幹員庫', icon: 'roster', hint: '查詢與檢視' }, { label: '批次修正', icon: 'edit', hint: '逐列核對欄位' },
-  { label: '基建', icon: 'base', hint: '尚未實作' }, { label: '養成', icon: 'grow', hint: '尚未實作' }, { label: '搭配', icon: 'link', hint: '尚未實作' },
+  { label: '基建', icon: 'base', hint: '設施配置與技能' }, { label: '養成', icon: 'grow', hint: '尚未實作' }, { label: '搭配', icon: 'link', hint: '尚未實作' },
   { label: '設定', icon: 'settings', hint: '保存、備份與來源' },
 ];
 const SUBTITLE: Record<Page, string> = {
   幹員庫: '整理養成進度、核對資料缺口。', 批次修正: '左側勾選角色，右側直接改欄位；預覽確認後才保存。',
-  基建: '待建立可追溯規則。', 養成: '待建立可追溯規則。', 搭配: '待建立可追溯規則。', 設定: '來源與版本、本機保存及備份。',
+  基建: '設施配置、進駐名單與可追溯的技能加成。', 養成: '待建立可追溯規則。', 搭配: '待建立可追溯規則。', 設定: '來源與版本、本機保存及備份。',
 };
 
 export default function App() {
@@ -206,7 +207,8 @@ export default function App() {
         {page === '設定' && <SettingsPage state={state} isDemo={isDemo} busy={busy} persistence={persistence} onSwitch={() => openPanel('switch')} onPreviewDemo={previewDemo} onBackup={downloadBackup} onRestoreFile={readBackupFile}
           onRequestPersistence={() => void run(async () => { const granted = await requestPersistence(); setPersistence(await queryPersistence()); setNotice({ text: granted ? '瀏覽器已授予持久儲存；這不代表永不丟失，仍須備份。' : '瀏覽器尚未授予持久儲存。你仍可使用本機庫，請定期備份。', error: false }); })}
           onUndo={() => void run(async () => { await persist(undoLastImport(state), state.revision); setNotice({ text: '最後匯入批次已撤銷，復原結果已保存。撤銷紀錄已保留。', error: false }); })}/>}
-        {(page === '基建' || page === '養成' || page === '搭配') && <PlannedPage name={page} onRoster={() => goto('幹員庫')} onSettings={() => goto('設定')}/>}
+        {page === '基建' && <BasePage key={namespace} state={state} isDemo={isDemo} busy={busy} onSave={base => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, base } }, state.revision); setNotice({ text: '基建配置已保存至本機。', error: false }); })}/>}
+        {(page === '養成' || page === '搭配') && <PlannedPage name={page} onRoster={() => goto('幹員庫')} onSettings={() => goto('設定')}/>}
       </main>
     </div>
     {nav(true)}
