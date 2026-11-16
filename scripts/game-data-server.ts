@@ -124,5 +124,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     console.info(`公開遊戲資料服務：${service.origin}（僅本機）`);
     const stop = () => { void service.close().then(() => process.exit(0), () => process.exit(1)); };
     process.once('SIGINT', stop); process.once('SIGTERM', stop);
-  } catch { console.error('公開遊戲資料服務啟動失敗。請確認 5188 未被使用。'); process.exitCode = 1; }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // 只輸出錯誤代碼與對應說明，不輸出可能含路徑的完整堆疊。
+    const reason = code === 'EADDRINUSE' ? '5188 已被其他程式使用；若已有另一個 npm run game-data 視窗在執行，直接沿用即可。'
+      : code === 'EACCES' ? '系統不允許使用 5188（Windows 可能因 Hyper-V／WSL 保留了這段連接埠）。'
+      : '請確認 5188 未被使用。';
+    console.error(`公開遊戲資料服務啟動失敗（${code ?? '未知錯誤'}）：${reason}`); process.exitCode = 1;
+  }
 }
