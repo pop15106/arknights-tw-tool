@@ -25,6 +25,10 @@ export type SkillEffect =
   /** 控制中樞對其他設施中某陣營幹員的加成：每名符合者在其所在設施各給一次。 */
   | { kind: 'remote'; target: 'MANUFACTURE' | 'TRADING'; group: string; effects: SkillEffect[] }
   /** 改變貿易站訂單內容的技能（品質、特殊訂單、違約、投資），數值依 PRTS 同步的訂單參數計算。 */
+  /** 產生人間煙火：flat 為固定值（可限心情高／低時）；perGroupOutsideDorm 為宿舍外每名某陣營幹員；perDormOccupant 為宿舍每名幹員。 */
+  | { kind: 'resource'; resource: '人間煙火'; source: 'flat' | 'perGroupOutsideDorm' | 'perDormOccupant'; amount: number; when?: 'high' | 'low'; group?: string; max?: number }
+  /** 依人間煙火數量給加成：每 per 點給 amount（生產力或訂單效率，%）。 */
+  | { kind: 'resourceScale'; resource: '人間煙火'; per: number; target: 'productivity' | 'order'; amount: number }
   | { kind: 'orderMod'; mod: 'qualityAlpha' | 'qualityBeta' | 'pepe' | 'closure' | 'twoGold' | 'breach' | 'breachBonus' | 'invest'; amount?: number };
 /** 單純數值效果的值；倍增與跨設施效果需另依配置計算，這裡回傳 0。 */
 export const scalar = (effect: SkillEffect): number => 'value' in effect ? effect.value : 0;
@@ -120,7 +124,17 @@ const ORDER_SKILLS: { pattern: RegExp; effects: (m: RegExpMatchArray) => SkillEf
   { pattern: /^進駐貿易站後，如果下筆赤金訂單交付數大於3（違約訂單不視作赤金訂單），則其龍門幣收益\+(\d+)，心情每小時消耗([+-][\d.]+)$/u, effects: m => [{ kind: 'orderMod', mod: 'invest', amount: Number(m[1]) }, { kind: 'moodCost', value: Number(m[2]) }] },
 ];
 
+// 人間煙火相關的完整句型（台服原文）。
+const RESOURCE_SKILLS: { room: string; pattern: RegExp; effects: (m: RegExpMatchArray) => SkillEffect[]; ignored?: string }[] = [
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，當自身心情大於12時，人間煙火\+(\d+)；當自身心情處於12以下時，感知資訊\+\d+$/u, effects: m => [{ kind: 'resource', resource: '人間煙火', source: 'flat', amount: Number(m[1]), when: 'high' }], ignored: '心情 12 以下時的感知資訊' },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，控制中樞內所有幹員的心情每小時恢復\+[\d.]+；當自身心情處於12以下時，人間煙火\+(\d+)$/u, effects: m => [{ kind: 'resource', resource: '人間煙火', source: 'flat', amount: Number(m[1]), when: 'low' }], ignored: '控制中樞全體心情恢復' },
+  { room: 'CONTROL', pattern: /^進駐控制中樞時，自身心情每小時消耗\+([\d.]+)；每個歲幹員進駐在宿舍和活動室以外的設施則人間煙火\+(\d+)（最多(\d+)名）$/u, effects: m => [{ kind: 'moodCost', value: Number(m[1]) }, { kind: 'resource', resource: '人間煙火', source: 'perGroupOutsideDorm', group: '歲', amount: Number(m[2]), max: Number(m[3]) }] },
+  { room: 'TRADING', pattern: /^進駐貿易站時，宿舍內每有1名幹員則人間煙火\+(\d+)，同時每有1點人間煙火，則訂單獲取效率\+(\d+)%$/u, effects: m => [{ kind: 'resource', resource: '人間煙火', source: 'perDormOccupant', amount: Number(m[1]) }, { kind: 'resourceScale', resource: '人間煙火', per: 1, target: 'order', amount: Number(m[2]) }] },
+  { room: 'MANUFACTURE', pattern: /^進駐製造站時，每(\d+)點人間煙火\+(\d+)%生產力$/u, effects: m => [{ kind: 'resourceScale', resource: '人間煙火', per: Number(m[1]), target: 'productivity', amount: Number(m[2]) }] },
+];
+
 export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): ParsedSkill {
+  for (const rule of RESOURCE_SKILLS) { if (rule.room !== skill.roomType) continue; const match = skill.description.match(rule.pattern); if (match) return { supported: true, effects: rule.effects(match), ...(rule.ignored ? { ignoredCondition: rule.ignored } : {}) }; }
   if (skill.roomType === 'TRADING') for (const rule of ORDER_SKILLS) { const match = skill.description.match(rule.pattern); if (match) return { supported: true, effects: rule.effects(match) }; }
   const prefix = ROOM_PREFIX[skill.roomType];
   const unsupported = { supported: false, effects: [] };
@@ -212,7 +226,7 @@ export interface FacilityResult {
   notApplicable: { operatorId: string; skill: BaseSkill }[];
   issues: string[];
 }
-export interface BaseEvaluation { facilities: FacilityResult[]; electricity: { produced: number; consumed: number }; issues: string[] }
+export interface BaseEvaluation { facilities: FacilityResult[]; electricity: { produced: number; consumed: number }; issues: string[]; resources: { name: '人間煙火'; high: number; low: number; used: number; sources: string[] }[] }
 
 function roomSkillApplies(skill: BaseSkill, roomType: BaseRoomType): boolean { return skill.roomType === roomType; }
 export function productMatches(effect: SkillEffect, facility: Pick<Facility, 'product'>): boolean {
@@ -300,6 +314,27 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     result.totals.drone = round(result.totals.drone);
     return result;
   });
+  // 人間煙火：先加總全基建產量（分心情高／低兩種情況），再套用到依數量加成的技能，取兩者較低值（保守）。
+  const dormOccupants = facilities.filter(result => result.facility.type === 'dormitory').reduce((sum, result) => sum + result.operators.length, 0);
+  const outsideDorm = facilities.filter(result => result.facility.type !== 'dormitory').flatMap(result => result.operators.map(op => op.operatorId));
+  const smoke = { high: 0, low: 0, sources: [] as string[] };
+  for (const result of facilities) for (const op of result.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
+    if (effect.kind !== 'resource') continue;
+    const amount = effect.source === 'flat' ? effect.amount
+      : effect.source === 'perDormOccupant' ? effect.amount * dormOccupants
+      : effect.amount * Math.min(effect.max ?? Infinity, new Set(outsideDorm.filter(id => groupsOf(id).includes(effect.group ?? '')).map(characterOf)).size);
+    if (effect.when !== 'low') smoke.high += amount;
+    if (effect.when !== 'high') smoke.low += amount;
+    smoke.sources.push(`${op.name}「${skill.active!.name}」${effect.when === 'high' ? '（心情 > 12）' : effect.when === 'low' ? '（心情 ≤ 12）' : ''} +${amount}`);
+  }
+  const smokeUsed = Math.min(smoke.high, smoke.low);
+  for (const result of facilities) for (const op of result.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
+    if (effect.kind !== 'resourceScale' || !smokeUsed) continue;
+    const value = round(Math.floor(smokeUsed / effect.per) * effect.amount);
+    if (effect.target === 'productivity') result.totals.productivity = round(result.totals.productivity + value);
+    else result.totals.order = round(result.totals.order + value);
+    result.remote.push({ from: op.name, skill: skill.active!.name, text: `人間煙火 ${smokeUsed} 點`, value, kind: effect.target });
+  }
   // 第二輪：控制中樞對其他設施中特定陣營幹員的加成，記在被加成的設施上。
   for (const control of facilities.filter(result => result.facility.type === 'control')) {
     for (const op of control.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
@@ -323,7 +358,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     if (room && room.maxCount && count > room.maxCount) issues.push(`${room.name}最多 ${room.maxCount} 座，目前設定 ${count} 座。`);
   }
   if (consumed > produced) issues.push(`電力不足：需要 ${consumed}，發電 ${produced}。`);
-  return { facilities, electricity: { produced, consumed }, issues };
+  return { facilities, electricity: { produced, consumed }, issues, resources: smoke.sources.length ? [{ name: '人間煙火', high: smoke.high, low: smoke.low, used: smokeUsed, sources: smoke.sources }] : [] };
 }
 const round = (value: number) => Math.round(value * 100) / 100;
 

@@ -24,6 +24,11 @@ export function BaseStats({ evaluation, catalog }: { evaluation: BaseEvaluation;
       <span>製造 {fmt(stats.goldPerDay)} 條／日 − 貿易站消耗 {fmt(stats.goldConsumedPerDay)} 條／日 ＝ <b>{stats.goldPerDay >= stats.goldConsumedPerDay ? '+' : ''}{fmt(stats.goldPerDay - stats.goldConsumedPerDay)} 條／日</b></span>
       <small>{stats.goldPerDay >= stats.goldConsumedPerDay ? '赤金足夠，貿易站不會因缺赤金而停單。' : '赤金不夠用：貿易站會因缺赤金而無法交付訂單，可考慮增加赤金製造站或提高其生產力。'}</small>
     </div>}
+    {evaluation.resources.map(resource => <div key={resource.name} className="gold-balance ok">
+      <strong>{resource.name}</strong>
+      <span>班次前段（心情 &gt; 12）<b>{resource.high}</b> 點 · 後段（心情 ≤ 12）<b>{resource.low}</b> 點 · 加成以 <b>{resource.used}</b> 點計算（取較低值）</span>
+      <small>來源：{resource.sources.join('、')}</small>
+    </div>)}
     {stats.storageWarnings.map(text => <p key={text} className="callout warning">{text}</p>)}
     <div className="stats-tables">
       <div>

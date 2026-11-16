@@ -279,3 +279,25 @@ test('訂單技能：台服原文可解析，並進入龍門幣與赤金消耗�
   assert.equal(stats.lmdPerDay, Math.round(86400 * 1.01 / seconds * 1900));
   assert.equal(stats.shifts[0].rate, 0.75);
 });
+
+test('人間煙火：依產生來源加總（分心情高低），再套用到依數量加成的技能（取較低值）', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.meta = { 'demo-3': { groups: ['歲'] }, 'demo-6': { groups: ['歲'] } };
+  catalog.skills['s-ling'] = { id: 's-ling', name: '山河遠闊', roomType: 'CONTROL', description: '進駐控制中樞時，當自身心情大於12時，人間煙火+15；當自身心情處於12以下時，感知資訊+10' };
+  catalog.skills['s-chong'] = { id: 's-chong', name: '知我為我', roomType: 'CONTROL', description: '進駐控制中樞時，自身心情每小時消耗+0.5；每個歲幹員進駐在宿舍和活動室以外的設施則人間煙火+5（最多5名）' };
+  catalog.skills['s-shu'] = { id: 's-shu', name: '稻禾厚', roomType: 'MANUFACTURE', description: '進駐製造站時，每3點人間煙火+1%生產力' };
+  catalog.skills['s-wu'] = { id: 's-wu', name: '願者上鉤', roomType: 'TRADING', description: '進駐貿易站時，宿舍內每有1名幹員則人間煙火+1，同時每有1點人間煙火，則訂單獲取效率+1%' };
+  catalog.operators['demo-1'] = [[{ buffId: 's-ling', elite: 0, level: 1 }]];
+  catalog.operators['demo-2'] = [[{ buffId: 's-chong', elite: 0, level: 1 }]];
+  catalog.operators['demo-3'] = [[{ buffId: 's-shu', elite: 0, level: 1 }]];
+  catalog.operators['demo-4'] = [[{ buffId: 's-wu', elite: 0, level: 1 }]];
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 'm', type: 'manufacturing', level: 3, product: 'gold' }, { id: 't', type: 'trading', level: 3 }, { id: 'd', type: 'dormitory', level: 5 }];
+  const ev = evaluateBase({ facilities, onlineSlots: [], assignments: { c: ['demo-1', 'demo-2', 'demo-6'], m: ['demo-3'], t: ['demo-4'], d: ['demo-5', 'demo-7'] } }, catalog, state.roster, definitions);
+  // 心情高：令 15＋重岳（歲 2 名在宿舍外）10＋烏有（宿舍 2 人）2 = 27；心情低：無令 = 12
+  assert.deepEqual([ev.resources[0].high, ev.resources[0].low, ev.resources[0].used], [27, 12, 12]);
+  const manu = ev.facilities[1], trade = ev.facilities[2];
+  assert.equal(manu.totals.productivity, 4, '黍：floor(12/3)×1%');
+  assert.equal(trade.totals.order, 12, '烏有：12 點 ×1%');
+  assert.equal(parseSkill(catalog.skills['s-ling']).ignoredCondition, '心情 12 以下時的感知資訊');
+});
