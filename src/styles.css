@@ -629,3 +629,4 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
   .base-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .facility-grid { grid-template-columns: 1fr; }
 }
+.operator-art .portrait-retry { display: none; }
