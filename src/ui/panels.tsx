@@ -35,7 +35,7 @@ export function ImportPanel({ isDemo, busy, notice, onClose, onFile, onText, onP
   return <Modal title="匯入幹員資料" eyebrow="資料先預覽，確認後才保存" onClose={onClose} footer={<button type="button" className="button ghost" disabled={busy} onClick={onClose}>取消</button>}>
     <Notice notice={notice}/>
     <div className="import-methods">
-      <div className="method"><Icon name="file"/><div><strong>JSON 資料</strong><span className="tag">可用</span><p>本工具候選或 SKPORT 研究格式；來源保留未驗證標記。</p></div></div>
+      <div className="method"><Icon name="file"/><div><strong>JSON 資料</strong><span className="tag">可用</span><p>本工具候選、SKPORT 研究格式或 MAA 幹員辨識結果；來源保留未驗證標記。</p></div></div>
       <div className="method"><Icon name="image"/><div><strong>多張截圖</strong><span className="tag amber">研究中</span><p>載入 Windows 本機 OCR 結果並核對原圖。</p></div></div>
       <div className="method disabled"><Icon name="film"/><div><strong>影片辨識</strong><span className="tag muted">停用</span><p>尚無解碼與抽幀成功證據。</p></div></div>
     </div>

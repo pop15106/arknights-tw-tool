@@ -1,8 +1,15 @@
 import { MAX_IMPORT_BYTES, parseJson, validateDataset, validateImportDocument, verifyDatasetChecksum, type Dataset, type ImportDocument } from '../domain/model.ts';
 import { convertSkportOffline } from './skport.ts';
+import { convertMaaOperBox, isMaaOperBox } from './maa.ts';
 
 export async function prepareLocalImportText(text: string, options: { dataset: Dataset; confirmedTw: boolean; importedAt: string; fetcher?: typeof fetch }): Promise<ImportDocument> {
   const value = parseJson(text, MAX_IMPORT_BYTES);
+  if (isMaaOperBox(value)) {
+    if (options.dataset.metadata.namespace !== 'personal') throw new Error('這是 MAA 幹員辨識的個人資料；請先切換至個人工作區，再重新選取檔案。');
+    if (!options.confirmedTw) throw new Error('請先勾選確認這份資料來自《明日方舟》本作繁中服。');
+    const dataset = await loadReferenceDataset(options.fetcher);
+    return (await convertMaaOperBox(value, { dataset, importedAt: options.importedAt })).document;
+  }
   if (!value || typeof value !== 'object' || !('format' in value) || value.format !== 'skport-offline-research') return validateImportDocument(value);
   if (options.dataset.metadata.namespace !== 'personal') throw new Error('這是 SKPORT 個人資料；請先切換至個人工作區，再重新選取檔案。');
   if (!options.confirmedTw) throw new Error('請先勾選確認這份資料來自《明日方舟》本作繁中服。');
