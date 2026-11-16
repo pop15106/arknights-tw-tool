@@ -14,6 +14,7 @@ interface ServerOptions {
   load?: () => Promise<GameDataSnapshot | null>;
   sync?: () => Promise<GameDataSnapshot>;
   loadTrading?: () => Promise<TradingParams | null>;
+  stageEnemies?: (stageId: string) => Promise<{ stageId: string; levelId: string; enemies: { id: string; level: number; count: number }[] } | null>;
   loadDrops?: () => Promise<import('../src/catalog/drops.ts').DropRates | null>;
 }
 class ApiError extends Error {
@@ -62,9 +63,10 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const load = options.load ?? (async () => (await import('./game-data-sync.ts')).loadGameData());
   const sync = options.sync ?? (async () => (await import('./game-data-sync.ts')).syncGameData());
   const loadTrading = options.loadTrading ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadTradingData());
+  const stageEnemies = options.stageEnemies ?? (options.load ? async () => null : async (stageId: string) => (await import('./game-data-sync.ts')).stageEnemiesData(stageId));
   const loadDrops = options.loadDrops ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadDropsData());
   let origin = '', host = '';
-  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'sync'].map(name => `/api/game-data/${name}`));
+  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     try {
       if (req.headers.host !== host && !isLoopbackHost(req.headers.host)) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
@@ -76,7 +78,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       const isSync = url.pathname === '/api/game-data/sync';
       if (req.method !== (isSync ? 'POST' : 'GET')) throw new ApiError(405, 'METHOD', '不支援此請求方法。');
       const isList = url.pathname === '/api/game-data/stages' || url.pathname === '/api/game-data/events';
-      const allowedQuery = isList ? ['limit', 'offset', 'q'] : [];
+      const allowedQuery = isList ? ['limit', 'offset', 'q'] : url.pathname === '/api/game-data/stage-enemies' ? ['id'] : [];
       for (const key of url.searchParams.keys()) {
         if (!allowedQuery.includes(key) || url.searchParams.getAll(key).length !== 1) throw new ApiError(400, 'QUERY', '查詢參數無效。');
       }
@@ -99,6 +101,18 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (!snapshot) throw new ApiError(503, 'DATA_UNAVAILABLE', '尚未同步公開遊戲資料。');
       if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
+      if (url.pathname === '/api/game-data/enemies') {
+        if (!snapshot.enemies) throw new ApiError(503, 'ENEMIES_UNAVAILABLE', '目前的遊戲資料沒有敵人資料，請到設定按「更新遊戲資料」。');
+        json(res, 200, snapshot.enemies); return;
+      }
+      if (url.pathname === '/api/game-data/stage-enemies') {
+        const id = url.searchParams.get('id') ?? '';
+        if (!/^[A-Za-z0-9_#-]{1,64}$/u.test(id)) throw new ApiError(400, 'QUERY', '關卡 ID 無效。');
+        let detail: Awaited<ReturnType<typeof stageEnemies>>;
+        try { detail = await stageEnemies(id); } catch { throw new ApiError(502, 'LEVEL_FAILED', '關卡檔下載失敗，請稍後再試。'); }
+        if (!detail) throw new ApiError(404, 'LEVEL_NOT_FOUND', '找不到此關卡的敵人資料。');
+        json(res, 200, detail); return;
+      }
       if (url.pathname === '/api/game-data/drops') {
         const drops = await loadDrops().catch(() => null);
         if (!drops) throw new ApiError(503, 'DROPS_UNAVAILABLE', '尚未同步企鵝物流掉落統計；在設定按「更新遊戲資料」時會一併取得。');

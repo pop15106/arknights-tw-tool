@@ -4,6 +4,10 @@ import { analyzeSynergies, DEBUFF_PARTNER, type SynergyLink } from '../domain/sy
 import { useBaseCatalog } from './BasePage';
 import { useGrowthCatalog } from './GrowthPage';
 import { buildSquad, operatorInfo, TEMPLATES } from '../domain/squad';
+import { useEffect } from 'preact/hooks';
+import type { EnemyCatalog } from '../catalog/enemies';
+import { analyzeStage, parseDangerLevel, stageEnemyList, THRESHOLDS, type StageEnemy } from '../domain/stagePlan';
+import { useStageData } from './gameData';
 
 const TRIGGER_LABEL: Record<SynergyLink['trigger'], string> = { squad: '編入隊伍', deployed: '在場時', skill: '技能期間', always: '說明未寫條件' };
 const KIND_ORDER: SynergyLink['target']['kind'][] = ['operator', 'group', 'profession', 'branch', 'rarity', 'position'];
@@ -15,7 +19,7 @@ export function TeamPage({ state, isDemo }: { state: AppState; isDemo: boolean }
   return <div className="team-page">
     {tab === 'synergy' && <SynergyTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'squad' && <SquadTab state={state} isDemo={isDemo} tabs={tabs}/>}
-    {tab === 'stage' && <section className="panel"><header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>依關卡推薦</h2></div>{tabs}</header><p className="fine-print">施工中。</p></section>}
+    {tab === 'stage' && <StageTab state={state} isDemo={isDemo} tabs={tabs}/>}
   </div>;
 }
 
@@ -119,5 +123,73 @@ function SquadTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
       {active.length ? <ul className="gap-list">{active.map(link => <li key={`${link.providerId}-${link.target.value}`}><strong>{byId.get(link.providerId)?.displayName}</strong> → {link.target.label}（{link.beneficiaries.map(id => byId.get(id)?.displayName).join('、')}）：{link.source.description}</li>)}</ul>
         : <p className="fine-print">這支隊伍裡沒有天賦或技能明寫的陣營／職業加成。</p>}
     </section>
+  </>;
+}
+
+const STAGE_TYPES = new Set(['MAIN', 'SUB', 'DAILY', 'ACTIVITY', 'CAMPAIGN']);
+const RANK: Record<StageEnemy['rank'], string> = { NORMAL: '一般', ELITE: '精英', BOSS: '領袖' };
+function StageTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; tabs: preact.JSX.Element }) {
+  const { data } = useStageData(isDemo);
+  const { catalog: growth } = useGrowthCatalog(isDemo);
+  const { catalog: base } = useBaseCatalog(isDemo, 0);
+  const [enemyCatalog, setEnemyCatalog] = useState<EnemyCatalog | null>(null);
+  const [query, setQuery] = useState('');
+  const [stageId, setStageId] = useState('');
+  const [detail, setDetail] = useState<{ stageId: string; enemies: { id: string; level: number; count: number }[] } | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (isDemo) return;
+    const controller = new AbortController();
+    void fetch('/api/game-data/enemies', { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }).then(async response => { const body = await response.json().catch(() => null); if (!response.ok || !body || body.error) throw new Error(body?.error?.message ?? '無法讀取敵人資料。'); setEnemyCatalog(body); }).catch(err => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '無法讀取敵人資料。'); });
+    return () => controller.abort();
+  }, [isDemo]);
+  useEffect(() => {
+    if (!stageId) return;
+    const controller = new AbortController();
+    setDetail(null); setError('');
+    void fetch(`/api/game-data/stage-enemies?id=${encodeURIComponent(stageId)}`, { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }).then(async response => { const body = await response.json().catch(() => null); if (!response.ok || !Array.isArray(body?.enemies)) throw new Error(body?.error?.message ?? '無法讀取關卡敵人。'); setDetail(body); }).catch(err => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : '無法讀取關卡敵人。'); });
+    return () => controller.abort();
+  }, [stageId]);
+  const byId = useMemo(() => new Map(state.dataset.operators.map(def => [def.id, def])), [state.dataset]);
+  const rows = useMemo(() => new Map(state.roster.map(row => [row.operatorId, row])), [state.roster]);
+  const infos = useMemo(() => growth ? state.roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false) && byId.get(row.operatorId) && growth.operators[row.operatorId]).map(row => operatorInfo(byId.get(row.operatorId)!, rows.get(row.operatorId), growth)) : [], [growth, state.roster, byId, rows]);
+  const owned = useMemo(() => new Set(infos.map(info => info.id)), [infos]);
+  const debuffs = useMemo(() => analyzeSynergies(state.dataset.operators, id => base?.meta?.[id]?.groups ?? [], owned).debuffs, [state.dataset, base, owned]);
+  const head = <header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>依關卡推薦</h2></div>{tabs}</header>;
+  if (!data || !enemyCatalog || !growth) return <section className="panel">{head}{error ? <p className="callout warning">{error}</p> : <p className="fine-print">讀取遊戲資料中…</p>}</section>;
+  const q = query.trim().toUpperCase();
+  const matches = q ? data.stages.filter(stage => STAGE_TYPES.has(stage.type) && (stage as { levelId?: string }).levelId && !/^(easy|tough)_|#f#$/u.test(stage.id) && (stage.code.toUpperCase().includes(q) || stage.name.includes(query.trim()) || stage.id.toUpperCase() === q)).slice(0, 12) : [];
+  const stage = data.stages.find(item => item.id === stageId);
+  const enemies = detail && detail.stageId === stageId ? stageEnemyList(detail.enemies, enemyCatalog) : [];
+  const threats = enemies.length ? analyzeStage(enemies, infos, debuffs) : [];
+  const danger = parseDangerLevel(stage?.dangerLevel);
+  const info = new Map(infos.map(item => [item.id, item]));
+  const below = (id: string) => { if (!danger) return false; const row = rows.get(id); const e = row?.fields.elite, l = row?.fields.level; const elite = e?.status === 'known' ? Number(e.value) : undefined, level = l?.status === 'known' ? Number(l.value) : undefined; return elite !== undefined && level !== undefined && (elite < danger.elite || (elite === danger.elite && level < danger.level)); };
+  return <>
+    <section className="panel">
+      {head}
+      <p className="fine-print">讀取關卡的敵人名單與數值（繁中服關卡檔與敵人資料庫，固定版本），找出需要對應的威脅，再從你持有的幹員中依招募標籤與養成度挑選。高防禦（≥{THRESHOLDS.highDef}）、高法抗（≥{THRESHOLDS.highRes}）、敵人數量多（≥{THRESHOLDS.crowd}）是本工具的判斷門檻，下方會列出實際數值。</p>
+      <input className="text-input" placeholder="輸入關卡代號或名稱，例如 1-7、S3-3…" value={query} onInput={event => setQuery(event.currentTarget.value)}/>
+      {matches.length > 0 && <div className="growth-matches">{matches.map(item => <button key={item.id} type="button" className={`button ${item.id === stageId ? 'primary' : 'secondary'} small`} onClick={() => { setStageId(item.id); setQuery(''); }}>{item.code} {item.name}</button>)}</div>}
+    </section>
+    {stage && <section className="panel" aria-label="關卡敵人">
+      <h3>{stage.code} {stage.name}{stage.dangerLevel && stage.dangerLevel !== '-' ? `（建議 ${stage.dangerLevel}）` : ''}</h3>
+      {error && <p className="callout warning">{error}</p>}
+      {!detail && !error && <p className="fine-print">下載關卡檔中…</p>}
+      {enemies.length > 0 && <div className="table-scroll"><table className="stats-table enemy-table"><thead><tr><th>敵人</th><th>等級</th><th>數量</th><th>生命</th><th>攻擊</th><th>防禦</th><th>法抗</th><th>移動</th><th>傷害</th></tr></thead><tbody>
+        {enemies.map(enemy => <tr key={enemy.id}><td>{enemy.name}</td><td>{RANK[enemy.rank]}</td><td>{enemy.count}</td><td>{enemy.stats.hp.toLocaleString('zh-TW')}</td><td>{enemy.stats.atk}</td><td className={enemy.stats.def >= THRESHOLDS.highDef ? 'hot' : ''}>{enemy.stats.def}</td><td className={enemy.stats.res >= THRESHOLDS.highRes ? 'hot' : ''}>{enemy.stats.res}</td><td>{enemy.stats.motion === 'FLY' ? '飛行' : '地面'}</td><td>{enemy.damage.map(type => ({ PHYSIC: '物理', MAGIC: '法術', HEAL: '治療', NO_DAMAGE: '無' } as Record<string, string>)[type] ?? type).join('、')}</td></tr>)}
+      </tbody></table></div>}
+    </section>}
+    {threats.length > 0 && <section className="panel" aria-label="需要對應的威脅">
+      <h3>需要對應的威脅（{threats.length}）</h3>
+      <div className="synergy-grid">{threats.map(threat => <article key={threat.key} className="synergy-card">
+        <header><strong>{threat.title}</strong></header>
+        <p className="fine-print">{threat.evidence}</p>
+        <p className="synergy-text">{threat.advice}</p>
+        {threat.candidates.length ? <ul className="threat-list">{threat.candidates.map(item => <li key={item.id}><strong>{info.get(item.id)?.definition.displayName ?? byId.get(item.id)?.displayName}</strong>{below(item.id) && <span className="tag amber">低於建議等級</span>}<small>{item.reason}</small></li>)}</ul>
+          : <p className="fine-print">{threat.key === 'stealth' ? '需要看幹員說明判斷，這裡不自動推薦。' : '你持有的幹員中沒有符合的人選。'}</p>}
+      </article>)}</div>
+    </section>}
+    {enemies.length > 0 && !threats.length && <section className="panel"><p className="fine-print">這關沒有超過門檻的威脅，一般配置即可。</p></section>}
   </>;
 }

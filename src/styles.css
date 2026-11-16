@@ -917,3 +917,9 @@ h2 { font-weight: 800; }
 .squad-card header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .squad-card p { margin: 0; }
 .squad-reason { font-size: 12px; color: var(--muted); }
+.table-scroll { overflow-x: auto; }
+.enemy-table { min-width: 640px; }
+.enemy-table td.hot { color: var(--danger); font-weight: 800; }
+.threat-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.threat-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.threat-list small { width: 100%; color: var(--muted); font-size: 12px; }

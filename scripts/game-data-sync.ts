@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DATA_COMMIT, type GameDataSnapshot, type GameDataTables } from '../src/catalog/build.ts';
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
 import { parseTradingWikitext, PRTS_TRADING_API, validateTradingParams, type TradingParams } from '../src/catalog/trading.ts';
+import { parseLevelEnemies } from '../src/catalog/enemies.ts';
 import { parsePenguinMatrix, PENGUIN_MATRIX_API, validateDropRates, type DropRates } from '../src/catalog/drops.ts';
 export type { GameDataSnapshot } from '../src/catalog/build.ts';
 
@@ -112,6 +113,22 @@ export function createGameDataStore(options: {
     await writeFile(temporary, JSON.stringify(drops), { flag: 'wx' }); await rename(temporary, dropsFile);
     return drops;
   }
+  // 關卡敵人：依需要下載單一關卡檔（固定版本），只保存敵人與數量的摘要。
+  const levelDir = path.join(cache, 'levels');
+  async function stageEnemies(stageId: string): Promise<{ stageId: string; levelId: string; enemies: { id: string; level: number; count: number }[] } | null> {
+    if (!/^[A-Za-z0-9_#-]{1,64}$/u.test(stageId)) return null;
+    const snapshot = await load();
+    const stage = snapshot?.stages.find(item => item.id === stageId) as { levelId?: string } | undefined;
+    const levelId = stage?.levelId;
+    if (!levelId || !/^[A-Za-z0-9_/-]{1,120}$/u.test(levelId) || levelId.includes('..')) return null;
+    const file = path.join(levelDir, `${levelId.toLowerCase().replaceAll('/', '__')}.json`);
+    try { const cached = JSON.parse(await readFile(file, 'utf8')); if (Array.isArray(cached?.enemies)) return { stageId, levelId, enemies: cached.enemies }; } catch { /* 沒有快取 */ }
+    const enemies = parseLevelEnemies(JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/levels/${levelId.toLowerCase()}.json`, 8 * 1024 * 1024)).toString('utf8')));
+    await mkdir(levelDir, { recursive: true });
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify({ enemies }), { flag: 'wx' }); await rename(temporary, file);
+    return { stageId, levelId, enemies };
+  }
   async function images(snapshot: GameDataSnapshot): Promise<void> {
     await mkdir(assets, { recursive: true });
     const queue = [...snapshot.dataset.operators];
@@ -155,6 +172,9 @@ export function createGameDataStore(options: {
       const tables = {} as GameDataTables;
       for (const [key, filename] of Object.entries(TABLES)) tables[key as keyof GameDataTables] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${DATA_REPO}/${commit.sha}/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json', teams: 'handbook_team_table.json' })) tables[key as 'battleEquip' | 'favor' | 'teams'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
+      // 敵人圖鑑與資料庫（依關卡推薦用）：同一固定版本；資料庫較大，只在建置時投影成精簡摘要。
+      tables.enemyHandbook = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/enemy_handbook_table.json`, 24 * 1024 * 1024)).toString('utf8'));
+      tables.enemyDatabase = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/levels/enemydata/enemy_database.json`, 32 * 1024 * 1024)).toString('utf8'));
       const published = await publish(tables, { commit: commit.sha, sourceUpdatedAt: commit.commit.committer.date, syncedAt: new Date().toISOString() });
       await refreshTrading().catch(() => undefined); await refreshDrops().catch(() => undefined);
       return published;
@@ -164,7 +184,7 @@ export function createGameDataStore(options: {
     if (!active) active = update().finally(() => { active = undefined; });
     return active;
   }
-  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops };
+  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies };
 }
 
 const defaultStore = createGameDataStore();
@@ -173,3 +193,4 @@ export const syncGameData = defaultStore.sync;
 export const seedGameData = defaultStore.seed;
 export const loadTradingData = defaultStore.loadTrading;
 export const loadDropsData = defaultStore.loadDrops;
+export const stageEnemiesData = defaultStore.stageEnemies;
