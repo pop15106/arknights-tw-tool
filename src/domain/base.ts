@@ -219,3 +219,66 @@ export function candidatesFor(facility: Facility, catalog: BaseCatalog, roster: 
   const rank = { ready: 0, unknown: 1, locked: 2, none: 3 } as const;
   return list.sort((a, b) => rank[a.state] - rank[b.state] || b.score - a.score || a.name.localeCompare(b.name, 'zh-Hant'));
 }
+
+/* ------------------------------------------------------------------ */
+/* 推薦配置：只用「已解鎖且可解析」的技能，全域貪婪分配。                  */
+/* 不模擬心情與輪班；控制中樞等無法計算的設施不推薦人選。                  */
+/* ------------------------------------------------------------------ */
+export interface RecommendationPick { facilityId: string; operatorId: string; name: string; score: number; summary: string }
+export interface FacilityRecommendation {
+  facilityId: string; label: string; picks: RecommendationPick[];
+  /** 未被選上、但同樣有可計算技能的前幾名。 */
+  alternatives: RecommendationPick[];
+  /** 解鎖狀態未知、若已解鎖可能值得考慮的人選。 */
+  maybe: { operatorId: string; name: string; summary: string }[];
+  note?: string;
+}
+export interface BaseRecommendation { assignments: Record<string, string[]>; facilities: FacilityRecommendation[]; pool: number; picked: number }
+
+const RECOMMENDABLE: ReadonlySet<BaseRoomType> = new Set(['MANUFACTURE', 'TRADING', 'POWER', 'DORMITORY']);
+
+export function recommendBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>): BaseRecommendation {
+  const rooms = new Map(catalog.rooms.map(room => [room.id, room]));
+  const capacity = (facility: Facility) => rooms.get(ROOM_OF[facility.type])?.phases[facility.level - 1]?.maxStationedNum ?? 0;
+  const owned = roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false));
+  // 每座可推薦設施的完整候選（含分數），之後全域依分數由高到低分配，避免先處理的設施搶走更適合別處的人。
+  const options: (RecommendationPick & { order: number })[] = [];
+  const candidateLists = new Map<string, Candidate[]>();
+  base.facilities.forEach((facility, order) => {
+    if (!RECOMMENDABLE.has(ROOM_OF[facility.type])) return;
+    const list = candidatesFor(facility, catalog, owned, definitions, new Set());
+    candidateLists.set(facility.id, list);
+    for (const item of list) if (item.state === 'ready' && item.score > 0) options.push({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, summary: item.summary, order });
+  });
+  options.sort((a, b) => b.score - a.score || a.order - b.order || a.name.localeCompare(b.name, 'zh-Hant'));
+  const assignments: Record<string, string[]> = Object.fromEntries(base.facilities.map(facility => [facility.id, []]));
+  const used = new Set<string>();
+  const picks = new Map<string, RecommendationPick[]>();
+  // 「全宿舍恢復」為同種效果取最高，同一間宿舍放第二位不會增加效果，因此每間只放一位。
+  const allDorm = (operatorId: string) => {
+    const row = owned.find(item => item.operatorId === operatorId);
+    return !!row && (catalog.operators[operatorId] ?? []).some(slot => { const active = slotResult(slot, row, catalog).active; return !!active && active.roomType === 'DORMITORY' && parseSkill(active).effects.some(effect => effect.kind === 'moodRecoverAll'); });
+  };
+  const dormWithAll = new Set<string>();
+  for (const option of options) {
+    const facility = base.facilities.find(item => item.id === option.facilityId)!;
+    if (used.has(option.operatorId) || assignments[facility.id].length >= capacity(facility)) continue;
+    if (facility.type === 'dormitory' && allDorm(option.operatorId)) { if (dormWithAll.has(facility.id)) continue; dormWithAll.add(facility.id); }
+    assignments[facility.id].push(option.operatorId); used.add(option.operatorId);
+    picks.set(facility.id, [...(picks.get(facility.id) ?? []), option]);
+  }
+  const labels = evaluateBase(base, catalog, [], definitions).facilities;
+  const facilities = base.facilities.map((facility, index): FacilityRecommendation => {
+    const label = labels[index].label;
+    if (!RECOMMENDABLE.has(ROOM_OF[facility.type])) return { facilityId: facility.id, label, picks: [], alternatives: [], maybe: [], note: `${FACILITY_LABEL[facility.type]}的技能多為跨設施或條件效果，無法用可追溯數值比較，因此不推薦人選。` };
+    const list = candidateLists.get(facility.id) ?? [];
+    const alternatives = list.filter(item => item.state === 'ready' && item.score > 0 && !assignments[facility.id].includes(item.operatorId)).slice(0, 3)
+      .map(item => ({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, summary: used.has(item.operatorId) ? `${item.summary}（已排在其他設施）` : item.summary }));
+    const maybe = list.filter(item => item.state === 'unknown').slice(0, 3).map(item => ({ operatorId: item.operatorId, name: item.name, summary: item.summary }));
+    const chosen = picks.get(facility.id) ?? [];
+    const open = capacity(facility) - chosen.length;
+    const note = open > 0 ? `還有 ${open} 個空位沒有可計算技能的人選${ROOM_OF[facility.type] === 'MANUFACTURE' || ROOM_OF[facility.type] === 'TRADING' ? '；放任何幹員都有基礎加成' : ''}。` : undefined;
+    return { facilityId: facility.id, label, picks: chosen, alternatives, maybe, note };
+  });
+  return { assignments, facilities, pool: owned.length, picked: used.size };
+}

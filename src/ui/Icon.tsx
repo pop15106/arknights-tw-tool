@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 
 export type IconName = 'roster' | 'base' | 'grow' | 'link' | 'settings' | 'plus' | 'download' | 'search' | 'shield' | 'file' | 'image' | 'film'
-  | 'arrow' | 'edit' | 'sun' | 'moon' | 'close' | 'alert' | 'check' | 'chevron' | 'database' | 'upload' | 'undo';
+  | 'arrow' | 'edit' | 'sun' | 'moon' | 'close' | 'alert' | 'check' | 'chevron' | 'database' | 'upload' | 'undo' | 'monitor';
 
 const PATHS: Record<IconName, ComponentChildren> = {
   roster: <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
@@ -26,6 +26,7 @@ const PATHS: Record<IconName, ComponentChildren> = {
   check: <path d="m5 12 4.5 4.5L19 7"/>,
   chevron: <path d="m9 6 6 6-6 6"/>,
   database: <><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></>,
+  monitor: <><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8m-4-4v4"/></>,
   undo: <path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/>,
 };
 

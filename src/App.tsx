@@ -195,7 +195,9 @@ export default function App() {
         <div className="page-title"><h1>{page}</h1><p>{SUBTITLE[page]}</p></div>
         <div className="topbar-actions">
           <span className="tag amber prototype-tag" title={isDemo ? '姓名、養成與圖形皆為自製測試資料，與個人庫分開保存。' : '請勿貼入密碼、Cookie 或 Token。遊戲資料來源與繁中服相容性仍須核對。'}>{isDemo ? '示範庫' : '個人庫'} · 研究原型</span>
-          <button type="button" className="icon-button" aria-label={theme.effective === 'dark' ? '切換為淺色主題' : '切換為深色主題'} onClick={theme.toggle}><Icon name={theme.effective === 'dark' ? 'sun' : 'moon'}/></button>
+          <div className="segmented theme-switch" role="radiogroup" aria-label="顯示模式">
+            {([['light', 'sun', '淺色'], ['dark', 'moon', '深色'], ['system', 'monitor', '系統']] as const).map(([value, icon, label]) => <button type="button" key={value} role="radio" aria-checked={theme.choice === value} className={theme.choice === value ? 'active' : ''} onClick={() => theme.setChoice(value)} title={value === 'system' ? '跟隨系統設定' : `${label}模式`}><Icon name={icon} size={15}/><span>{label}</span></button>)}
+          </div>
           <button type="button" className="button secondary small hide-sm" disabled={busy} onClick={downloadBackup}><Icon name="download" size={16}/>備份</button>
           <button type="button" className="button primary small" disabled={busy} onClick={() => openPanel('import')}><Icon name="plus" size={16}/>匯入</button>
         </div>

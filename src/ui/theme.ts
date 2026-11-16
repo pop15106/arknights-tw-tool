@@ -17,5 +17,5 @@ export function useTheme() {
   }, [choice]);
   const systemDark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
   const effective = choice === 'system' ? (systemDark ? 'dark' : 'light') : choice;
-  return { choice, effective, toggle: () => setChoice(effective === 'dark' ? 'light' : 'dark') };
+  return { choice, effective, setChoice, toggle: () => setChoice(effective === 'dark' ? 'light' : 'dark') };
 }

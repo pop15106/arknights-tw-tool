@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseCatalog, plainGameText } from '../src/catalog/base.ts';
-import { candidatesFor, evaluateBase, parseSkill, slotResult, unlockState, type Facility } from '../src/domain/base.ts';
+import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, unlockState, type Facility } from '../src/domain/base.ts';
 import { createDemoBaseCatalog, createDemoDataset, createDemoImport } from '../src/demo.ts';
 import { createEmptyState, known, unknown, validateAppState, type OwnedOperator } from '../src/domain/model.ts';
 import { applyImport, previewImport } from '../src/domain/import.ts';
@@ -106,4 +106,30 @@ test('由原始 building_data 投影：只保留需要欄位與已知幹員', ()
   assert.equal(catalog.rooms[0].name, 'CONTROL');
   assert.deepEqual(catalog.basicSpeedPercent, { MANUFACTURE: 1, TRADING: 1 });
   assert.throws(() => buildBaseCatalog({ ...raw, rooms: {} }, [], 'v', 's'), /設施/);
+});
+
+test('推薦配置：全域依分數分配、不重複、不超過容量，控制中樞不推薦', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 'm1', type: 'manufacturing', level: 2, product: 'gold' }, { id: 'm2', type: 'manufacturing', level: 1, product: 'record' }, { id: 't', type: 'trading', level: 1 }];
+  const rec = recommendBase({ facilities, onlineSlots: [] }, catalog, state.roster, definitions);
+  const all = Object.values(rec.assignments).flat();
+  assert.equal(new Set(all).size, all.length);
+  assert.deepEqual(rec.assignments.c, []);
+  assert.ok(rec.facilities[0].note?.includes('不推薦'));
+  assert.ok(rec.assignments.m1.length <= 2 && rec.assignments.m2.length <= 1 && rec.assignments.t.length <= 1);
+  assert.ok(rec.assignments.m1.includes('demo-3'), '赤金技能應排進赤金製造站');
+  assert.deepEqual(rec.assignments.m2, ['demo-4'], '作戰記錄技能應排進作戰記錄製造站');
+  assert.deepEqual(rec.assignments.t, ['demo-2'], '貿易站選訂單效率最高者');
+  // 推薦結果可直接通過評估，沒有一人兩房
+  const evaluation = evaluateBase({ facilities, onlineSlots: [], assignments: rec.assignments }, catalog, state.roster, definitions);
+  assert.ok(!evaluation.issues.some(issue => issue.includes('同時被安排')));
+});
+
+test('推薦配置：同一間宿舍只放一位「全宿舍恢復」技能（取最高不疊加）', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  catalog.operators['demo-6'] = [[{ buffId: 'demo-dorm', elite: 0, level: 1 }]];
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const rec = recommendBase({ facilities: [{ id: 'd1', type: 'dormitory', level: 1 }, { id: 'd2', type: 'dormitory', level: 1 }], onlineSlots: [] }, catalog, state.roster, definitions);
+  assert.deepEqual(rec.assignments.d1.length, 1); assert.deepEqual(rec.assignments.d2.length, 1);
 });

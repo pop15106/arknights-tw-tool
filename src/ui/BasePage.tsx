@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { AppState, Settings } from '../domain/model';
 import type { BaseCatalog } from '../catalog/base';
-import { candidatesFor, evaluateBase, FACILITY_LABEL, parseSkill, productMatches, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
+import { candidatesFor, evaluateBase, recommendBase, type BaseRecommendation, FACILITY_LABEL, parseSkill, productMatches, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 
@@ -107,6 +107,75 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
   </article>;
 }
 
+interface DataStatus { version: string; sourceUpdatedAt: string; syncedAt: string; counts: { operators: number } }
+
+/** 推薦前先確認目前的繁中服資料版本與可用幹員，再用已持有幹員產生配置。 */
+function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onRefreshed }: {
+  state: AppState; isDemo: boolean; busy: boolean; catalog: BaseCatalog; base: Base; onApply: (assignments: Record<string, string[]>) => void; onRefreshed: () => void;
+}) {
+  const [status, setStatus] = useState<DataStatus | null>(null);
+  const [message, setMessage] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [result, setResult] = useState<BaseRecommendation | null>(null);
+  const loadStatus = async (sync = false) => {
+    if (isDemo) return;
+    setMessage(sync ? '正在向公開來源檢查繁中服最新資料，可能需要幾分鐘…' : '');
+    setSyncing(sync);
+    try {
+      if (sync) {
+        const response = await fetch('/api/game-data/sync', { method: 'POST', headers: { 'X-Game-Data-Sync': '1' }, credentials: 'omit', redirect: 'error', cache: 'no-store' });
+        if (!response.ok) throw new Error('更新沒有完成，原有資料保留。請確認網路後重試。');
+      }
+      const response = await fetch('/api/game-data/status', { credentials: 'omit', redirect: 'error', cache: 'no-store' });
+      if (!response.ok) throw new Error('暫時無法讀取資料版本。');
+      setStatus(await response.json() as DataStatus);
+      if (sync) { setMessage('已確認為目前可取得的最新繁中服資料。'); setResult(null); onRefreshed(); }
+    } catch (error) { setMessage(error instanceof Error && error.constructor === Error ? error.message : '暫時無法讀取資料版本。'); }
+    finally { setSyncing(false); }
+  };
+  useEffect(() => { void loadStatus(); }, [isDemo]);
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const ownedIds = state.roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false)).map(row => row.operatorId);
+  const withSkills = ownedIds.filter(id => catalog.operators[id]).length;
+  const ageDays = status ? Math.floor((Date.now() - Date.parse(status.sourceUpdatedAt)) / 86_400_000) : undefined;
+  const date = (value: string) => new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeZone: 'Asia/Taipei' }).format(new Date(value));
+  return <section className="panel recommend-panel" aria-label="基建推薦">
+    <header className="recommend-head">
+      <div><p className="eyebrow">推薦配置</p><h2>用你持有的幹員排出可計算加成最高的配置</h2></div>
+      {!isDemo && <button type="button" className="button secondary small" disabled={busy || syncing} onClick={() => void loadStatus(true)}><Icon name="download" size={16}/>{syncing ? '檢查中…' : '檢查繁中服更新'}</button>}
+    </header>
+    <div className="recommend-facts">
+      <div><span>資料版本</span><strong>{isDemo ? '示範資料' : status ? status.version.slice(0, 7) : '讀取中'}</strong><small>{isDemo ? '虛構' : status ? `來源更新 ${date(status.sourceUpdatedAt)}` : ''}</small></div>
+      <div><span>繁中服圖鑑幹員</span><strong>{isDemo ? state.dataset.operators.length : status?.counts.operators ?? '—'}</strong><small>含轉職形態</small></div>
+      <div><span>你持有</span><strong>{ownedIds.length}</strong><small>依目前幹員庫</small></div>
+      <div><span>有基建技能資料</span><strong>{withSkills}</strong><small>可參與推薦</small></div>
+    </div>
+    {ageDays !== undefined && ageDays > 30 && <p className="callout warning">資料來源已 {ageDays} 天未更新，新幹員或技能調整可能尚未反映。建議先按「檢查繁中服更新」。</p>}
+    {message && <p className="fine-print" role="status">{message}</p>}
+    <div className="inline-actions">
+      <button type="button" className="button primary" disabled={busy || syncing || !base.facilities.length} onClick={() => setResult(recommendBase(base, catalog, state.roster, definitions))}>{result ? '重新產生推薦' : '產生推薦'}</button>
+      {result && <button type="button" className="button secondary" disabled={busy} onClick={() => onApply(result.assignments)}>套用到配置草稿</button>}
+      {!base.facilities.length && <span className="fine-print">請先在下方選一個常見布局或新增設施。</span>}
+    </div>
+    {result && <div className="recommend-result">
+      <p className="recommend-verdict"><strong>從 {result.pool} 名持有幹員中選出 {result.picked} 名。</strong>只比較已解鎖且數值可追溯的技能；套用後仍可逐格調整，保存前不會寫入。</p>
+      <div className="recommend-grid">{result.facilities.map(item => <article key={item.facilityId} className="recommend-card">
+        <h3>{item.label}</h3>
+        {item.picks.length > 0 && <ol className="recommend-picks">{item.picks.map(pick => <li key={pick.operatorId}><strong>{pick.name}</strong><span className="score">+{pick.score}</span><small>{pick.summary}</small></li>)}</ol>}
+        {item.note && <p className="fine-print">{item.note}</p>}
+        {item.alternatives.length > 0 && <details className="plain-details"><summary>替代人選（{item.alternatives.length}）</summary><ul>{item.alternatives.map(alt => <li key={alt.operatorId}>{alt.name}（+{alt.score}）<small>{alt.summary}</small></li>)}</ul></details>}
+        {item.maybe.length > 0 && <p className="fine-print">解鎖待核對、可能也合適：{item.maybe.map(m => m.name).join('、')}</p>}
+      </article>)}</div>
+      <details className="plain-details"><summary>推薦依據與限制</summary><ul className="gap-list">
+        <li>候選只來自你的幹員庫，並以目前繁中服資料包的技能與解鎖條件判斷；資料版本見上方。</li>
+        <li>分數＝已解鎖技能中可解析的數值加總（製造依產品過濾）。條件型、聯動、隨時間累積的技能不加分，也不扣分。</li>
+        <li>分配方式：把所有「幹員×設施」組合依分數由高到低排序，依序放入，每人只排一處、不超過進駐上限。</li>
+        <li>沒有模擬心情消耗與換班，因此不是收益最佳化或排班建議；控制中樞、會客室等不推薦人選。</li>
+      </ul></details>
+    </div>}
+  </section>;
+}
+
 export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isDemo: boolean; busy: boolean; onSave: (base: Base) => void }) {
   const [attempt, setAttempt] = useState(0);
   const { catalog, error } = useBaseCatalog(isDemo, attempt);
@@ -145,6 +214,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
         <button type="button" className="button primary" disabled={busy || !dirty || draft.facilities.length > 20} onClick={() => onSave(draft)}>{dirty ? '保存配置' : '已保存'}</button>
       </div>
     </div>
+    <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApply={assignments => update({ ...draft, assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
     {evaluation.issues.length > 0 && <div className="callout danger" role="status"><strong>配置有 {evaluation.issues.length} 個問題</strong><ul>{evaluation.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
     {!draft.facilities.length && <section className="empty-inline base-empty"><strong>先建立設施配置</strong><span>選一個常見布局作為起點，或逐一新增設施；之後可以再調整等級與數量。</span>
       <div className="inline-actions center">{TEMPLATES.map((template, index) => <button type="button" key={template.label} className="button secondary small" disabled={busy} onClick={() => applyTemplate(index)}>{template.label}</button>)}</div>
