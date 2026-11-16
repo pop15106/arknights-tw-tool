@@ -86,7 +86,7 @@ function effectText(effect: SkillEffect): string {
   }
 }
 
-function useBaseCatalog(isDemo: boolean, attempt: number) {
+export function useBaseCatalog(isDemo: boolean, attempt: number) {
   const [catalog, setCatalog] = useState<BaseCatalog | null>(isDemo ? createDemoBaseCatalog() : null);
   const [error, setError] = useState('');
   useEffect(() => {

@@ -896,3 +896,18 @@ h2 { font-weight: 800; }
   .growth-items th:nth-child(1) { width: 44%; } .growth-items th:nth-child(2) { width: 16%; } .growth-items th:nth-child(3) { width: 24%; } .growth-items th:nth-child(4) { width: 16%; }
   .growth-farm-inline { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
 }
+
+/* 搭配 */
+.team-page { display: grid; gap: 16px; }
+.team-page .inline-actions .text-input { min-width: 220px; flex: 1; max-width: 360px; }
+.synergy-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); margin-top: 10px; }
+.synergy-card { display: grid; gap: 8px; align-content: start; padding: 14px; border: 2px solid var(--edge); border-radius: 14px; background: var(--surface-2); box-shadow: var(--pop-sm); }
+.synergy-card header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.synergy-arrow { color: var(--muted); }
+.synergy-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.synergy-text { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text); }
+.synergy-text.more { color: var(--muted); }
+.synergy-beneficiaries { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.op-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border: 1.5px solid var(--line-strong); border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--text); background: var(--surface); }
+.op-chip small { font-weight: 400; color: var(--muted); }
+.op-chip.missing { opacity: .55; border-style: dashed; }
