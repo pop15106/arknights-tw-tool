@@ -39,8 +39,18 @@ export type SkillEffect =
   | { kind: 'perOtherWorking'; effect: SkillEffect }
   /** 宿舍：讓該宿舍某位心情未滿的其他幹員每小時恢復（同種效果取最高）。 */
   | { kind: 'dormSingle'; value: number }
-  /** 依招募位數、發電站數或本設施等級倍增 effect。 */
-  | { kind: 'scaleBy'; by: 'recruitSlots' | 'powerPlants' | 'roomLevel'; per: number; effect: SkillEffect }
+  /** 依招募位、發電站數、本設施等級、宿舍總等級、貿易站數、會客室／訓練室等級倍增 effect；max 為加成上限。 */
+  | { kind: 'scaleBy'; by: 'recruitSlots' | 'powerPlants' | 'roomLevel' | 'dormLevels' | 'tradingPosts' | 'meetingLevel' | 'trainingLevel'; per: number; effect: SkillEffect; max?: number }
+  /** 生產特定配方時才生效。 */
+  | { kind: 'whenProduct'; product: 'gold' | 'record'; effect: SkillEffect }
+  /** 指定幹員在某設施（或基建內、工作場所）時才生效。 */
+  | { kind: 'ifPresent'; name: string; where: BaseRoomType | 'base' | 'work'; effect: SkillEffect }
+  /** 同設施內有其他某陣營幹員時才生效。 */
+  | { kind: 'ifGroupInRoom'; group: string; effect: SkillEffect }
+  /** 控制中樞：所有宿舍內所有幹員心情恢復（同種效果取最高）。 */
+  | { kind: 'globalDorm'; value: number }
+  /** 隨進駐時間爬升：首小時 first，此後每小時 +perHour，最多 max。 */
+  | { kind: 'ramp'; stat: 'productivity' | 'drone'; first: number; perHour: number; max: number }
   /** 控制中樞：其他設施內處於工作狀態的幹員心情每小時調整（負值＝恢復）。 */
   | { kind: 'workingMood'; value: number }
   /** 同設施內所有幹員的心情消耗調整（負值＝恢復）。 */
@@ -116,6 +126,14 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^(?:貿易站|製造站|發電站)內全體幹員每小時心情消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodRoom', value: Number(m[1]) }) },
   { pattern: new RegExp(`^其他設施內處於工作狀態的幹員心情每小時恢復\\+([\\d.]+)$`, 'u'), effect: m => ({ kind: 'workingMood', value: -Number(m[1]) }) },
   { pattern: new RegExp(`^(?:貿易站|製造站)內除自身以外每名處於工作狀態的幹員${NUM}%訂單獲取效率$`, 'u'), effect: m => ({ kind: 'perOtherWorking', effect: { kind: 'order', value: Number(m[1]) } }) },
+  { pattern: new RegExp(`^(?:目前|當前)製造站內所有幹員心情每小時消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodRoom', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^貿易站內幹員心情每小時消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodRoom', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^每間宿舍每級為貴金屬類配方的生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'scaleBy', by: 'dormLevels', per: 1, effect: { kind: 'productivity', value: Number(m[1]), product: 'gold' } }) },
+  { pattern: new RegExp(`^每間宿舍每級${NUM}%獲取效率$`, 'u'), effect: m => ({ kind: 'scaleBy', by: 'dormLevels', per: 1, effect: { kind: 'order', value: Number(m[1]) } }) },
+  { pattern: new RegExp(`^每間宿舍每級為充能速度${NUM}%$`, 'u'), effect: m => ({ kind: 'scaleBy', by: 'dormLevels', per: 1, effect: { kind: 'drone', value: Number(m[1]) } }) },
+  { pattern: new RegExp(`^每個貿易站為當前製造站貴金屬類配方的生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'scaleBy', by: 'tradingPosts', per: 1, effect: { kind: 'productivity', value: Number(m[1]), product: 'gold' } }) },
+  { pattern: new RegExp(`^所有宿舍內所有幹員的心情每小時恢復\\+([\\d.]+)（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'globalDorm', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^控制中樞內每個(.+?)幹員可使控制中樞內所有幹員的心情每小時恢復\\+([\\d.]+)$`, 'u'), effect: m => ({ kind: 'perGroup', scope: 'room', group: m[1], per: { kind: 'moodRoom', value: -Number(m[2]) } }) },
   { pattern: new RegExp(`^無人機充能速度${NUM}%$`, 'u'), effect: m => ({ kind: 'drone', value: Number(m[1]) }) },
   { pattern: new RegExp(`^自身心情每小時恢復${NUM}$`, 'u'), effect: m => ({ kind: 'moodRecoverSelf', value: Number(m[1]) }) },
   { pattern: new RegExp(`^使該宿舍內除自身以外心情未滿的某個幹員每小時恢復\\+([\\d.]+)（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'dormSingle', value: Number(m[1]) }) },
@@ -132,6 +150,56 @@ function parseClause(raw: string): SkillEffect | null {
   const clause = raw.trim().replace(/^同時/u, '').replace(/額外(?=[+-]|提升)/u, '').replace(/^(?:當前|目前)(?:貿易站|製造站)/u, '');
   const rule = CLAUSES.map(item => ({ item, match: clause.match(item.pattern) })).find(entry => entry.match);
   return rule?.match ? rule.item.effect(rule.match) : null;
+}
+
+const ROOM_NAME: Record<string, BaseRoomType> = { 貿易站: 'TRADING', 製造站: 'MANUFACTURE', 發電站: 'POWER', 會客室: 'MEETING', 控制中樞: 'CONTROL', 訓練室協助位: 'TRAINING', 訓練室: 'TRAINING' };
+/** 條件句（產品、他人在場、陣營同房、設施等級上限、時間爬升）；回傳 undefined 表示不是條件句。 */
+function parseConditionClause(parts: string[], index: number): { effects: SkillEffect[]; consumed: number } | null | undefined {
+  const part = parts[index], next = parts[index + 1] ?? '';
+  const after = (raw: string) => parseClause(raw.replace(/^則/u, ''));
+  let m: RegExpMatchArray | null;
+  if ((m = part.match(/^生產(作戰記錄|貴金屬)類配方時$/u))) {
+    const rest = parts.slice(index + 1).map(after);
+    return rest.length && rest.every(Boolean) ? { effects: rest.map(effect => ({ kind: 'whenProduct', product: m![1] === '貴金屬' ? 'gold' : 'record', effect: effect! })), consumed: 1 + rest.length } : null;
+  }
+  const presence: [RegExp, (m: RegExpMatchArray) => { name: string; where: BaseRoomType | 'base' | 'work' }][] = [
+    [/^若(.+?)在(貿易站|製造站|發電站|會客室|控制中樞)$/u, x => ({ name: x[1], where: ROOM_NAME[x[2]] })],
+    [/^如果(.+?)進駐在(控制中樞|訓練室協助位|發電站|製造站|貿易站)$/u, x => ({ name: x[1], where: ROOM_NAME[x[2]] })],
+    [/^當(.+?)在基建內時（不包含副手及活動室使用者）$/u, x => ({ name: x[1], where: 'base' })],
+    [/^當([^、]+?)入駐工作場所時（不包含副手）$/u, x => ({ name: x[1], where: 'work' })],
+    [/^當與([^、]+?)一起進駐控制中樞時$/u, x => ({ name: x[1], where: 'CONTROL' })],
+  ];
+  for (const [pattern, build] of presence) {
+    if (!(m = part.match(pattern))) continue;
+    // 名稱必須像單一幹員：不含數字、不以「有」開頭、不是陣營或作業平台。
+    if (/幹員$|作業平台|^有|\d/u.test(m[1])) break;
+    const effect = after(next);
+    return effect ? { effects: [{ kind: 'ifPresent', ...build(m), effect }], consumed: 2 } : null;
+  }
+  if ((m = part.match(/^(?:目前貿易站內存在(.+?)幹員時|當與(.+?)幹員進駐控制中樞一起工作時)$/u))) {
+    const effect = after(next);
+    return effect ? { effects: [{ kind: 'ifGroupInRoom', group: (m[1] ?? m[2]), effect }], consumed: 2 } : null;
+  }
+  if (part === '同一貿易站中' && (m = next.match(/^每有1名(.+?)幹員$/u))) {
+    const effect = parseClause(parts[index + 2] ?? '');
+    return effect ? { effects: [{ kind: 'remote', target: 'TRADING', group: m[1], effects: [effect] }], consumed: 3 } : null;
+  }
+  if ((m = part.match(/^(會客室|訓練室)每級(?:額外提供|為目前製造站\+)(\d+)%(獲取效率|生產力)$/u))) {
+    const cap = next.match(/^最多(?:提供)?(\d+)%(?:效率)?$/u);
+    const effect: SkillEffect = m[3] === '生產力' ? { kind: 'productivity', value: Number(m[2]) } : { kind: 'order', value: Number(m[2]) };
+    return { effects: [{ kind: 'scaleBy', by: m[1] === '會客室' ? 'meetingLevel' : 'trainingLevel', per: 1, effect, ...(cap ? { max: Number(cap[1]) } : {}) }], consumed: cap ? 2 : 1 };
+  }
+  if ((m = part.match(/^(生產力|無人機充能速度)(首小時|每小時)\+(\d+(?:\.\d+)?)%$/u))) {
+    const stat = m[1] === '生產力' ? 'productivity' : 'drone';
+    const first = Number(m[3]);
+    let perHour = m[2] === '每小時' ? first : 0, consumed = 1;
+    const later = next.match(/^此後每小時\+(\d+(?:\.\d+)?)%$/u);
+    if (later) { perHour = Number(later[1]); consumed++; }
+    const final = (parts[index + consumed] ?? '').match(/^最終達到\+(\d+(?:\.\d+)?)%$/u);
+    if (!final) return null;
+    return { effects: [{ kind: 'ramp', stat, first, perHour, max: Number(final[1]) }], consumed: consumed + 1 };
+  }
+  return undefined;
 }
 
 const reRes = (body: string) => new RegExp(`^(?:同時)?${body.replaceAll('RES', RES)}$`, 'u');
@@ -226,6 +294,9 @@ function parseClauses(text: string): SkillEffect[] | null {
       index++;
       continue;
     }
+    const conditional = parseConditionClause(parts, index);
+    if (conditional === null) return null;
+    if (conditional) { effects.push(...conditional.effects); index += conditional.consumed - 1; continue; }
     const resource = parseResourceClause(parts, index, effects);
     if (resource === null) return null;
     if (resource) { effects.push(...resource.effects); index += resource.consumed - 1; continue; }
@@ -292,7 +363,7 @@ export function parseSkill(skill: Pick<BaseSkill, 'roomType' | 'description'>): 
   const prefix = ROOM_PREFIX[skill.roomType];
   const unsupported = { supported: false, effects: [] };
   if (!prefix) return unsupported;
-  const head = `進駐${prefix}時，`;
+  const head = skill.description.startsWith(`進駐${prefix}後，`) ? `進駐${prefix}後，` : `進駐${prefix}時，`;
   // 搭配條件：「當與【單一幹員名稱】在同一個（本設施）時，……」。陣營或多人條件不支援。
   const combo = skill.description.match(new RegExp(`[，；]?當與([^，；、或和]+?)在同一個${prefix}時，(.+)$`, 'u'));
   const before = combo ? skill.description.slice(0, combo.index) : skill.description;
@@ -389,7 +460,12 @@ export function productMatches(effect: SkillEffect, facility: Pick<Facility, 'pr
 }
 
 /** moods：各幹員目前心情（模擬用）。省略時視為班次開始、心情全滿；心情 0 者視為停工。 */
-export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, moods?: Readonly<Record<string, number>>): BaseEvaluation {
+/** elapsed：班次已經過的小時數（模擬用，影響隨時間爬升的技能）；省略時以 12 小時班的平均值計。 */
+export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, moods?: Readonly<Record<string, number>>, elapsed?: number): BaseEvaluation {
+  const rampValue = (effect: Extract<SkillEffect, { kind: 'ramp' }>, hours: number) => Math.min(effect.max, effect.first + effect.perHour * Math.max(0, Math.floor(hours)));
+  const rampAverage = (effect: Extract<SkillEffect, { kind: 'ramp' }>) => { let sum = 0; for (let h = 0; h < 12; h++) sum += rampValue(effect, h); return round(sum / 12); };
+  const nameOf = (id: string) => definitions.get(id)?.displayName ?? id;
+  const assignedIn = (filter: (facility: Facility) => boolean) => new Set(base.facilities.filter(filter).flatMap(facility => (base.assignments?.[facility.id] ?? []).filter(id => facility.type === 'dormitory' || (moods?.[id] ?? 1) > 0)).map(nameOf));
   const maxMood = (id: string) => catalog.mood?.maxByOperator?.[id] ?? catalog.mood?.max ?? 24;
   const moodOf = (id: string) => moods?.[id] ?? maxMood(id);
   const rows = new Map(roster.map(row => [row.operatorId, row]));
@@ -445,13 +521,25 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
         const comboActive = !!partner && partner !== name && roomNames.has(partner);
         if (partner) skill.combo = { partner, active: comboActive };
         const candidates = [...skill.parsed.effects, ...(comboActive ? skill.parsed.conditional!.effects : [])];
-        if (candidates.some(effect => (effect.kind === 'perGroup' || effect.kind === 'remote') && !knownGroups.has(effect.group))) { result.unsupported.push({ operatorId, skill: skill.active }); skill.applied = []; continue; }
+        if (candidates.some(effect => (effect.kind === 'perGroup' || effect.kind === 'remote' || effect.kind === 'ifGroupInRoom') && !knownGroups.has(effect.group))) { result.unsupported.push({ operatorId, skill: skill.active }); skill.applied = []; continue; }
         // 陣營倍增換算成目前配置下的實際數值。
         skill.applied = candidates.map(effect => {
           // 心情條件：依目前心情決定是否生效或倍數。
           if (effect.kind === 'whenMood') return (moodOf(operatorId) > 12) === (effect.cond === 'high') ? effect.effect : null;
           if (effect.kind === 'perMoodDrop') { const count = Math.floor((maxMood(operatorId) - moodOf(operatorId)) / effect.per); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
-          if (effect.kind === 'scaleBy') { const count = Math.floor((effect.by === 'recruitSlots' ? base.recruitSlots ?? 0 : effect.by === 'powerPlants' ? base.facilities.filter(item => item.type === 'power').length : facility.level) / effect.per); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
+          if (effect.kind === 'scaleBy') {
+            const levelOf = (type: FacilityType) => Math.max(0, ...base.facilities.filter(item => item.type === type).map(item => item.level));
+            const source = { recruitSlots: base.recruitSlots ?? 0, powerPlants: base.facilities.filter(item => item.type === 'power').length, roomLevel: facility.level, dormLevels, tradingPosts: base.facilities.filter(item => item.type === 'trading').length, meetingLevel: levelOf('meeting'), trainingLevel: levelOf('training') }[effect.by];
+            const count = Math.floor(source / effect.per);
+            return count && 'value' in effect.effect ? { ...effect.effect, value: round(Math.min(effect.max ?? Infinity, effect.effect.value * count)) } as SkillEffect : null;
+          }
+          if (effect.kind === 'whenProduct') return facility.product === effect.product ? effect.effect : null;
+          if (effect.kind === 'ifPresent') {
+            const pool = effect.where === 'base' ? assignedIn(() => true) : effect.where === 'work' ? assignedIn(item => item.type !== 'dormitory') : assignedIn(item => ROOM_OF[item.type] === effect.where);
+            return pool.has(effect.name) && effect.name !== name ? effect.effect : null;
+          }
+          if (effect.kind === 'ifGroupInRoom') return assigned.some(id => id !== operatorId && groupsOf(id).includes(effect.group)) ? effect.effect : null;
+          if (effect.kind === 'ramp') return { kind: effect.stat, value: elapsed === undefined ? rampAverage(effect) : rampValue(effect, elapsed) } as SkillEffect;
           if (effect.kind === 'perOtherWorking') return 'value' in effect.effect && assigned.length > 1 ? { ...effect.effect, value: round(effect.effect.value * (assigned.length - 1)) } as SkillEffect : null;
           return effect;
         }).filter((effect): effect is SkillEffect => !!effect).map(effect => {
@@ -1079,7 +1167,7 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
   const steps = Math.max(1, Math.round(hours / step));
   const names = new Map(base.facilities.map((facility, index) => [facility.id, evaluateBase(base, catalog, [], definitions).facilities[index]?.label ?? facility.id]));
   for (let i = 0; i < steps; i++) {
-    const evaluation = evaluateBase(base, catalog, roster, definitions, moods);
+    const evaluation = evaluateBase(base, catalog, roster, definitions, moods, i * step + step / 2);
     const stats = baseStatistics(evaluation, catalog);
     if (i === 0) start = { goldPerDay: stats.goldPerDay, expPerDay: stats.expPerDay, lmdPerDay: stats.lmdPerDay };
     totals.goldPerDay += stats.goldPerDay; totals.expPerDay += stats.expPerDay; totals.lmdPerDay += stats.lmdPerDay;
@@ -1108,11 +1196,13 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
   // 休息：本班消耗最多者在宿舍回滿所需時間，與輪替中可休息的時間比較。
   const dorms = base.facilities.filter(facility => facility.type === 'dormitory');
   const finalEval = evaluateBase(base, catalog, roster, definitions);
+  // 中樞「所有宿舍」恢復，同種效果取最高。
+  const globalDorm = Math.max(0, ...finalEval.facilities.filter(result => result.facility.type === 'control').flatMap(result => result.operators.flatMap(op => op.skills.flatMap(skill => (skill.applied ?? []).filter(effect => effect.kind === 'globalDorm').map(scalar)))));
   const dormRates = dorms.map(facility => {
     const result = finalEval.facilities.find(item => item.facility.id === facility.id);
     const atmosphere = Math.min(facility.atmosphere ?? facility.level * 1000, facility.level * 1000);
     // 最累的人安排在該宿舍，單人恢復技能也給他。
-    return (catalog.mood?.dormRecover?.[facility.level - 1] ?? 0) + 0.0004 * atmosphere + (result?.totals.moodRecoverAll ?? 0) + (result?.totals.dormSingle ?? 0);
+    return (catalog.mood?.dormRecover?.[facility.level - 1] ?? 0) + 0.0004 * atmosphere + (result?.totals.moodRecoverAll ?? 0) + (result?.totals.dormSingle ?? 0) + globalDorm;
   }).filter(rate => rate > 0);
   const consumed = Math.max(0, ...Object.entries(moods).map(([id, mood]) => maxMood(id) - mood));
   const dormRate = dormRates.length ? round(Math.max(...dormRates)) : 0;

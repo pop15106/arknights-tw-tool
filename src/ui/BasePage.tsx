@@ -40,7 +40,12 @@ function effectText(effect: SkillEffect): string {
     case 'perOtherWorking': return `同設施每名其他工作中幹員：${effectText(effect.effect)}`;
     case 'workingMood': return `其他設施工作中幹員心情恢復 +${-effect.value}/時`;
     case 'dormSingle': return `宿舍內某位心情未滿者恢復 +${effect.value}/時（取最高）`;
-    case 'scaleBy': return `${{ recruitSlots: '每個招募位', powerPlants: `每 ${effect.per} 間發電站`, roomLevel: '本宿舍每級' }[effect.by]}：${effectText(effect.effect)}`;
+    case 'scaleBy': return `${{ recruitSlots: '每個招募位', powerPlants: `每 ${effect.per} 間發電站`, roomLevel: '本設施每級', dormLevels: '宿舍每級', tradingPosts: '每個貿易站', meetingLevel: '會客室每級', trainingLevel: '訓練室每級' }[effect.by]}：${effectText(effect.effect)}${effect.max ? `（最多 ${effect.max}%）` : ''}`;
+    case 'whenProduct': return `生產${effect.product === 'gold' ? '赤金' : '作戰記錄'}時：${effectText(effect.effect)}`;
+    case 'ifPresent': return `${effect.name}在${effect.where === 'base' ? '基建內' : effect.where === 'work' ? '工作場所' : FACILITY_LABEL[Object.entries(ROOM_OF).find(([, room]) => room === effect.where)?.[0] as FacilityType] ?? effect.where}時：${effectText(effect.effect)}`;
+    case 'ifGroupInRoom': return `同設施有${effect.group}幹員時：${effectText(effect.effect)}`;
+    case 'globalDorm': return `所有宿舍心情恢復 +${effect.value}/時（取最高）`;
+    case 'ramp': return `${effect.stat === 'productivity' ? '生產力' : '無人機'}首小時 +${effect.first}%、每小時 +${effect.perHour}%、最多 +${effect.max}%`;
     case 'orderMod': return { qualityAlpha: '提高高品質訂單（α）', qualityBeta: '提高高品質訂單（β）', pepe: '特別獨佔訂單', closure: '可露希爾特別訂單', twoGold: '赤金交付數固定為 2', breach: '交付數小於 4 視為違約訂單', breachBonus: `違約訂單赤金 +${effect.amount}`, invest: `4 赤金訂單龍門幣 +${effect.amount}` }[effect.mod];
     case 'remote': return `${effect.target === 'MANUFACTURE' ? '製造站' : '貿易站'}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
     default: return '';

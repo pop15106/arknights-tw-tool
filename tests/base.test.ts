@@ -22,7 +22,7 @@ test('白名單句型解析；任一子句不支援即整個技能不計入', ()
   assert.deepEqual(parseSkill({ roomType: 'DORMITORY', description: '進駐宿舍時，該宿舍內所有幹員的心情每小時恢復+0.2（同種效果取最高）' }).effects, [{ kind: 'moodRecoverAll', value: 0.2 }]);
   for (const description of [
     '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每個發電站為當前製造站+5%的生產力',
-    '進駐製造站後，生產力首小時+15%，此後每小時+2%，最終達到+25%',
+    '進駐製造站時，當前製造站內每個標準化類技能為自身+5%的生產力',
     '進駐製造站時，如果有2台以上作業平台進駐在發電站，則生產力+2%',
     '進駐控制中樞時，較容易獲得線索板上尚未擁有的線索，但控制中樞內除自身以外的其餘幹員心情每小時消耗+0.25',
   ]) assert.equal(parseSkill({ roomType: description.includes('控制中樞') ? 'CONTROL' : 'MANUFACTURE', description }).supported, false, description);
@@ -458,4 +458,30 @@ test('宿舍：單人恢復取最高、全宿舍恢復同一人疊加後取最�
   assert.equal(dorm.totals.moodRecoverAll, 0.3, 'demo-2：0.15＋3×0.05＝0.30；demo-3：0.1＋2×0.05＝0.20 → 取最高 0.30');
   const sim = simulateShift(base as never, catalog, state.roster, definitions, { hours: 12 });
   assert.equal(sim.rest?.dormRate, 2 + 2 + 0.3 + 0.7, '5 級宿舍：基礎 2.0＋氛圍 2.0＋全體 0.3＋單人 0.7');
+});
+
+test('第 4 階段：產品條件、他人在場、同房陣營、設施數量／等級（含上限）、時間爬升、所有宿舍恢復', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.meta = { 'demo-8': { groups: ['乙團'] } };
+  const add = (id: string, roomType: string, description: string, operator: string) => { catalog.skills[id] = { id, name: id, roomType, description }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('rec', 'MANUFACTURE', '進駐製造站時，生產作戰記錄類配方時，倉庫容量上限+12', 'demo-1');
+  add('pres', 'MANUFACTURE', '進駐製造站時，若示範・霧航在貿易站，則作戰記錄類配方的生產力+35%', 'demo-3');
+  add('ramp', 'MANUFACTURE', '進駐製造站後，生產力首小時+20%，此後每小時+1%，最終達到+25%', 'demo-4');
+  add('lvl', 'TRADING', '進駐貿易站時，訂單獲取效率+25%，會客室每級額外提供5%獲取效率，最多提供40%效率', 'demo-2');
+  add('grp', 'TRADING', '進駐貿易站時，訂單獲得效率+30%；目前貿易站內存在乙團幹員時，訂單獲得效率額外+10%', 'demo-7');
+  add('dorm', 'CONTROL', '進駐控制中樞時，所有宿舍內所有幹員的心情每小時恢復+0.05（同種效果取最高）', 'demo-5');
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 'r', type: 'manufacturing', level: 3, product: 'record' }, { id: 'g', type: 'manufacturing', level: 3, product: 'gold' }, { id: 't', type: 'trading', level: 3 }, { id: 'me', type: 'meeting', level: 3 }, { id: 'd', type: 'dormitory', level: 5 }];
+  const base = { facilities, onlineSlots: [], assignments: { c: ['demo-5'], r: ['demo-1', 'demo-3'], g: ['demo-4'], t: ['demo-2', 'demo-7', 'demo-8'], me: [], d: [] } };
+  const ev = evaluateBase(base, catalog, state.roster, definitions);
+  const [, record, gold, trade] = ev.facilities;
+  assert.equal(record.totals.productivity, 35, '霧航（demo-2）在貿易站 → 作戰記錄 +35');
+  assert.equal(gold.totals.productivity, Math.round((20 + 21 + 22 + 23 + 24 + 25 * 7) / 12 * 100) / 100, '時間爬升以 12 小時平均計');
+  assert.equal(trade.totals.order, 25 + 15 + 30 + 10, '會客室 3 級 ×5＝15（未達上限 40）；同站有乙團 → +10');
+  assert.equal(evaluateBase(base, catalog, state.roster, definitions, undefined, 0).facilities[2].totals.productivity, 20, '開班第 0 小時為首小時值');
+  assert.equal(evaluateBase(base, catalog, state.roster, definitions, undefined, 10).facilities[2].totals.productivity, 25, '第 10 小時已達上限');
+  const stats = baseStatistics(ev, catalog);
+  assert.equal(stats.manufacture.find(item => item.product === 'record')?.storageItems, Math.floor((54 + 12) / 5), '生產作戰記錄時倉庫 +12');
+  const sim = simulateShift(base, catalog, state.roster, definitions, { hours: 12 });
+  assert.equal(sim.rest?.dormRate, 2 + 2 + 0.05, '宿舍：基礎 2.0＋氛圍 2.0＋所有宿舍恢復 0.05');
 });
