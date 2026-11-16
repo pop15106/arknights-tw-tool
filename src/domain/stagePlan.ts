@@ -37,10 +37,10 @@ export function analyzeStage(enemies: readonly StageEnemy[], infos: readonly Ope
     candidates: top(info => info.position === 'RANGED' && info.tags.includes('輸出'), info => `遠程輸出・${info.summary}`) });
   const highDef = enemies.filter(enemy => enemy.stats.def >= THRESHOLDS.highDef).sort((a, b) => b.stats.def - a.stats.def);
   if (highDef.length) threats.push({ key: 'def', title: '高防禦', evidence: names(highDef, enemy => `防禦 ${enemy.stats.def}`), advice: '物理傷害會被大幅減免，建議法術輸出，或搭配降低防禦／物理脆弱的幹員。',
-    candidates: [...top(info => info.definition.profession === '術師' && info.tags.includes('輸出'), info => `術師輸出・${info.summary}`), ...debuffers(['防禦力降低', '物理脆弱'])] });
+    candidates: [...top(info => (info.damage ? info.damage === 'arts' : info.definition.profession === '術師') && info.tags.includes('輸出'), info => `法術輸出・${info.summary}`), ...debuffers(['防禦力降低', '物理脆弱'])] });
   const highRes = enemies.filter(enemy => enemy.stats.res >= THRESHOLDS.highRes).sort((a, b) => b.stats.res - a.stats.res);
   if (highRes.length) threats.push({ key: 'res', title: '高法術抗性', evidence: names(highRes, enemy => `法抗 ${enemy.stats.res}`), advice: '法術傷害會被大幅減免，建議物理輸出，或搭配降低法術抗性的幹員。',
-    candidates: [...top(info => info.tags.includes('輸出') && info.definition.profession !== '術師', info => `${info.definition.profession}輸出・${info.summary}`), ...debuffers(['法術抗性降低'])] });
+    candidates: [...top(info => info.tags.includes('輸出') && (info.damage ? info.damage === 'physical' : info.definition.profession !== '術師'), info => `${info.definition.profession}物理輸出・${info.summary}`), ...debuffers(['法術抗性降低'])] });
   const magic = enemies.filter(enemy => enemy.damage.includes('MAGIC'));
   if (magic.length) threats.push({ key: 'magic', title: '法術攻擊的敵人', evidence: names(magic, enemy => `${enemy.count} 隻`), advice: '法術傷害無視防禦，阻擋位容易被打穿，治療要跟得上。',
     candidates: top(info => info.tags.includes('治療'), info => `治療・${info.summary}`) });

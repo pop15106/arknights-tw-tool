@@ -15,6 +15,7 @@ interface ServerOptions {
   sync?: () => Promise<GameDataSnapshot>;
   loadTrading?: () => Promise<TradingParams | null>;
   stageEnemies?: (stageId: string) => Promise<{ stageId: string; levelId: string; enemies: { id: string; level: number; count: number }[] } | null>;
+  rogueAnalysis?: (theme: string) => Promise<import('../src/catalog/rogue.ts').RogueAnalysis | null>;
   loadCnEvents?: () => Promise<{ fetchedAt: string; source: string; events: unknown[] } | null>;
   loadDrops?: () => Promise<import('../src/catalog/drops.ts').DropRates | null>;
 }
@@ -65,10 +66,11 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const sync = options.sync ?? (async () => (await import('./game-data-sync.ts')).syncGameData());
   const loadTrading = options.loadTrading ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadTradingData());
   const stageEnemies = options.stageEnemies ?? (options.load ? async () => null : async (stageId: string) => (await import('./game-data-sync.ts')).stageEnemiesData(stageId));
+  const rogueAnalysis = options.rogueAnalysis ?? (options.load ? async () => null : async (theme: string) => (await import('./game-data-sync.ts')).rogueAnalysisData(theme));
   const loadCnEvents = options.loadCnEvents ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadCnEventsData());
   const loadDrops = options.loadDrops ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadDropsData());
   let origin = '', host = '';
-  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'recruit', 'cn-events', 'sync'].map(name => `/api/game-data/${name}`));
+  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'recruit', 'cn-events', 'rogue', 'rogue-analysis', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     try {
       if (req.headers.host !== host && !isLoopbackHost(req.headers.host)) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
@@ -80,7 +82,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       const isSync = url.pathname === '/api/game-data/sync';
       if (req.method !== (isSync ? 'POST' : 'GET')) throw new ApiError(405, 'METHOD', '不支援此請求方法。');
       const isList = url.pathname === '/api/game-data/stages' || url.pathname === '/api/game-data/events';
-      const allowedQuery = isList ? ['limit', 'offset', 'q'] : url.pathname === '/api/game-data/stage-enemies' ? ['id'] : [];
+      const allowedQuery = isList ? ['limit', 'offset', 'q'] : url.pathname === '/api/game-data/stage-enemies' ? ['id'] : url.pathname === '/api/game-data/rogue-analysis' ? ['theme'] : [];
       for (const key of url.searchParams.keys()) {
         if (!allowedQuery.includes(key) || url.searchParams.getAll(key).length !== 1) throw new ApiError(400, 'QUERY', '查詢參數無效。');
       }
@@ -103,6 +105,18 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       if (!snapshot) throw new ApiError(503, 'DATA_UNAVAILABLE', '尚未同步公開遊戲資料。');
       if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
       if (url.pathname === '/api/game-data/operators') { json(res, 200, snapshot.dataset); return; }
+      if (url.pathname === '/api/game-data/rogue') {
+        if (!snapshot.rogue) throw new ApiError(503, 'ROGUE_UNAVAILABLE', '目前的遊戲資料沒有集成戰略資料，請到設定按「更新遊戲資料」。');
+        json(res, 200, snapshot.rogue.map(theme => ({ id: theme.id, name: theme.name, stages: theme.stages.length, relics: theme.relics.length }))); return;
+      }
+      if (url.pathname === '/api/game-data/rogue-analysis') {
+        const theme = url.searchParams.get('theme') ?? '';
+        if (!/^rogue_\d{1,2}$/u.test(theme)) throw new ApiError(400, 'QUERY', '主題 ID 無效。');
+        let analysis: Awaited<ReturnType<typeof rogueAnalysis>>;
+        try { analysis = await rogueAnalysis(theme); } catch { throw new ApiError(502, 'ROGUE_FAILED', '主題關卡下載失敗，請稍後再試。'); }
+        if (!analysis) throw new ApiError(404, 'ROGUE_NOT_FOUND', '找不到此主題的資料。');
+        json(res, 200, analysis); return;
+      }
       if (url.pathname === '/api/game-data/cn-events') {
         const cn = await loadCnEvents().catch(() => null);
         if (!cn) throw new ApiError(503, 'CN_EVENTS_UNAVAILABLE', '尚未同步陸服活動時間表；在設定按「更新遊戲資料」時會一併取得。');

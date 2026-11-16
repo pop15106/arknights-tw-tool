@@ -981,3 +981,7 @@ h2 { font-weight: 800; }
 .mood-legend i.s4, .mood-tooltip i.s4 { background: var(--s4); } .mood-legend i.s5, .mood-tooltip i.s5 { background: var(--s5); } .mood-legend i.s6, .mood-tooltip i.s6 { background: var(--s6); }
 .mood-tooltip { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 10px; border: 1.5px solid var(--line-strong); border-radius: 10px; background: var(--surface); font-size: 12px; }
 .review-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); margin-top: 10px; } .review-note { min-height: 60px; font-family: inherit; font-size: 13px; } .review-card .gap-list { font-size: 13px; }
+.fit-view p { margin: 0; }
+.fit-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1.5px solid var(--edge); }
+.fit-badge.fit-high { background: var(--card-yellow); color: var(--card-ink); } .fit-badge.fit-mid { background: var(--surface); } .fit-badge.fit-low { background: transparent; color: var(--muted); border-style: dashed; }
+.stats-table td.hot { color: var(--danger); font-weight: 800; }

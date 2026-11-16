@@ -14,6 +14,8 @@ export interface GrowthOperator {
   tags?: string[];
   position?: 'MELEE' | 'RANGED' | 'ALL';
   /** 最高精英、最高等級時的數值（不含潛能、信賴、模組）。 */
+  /** 依特性說明判斷的主要傷害類型：arts＝「攻擊造成法術傷害」、heal＝治療、physical＝其他。 */
+  damage?: 'arts' | 'heal' | 'physical';
   stats?: { hp: number; atk: number; def: number; res: number; cost: number; block: number; redeploy: number; interval: number };
   /** 技能 ID → 最高等級的觸發方式與技力。 */
   skillMeta?: Record<string, { type: string; sp: string; cost: number; init: number; duration: number }>;
@@ -60,6 +62,7 @@ export function buildGrowthCatalog(tables: { characters: Row; skills?: Row; cons
       masteries,
       ...(Array.isArray(char.tagList) && char.tagList.length ? { tags: char.tagList.filter((tag: unknown): tag is string => typeof tag === 'string' && tag.length > 0) } : {}),
       ...(['MELEE', 'RANGED', 'ALL'].includes(char.position) ? { position: char.position } : {}),
+      damage: (() => { const trait = String(char.description ?? '').replace(/<[^>]*>/gu, ''); return trait.includes('法術傷害') ? 'arts' as const : trait.includes('治療') ? 'heal' as const : 'physical' as const; })(),
       ...(() => { const data = char.phases.at(-1)?.attributesKeyFrames?.at(-1)?.data; return data ? { stats: { hp: Number(data.maxHp) || 0, atk: Number(data.atk) || 0, def: Number(data.def) || 0, res: Number(data.magicResistance) || 0, cost: Number(data.cost) || 0, block: Number(data.blockCnt) || 0, redeploy: Number(data.respawnTime) || 0, interval: Number(data.baseAttackTime) || 0 } } : {}; })(),
       ...(() => { const meta = Object.fromEntries((Array.isArray(char.skills) ? char.skills : []).flatMap((skill: Row) => { const level = tables.skills?.[skill?.skillId]?.levels?.at(-1); return level ? [[skill.skillId, { type: String(level.skillType ?? ''), sp: String(level.spData?.spType ?? ''), cost: Number(level.spData?.spCost) || 0, init: Number(level.spData?.initSp) || 0, duration: Number(level.duration) || 0 }]] : []; })); return Object.keys(meta).length ? { skillMeta: meta } : {}; })(),
     };

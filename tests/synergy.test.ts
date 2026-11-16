@@ -80,3 +80,31 @@ test('幹員簡評：同分支排位、技能觸發、模式明寫效果', async
   assert.equal(review.reclamation.length, 1);
   assert.equal(review.security.length, 0);
 });
+
+test('集成戰略：主題分析（敵人加權、領袖、地塊、藏品）與契合度理由', async () => {
+  const { analyzeRogueTheme, buildRogueThemes } = await import('../src/catalog/rogue.ts');
+  const { themeFit, fitLevel } = await import('../src/domain/rogueFit.ts');
+  const themes = buildRogueThemes({ topics: { rogue_9: { name: '測試主題' } }, details: { rogue_9: {
+    stages: { a: { id: 'a', code: 'T-1', name: '一', levelId: 'Obt/Roguelike/RO9/level_a', isBoss: 0 }, b: { id: 'b', code: 'T-2', name: '二', levelId: 'Obt/Roguelike/RO9/level_b', isBoss: 1 } },
+    items: { r1: { id: 'r1', name: '神射之羽', type: 'RELIC', usage: '【速射手】攻擊速度+10', rarity: 'RARE' }, r2: { id: 'r2', name: '通用', type: 'RELIC', usage: '【先鋒】攻擊力+5%', rarity: 'NORMAL' } },
+  } } })!;
+  const level = (spawns: [string, number][], tiles: string[]) => ({ enemyDbRefs: spawns.map(([id]) => ({ id, level: 0 })), waves: [{ fragments: [{ actions: spawns.map(([key, count]) => ({ actionType: 'SPAWN', key, count })) }] }], mapData: { tiles: tiles.map(buildableType => ({ buildableType })) } });
+  const levels = new Map([['obt/roguelike/ro9/level_a', level([['enemy_fly', 30], ['enemy_tank', 10]], ['MELEE', 'MELEE', 'RANGED'])], ['obt/roguelike/ro9/level_b', level([['enemy_boss', 1]], ['MELEE', 'RANGED'])]]);
+  const enemies = {
+    enemy_fly: { name: '飛蟲', rank: 'NORMAL', damage: ['PHYSIC'], abilities: [], levels: [{ hp: 1, atk: 1, def: 0, res: 0, motion: 'FLY' }] },
+    enemy_tank: { name: '重盾', rank: 'NORMAL', damage: ['PHYSIC'], abilities: [], levels: [{ hp: 1, atk: 1, def: 900, res: 0, motion: 'WALK' }] },
+    enemy_boss: { name: '王', rank: 'BOSS', damage: ['MAGIC'], abilities: ['會飛'], levels: [{ hp: 50000, atk: 500, def: 300, res: 60, motion: 'WALK' }] },
+  } as never;
+  const analysis = analyzeRogueTheme(themes[0], levels, enemies);
+  assert.equal(analysis.enemy.spawns, 41);
+  assert.equal(analysis.enemy.fly, Math.round(30 / 41 * 1000) / 1000);
+  assert.deepEqual(analysis.tiles, { melee: 3, ranged: 2, both: 0 });
+  assert.equal(analysis.bosses[0].name, '王');
+  const def = (id: string, branch: string) => ({ id, displayName: id, branch, profession: '狙擊', skills: [], modules: [], talents: [] }) as never;
+  const growth = { operators: { s: { tags: ['輸出'], position: 'RANGED', damage: 'physical' }, m: { tags: ['輸出'], position: 'RANGED', damage: 'arts' } } } as never;
+  const sniper = themeFit(def('s', '速射手'), growth, analysis, [], []), caster = themeFit(def('m', '中堅術師'), growth, analysis, [], []);
+  assert.ok(sniper.reasons.some(reason => /飛行敵人/.test(reason.text)) && sniper.reasons.some(reason => /神射之羽/.test(reason.text)), '飛行與點名分支的藏品');
+  assert.ok(!sniper.reasons.some(reason => /通用/.test(reason.text)), '各職業一件的通用藏品不加分');
+  assert.ok(caster.reasons.some(reason => /高防禦/.test(reason.text)));
+  assert.equal(fitLevel(100, [100, 50, 40, 30, 20, 10, 5]), '高');
+});

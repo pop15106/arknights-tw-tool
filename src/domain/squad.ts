@@ -6,7 +6,7 @@ import { currentState } from './growth.ts';
 /* 編隊建議：依官方招募標籤分配職責，再依已知養成度挑人。不使用主觀強度。   */
 /* ------------------------------------------------------------------ */
 export interface RoleSlot { key: string; label: string; count: number; test: (info: OperatorInfo) => boolean }
-export interface OperatorInfo { id: string; definition: OperatorDefinition; tags: string[]; position?: string; progress: number; summary: string; unknown: boolean }
+export interface OperatorInfo { id: string; definition: OperatorDefinition; tags: string[]; position?: string; damage?: 'arts' | 'heal' | 'physical'; progress: number; summary: string; unknown: boolean }
 export interface SquadPick { id: string; role: string; reason: string }
 export interface SquadResult { picks: SquadPick[]; missing: { role: string; need: number; got: number }[] }
 
@@ -46,7 +46,7 @@ export function operatorInfo(definition: OperatorDefinition, row: OwnedOperator 
   const progress = definition.rarity * 20 + state.elite * 100 + state.level + state.skillLevel * 5 + masteries * 10 + modules * 15;
   const op = catalog.operators[definition.id];
   const summary = [`${definition.rarity}★`, `精${state.elite} ${state.level} 級`, `技能 ${state.skillLevel}`, masteries ? `專精合計 ${masteries}` : '', modules ? `模組 ${modules} 級` : ''].filter(Boolean).join('・');
-  return { id: definition.id, definition, tags: op?.tags ?? [], ...(op?.position ? { position: op.position } : {}), progress, summary, unknown: unknown.includes('精英階段') || unknown.includes('等級') };
+  return { id: definition.id, definition, tags: op?.tags ?? [], ...(op?.position ? { position: op.position } : {}), ...(op?.damage ? { damage: op.damage } : {}), progress, summary, unknown: unknown.includes('精英階段') || unknown.includes('等級') };
 }
 
 /**

@@ -6,6 +6,7 @@ import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DA
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
 import { parseTradingWikitext, PRTS_TRADING_API, validateTradingParams, type TradingParams } from '../src/catalog/trading.ts';
 import { parseLevelEnemies } from '../src/catalog/enemies.ts';
+import { analyzeRogueTheme, type RogueAnalysis } from '../src/catalog/rogue.ts';
 import { parsePenguinMatrix, PENGUIN_MATRIX_API, validateDropRates, type DropRates } from '../src/catalog/drops.ts';
 export type { GameDataSnapshot } from '../src/catalog/build.ts';
 
@@ -143,6 +144,29 @@ export function createGameDataStore(options: {
     const temporary = `${cnEventsFile}.${crypto.randomUUID()}.tmp`;
     await writeFile(temporary, JSON.stringify({ fetchedAt: new Date().toISOString(), source: 'Kengxxiao/ArknightsGameData zh_CN activity_table', events }), { flag: 'wx' }); await rename(temporary, cnEventsFile);
   }
+  // 集成戰略主題分析：下載該主題所有關卡檔（固定版本、本機快取），彙整敵人、首領與地塊。
+  async function rogueAnalysis(themeId: string): Promise<RogueAnalysis | null> {
+    if (!/^rogue_\d{1,2}$/u.test(themeId)) return null;
+    const snapshot = await load();
+    const theme = snapshot?.rogue?.find(item => item.id === themeId);
+    if (!theme || !snapshot?.enemies) return null;
+    const file = path.join(cache, `rogue-${themeId}-${snapshot.status.version.slice(0, 12)}-${CATALOG_REVISION}.json`);
+    try { const cached = JSON.parse(await readFile(file, 'utf8')); if (cached?.id === themeId) return cached; } catch { /* 沒有快取 */ }
+    const levels = new Map<string, unknown>();
+    const queue = [...theme.stages];
+    await Promise.all(Array.from({ length: 6 }, async () => {
+      while (queue.length) {
+        const stage = queue.shift()!;
+        const key = stage.levelId.toLowerCase();
+        try { levels.set(key, JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/levels/${key}.json`, 8 * 1024 * 1024)).toString('utf8'))); } catch { /* 個別關卡缺檔時略過，分析會標出實際分析的關卡數 */ }
+      }
+    }));
+    const analysis = analyzeRogueTheme(theme, levels, snapshot.enemies);
+    await mkdir(cache, { recursive: true });
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(analysis), { flag: 'wx' }); await rename(temporary, file);
+    return analysis;
+  }
   async function images(snapshot: GameDataSnapshot): Promise<void> {
     await mkdir(assets, { recursive: true });
     const queue = [...snapshot.dataset.operators];
@@ -187,6 +211,7 @@ export function createGameDataStore(options: {
       for (const [key, filename] of Object.entries(TABLES)) tables[key as keyof GameDataTables] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${DATA_REPO}/${commit.sha}/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json', teams: 'handbook_team_table.json' })) tables[key as 'battleEquip' | 'favor' | 'teams'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       // 敵人圖鑑與資料庫（依關卡推薦用）：同一固定版本；資料庫較大，只在建置時投影成精簡摘要。
+      tables.rogue = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/roguelike_topic_table.json`, 40 * 1024 * 1024)).toString('utf8'));
       tables.enemyHandbook = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/enemy_handbook_table.json`, 24 * 1024 * 1024)).toString('utf8'));
       tables.enemyDatabase = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/levels/enemydata/enemy_database.json`, 32 * 1024 * 1024)).toString('utf8'));
       const published = await publish(tables, { commit: commit.sha, sourceUpdatedAt: commit.commit.committer.date, syncedAt: new Date().toISOString() });
@@ -198,7 +223,7 @@ export function createGameDataStore(options: {
     if (!active) active = update().finally(() => { active = undefined; });
     return active;
   }
-  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents };
+  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
 }
 
 const defaultStore = createGameDataStore();
@@ -209,3 +234,4 @@ export const loadTradingData = defaultStore.loadTrading;
 export const loadDropsData = defaultStore.loadDrops;
 export const stageEnemiesData = defaultStore.stageEnemies;
 export const loadCnEventsData = defaultStore.loadCnEvents;
+export const rogueAnalysisData = defaultStore.rogueAnalysis;
