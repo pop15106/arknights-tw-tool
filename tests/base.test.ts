@@ -576,3 +576,22 @@ test('巡線框架：依無人機上限，未設定時取技能上限', async ()
   assert.equal(drone(), 25);
   assert.equal(drone(200), 20);
 });
+
+test('多班輪替與 MAA 匯出格式', async () => {
+  const { planRotation, exportMaaSchedule } = await import('../src/domain/rotation.ts');
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const facilities: Facility[] = [{ id: 'm', type: 'manufacturing', level: 3, product: 'gold' }, { id: 't', type: 'trading', level: 3 }, { id: 'd', type: 'dormitory', level: 3 }, { id: 'tr', type: 'training', level: 3 }];
+  const base = { facilities, onlineSlots: [] };
+  const rotation = await planRotation(base, catalog, state.roster, definitions, { shifts: 3, timeBudgetMs: 50 });
+  assert.equal(rotation.shifts.length, 3);
+  assert.equal(rotation.hours, 8);
+  for (const shift of rotation.shifts) for (const worker of shift.workers) assert.ok(worker.consumed <= worker.moodStart + 1e-6, '每班的人都撐得完');
+  const json = exportMaaSchedule(base, rotation, definitions, { title: '測試', firstStart: '20:00', drones: { room: 'trading', index: 1 } }) as { plans: { period: string[][]; duration: number; rooms: Record<string, unknown[]> }[] };
+  assert.equal(json.plans.length, 3);
+  assert.deepEqual(json.plans[0].period, [['20:00', '23:59'], ['00:00', '03:59']], '跨日拆成兩段');
+  assert.deepEqual(json.plans[1].period, [['04:00', '11:59']]);
+  assert.equal(json.plans[0].duration, 480);
+  assert.ok(json.plans[0].rooms.manufacture && json.plans[0].rooms.trading);
+  assert.ok(!('dormitory' in json.plans[0].rooms) && !('training' in json.plans[0].rooms), '宿舍交給 MAA、訓練室不支援');
+});

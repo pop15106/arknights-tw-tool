@@ -8,6 +8,7 @@ import { Modal } from './Modal';
 import { BaseMap } from './BaseMap';
 import { BaseTraining } from './BaseTraining';
 import { BaseStats } from './BaseStats';
+import { BaseRotation } from './BaseRotation';
 
 type Base = Settings['base'];
 const TYPES: FacilityType[] = ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'];
@@ -322,6 +323,7 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLa
       <p className="fine-print">調整後按「產生推薦」重新計算。權重只影響最佳化如何取捨，不改變各設施的實際數值；設定只存在這台裝置。</p>
     </fieldset>
     <LayoutCompare state={state} catalog={catalog} weights={weights} busy={busy || running} onApply={onApplyLayout}/>
+    <BaseRotation state={state} catalog={catalog} base={base} weights={weights} busy={busy || running} onApply={(assignments, products) => onApply(assignments, products)}/>
     <div className="inline-actions">
       <button type="button" className="button primary" disabled={busy || syncing || !base.facilities.length} onClick={generate}>{running ? '最佳化計算中…' : result ? '重新產生推薦' : '產生推薦'}</button>
       {result && <button type="button" className="button secondary" disabled={busy || running} onClick={() => onApply(optimized?.assignments ?? result.assignments, optimized?.products)}>套用到配置草稿</button>}

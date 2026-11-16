@@ -1534,7 +1534,7 @@ export function baseObjective(evaluation: BaseEvaluation, catalog: BaseCatalog, 
 
 export interface OptimizeResult { assignments: Record<string, string[]>; products: Record<string, 'gold' | 'record'>; moodFilled: string[]; objective: BaseObjective; start: BaseObjective; moves: number; evaluations: number; timedOut: boolean }
 
-export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { timeBudgetMs?: number; start?: Record<string, string[]>; weights?: Partial<ObjectiveWeights> } = {}): OptimizeResult {
+export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { timeBudgetMs?: number; start?: Record<string, string[]>; weights?: Partial<ObjectiveWeights>; lockProducts?: boolean } = {}): OptimizeResult {
   const deadline = Date.now() + (options.timeBudgetMs ?? 4000);
   const owned = roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false));
   const rooms = new Map(catalog.rooms.map(room => [room.id, room]));
@@ -1566,7 +1566,7 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
   const usedCharacters = (assignments: Record<string, string[]>) => new Set(Object.values(assignments).flat().map(characterOf));
   while (improved && !timedOut) {
     improved = false;
-    for (const facilityId of Object.keys(products)) {
+    for (const facilityId of options.lockProducts ? [] : Object.keys(products)) {
       const next = { ...products, [facilityId]: products[facilityId] === 'gold' ? 'record' as const : 'gold' as const };
       const value = score(current, next);
       if (value.total > best.total + 0.001) { best = value; products = next; moves++; improved = true; }
