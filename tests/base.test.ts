@@ -24,7 +24,7 @@ test('白名單句型解析；任一子句不支援即整個技能不計入', ()
     '進駐製造站時，當前製造站內其他幹員提供的生產力全部歸零（不包含根據設施數量提供加成的生產力），每個發電站為當前製造站+5%的生產力',
     '進駐製造站後，生產力首小時+15%，此後每小時+2%，最終達到+25%',
     '進駐製造站時，每2個工程機器人+1%生產力',
-    '進駐控制中樞時，所有製造站生產力+2%（同種效果取最高）',
+    '進駐控制中樞時，較容易獲得線索板上尚未擁有的線索，但控制中樞內除自身以外的其餘幹員心情每小時消耗+0.25',
   ]) assert.equal(parseSkill({ roomType: description.includes('控制中樞') ? 'CONTROL' : 'MANUFACTURE', description }).supported, false, description);
   // 房間不符也不計入
   assert.equal(parseSkill({ roomType: 'TRADING', description: '進駐製造站時，生產力+15%' }).supported, false);
@@ -338,4 +338,25 @@ test('布局比較：每種布局建立正確設施數量，並各自最佳化�
   const all = Object.values(result.assignments).flat();
   assert.equal(new Set(all).size, all.length);
   assert.ok(result.electricity.produced > 0);
+});
+
+test('控制中樞：全域加成取最高、赤金限定加成相加；心情恢復補滿空位並延長工作時間', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.skills['g1'] = { id: 'g1', name: '示範・統籌', roomType: 'CONTROL', description: '進駐控制中樞時，所有製造站生產力+2%（同種效果取最高）' };
+  catalog.skills['g2'] = { id: 'g2', name: '示範・統籌β', roomType: 'CONTROL', description: '進駐控制中樞時，所有製造站生產力+5%（同種效果取最高）' };
+  catalog.skills['g3'] = { id: 'g3', name: '示範・鍍金', roomType: 'CONTROL', description: '進駐控制中樞時，所有生產貴金屬類配方的製造站生產力+3%' };
+  catalog.skills['mood'] = { id: 'mood', name: '示範・下午茶', roomType: 'CONTROL', description: '進駐控制中樞時，控制中樞內所有幹員的心情每小時恢復+0.05' };
+  catalog.operators['demo-5'] = [[{ buffId: 'g1', elite: 0, level: 1 }]];
+  catalog.operators['demo-6'] = [[{ buffId: 'g2', elite: 0, level: 1 }]];
+  catalog.operators['demo-7'] = [[{ buffId: 'g3', elite: 0, level: 1 }]];
+  catalog.operators['demo-8'] = [[{ buffId: 'mood', elite: 0, level: 1 }]];
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 'g', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'r', type: 'manufacturing', level: 3, product: 'record' }];
+  const ev = evaluateBase({ facilities, onlineSlots: [], assignments: { c: ['demo-5', 'demo-6', 'demo-7', 'demo-8'], g: ['demo-3'], r: ['demo-4'] } }, catalog, state.roster, definitions);
+  assert.equal(ev.facilities[1].totals.productivity, 30 + 5 + 3, '赤金站：精煉 30＋取最高 5＋赤金限定 3');
+  assert.equal(ev.facilities[2].totals.productivity, 30 + 5, '記錄站：歸檔 30＋取最高 5');
+  assert.equal(baseStatistics(ev, catalog).shifts.find(item => item.label.startsWith('控制'))?.rate, 0.95, '中樞 1 人恢復 0.05 → 每人 0.95/時');
+  const opt = optimizeBase({ facilities, onlineSlots: [] }, catalog, state.roster, definitions, { timeBudgetMs: 2000 });
+  assert.ok(opt.assignments.c.includes('demo-6'), '最佳化會把加成最高的中樞技能排進去');
+  assert.ok(opt.moodFilled.includes('demo-8') || opt.assignments.c.includes('demo-8'));
 });

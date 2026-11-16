@@ -27,6 +27,8 @@ function effectText(effect: SkillEffect): string {
     case 'perGroup': return `${effect.scope === 'room' ? '同設施' : '基建內'}每名${effect.group}：${effectText(effect.per)}${effect.max ? `（最多 ${effect.max} 名）` : ''}`;
     case 'resource': return `人間煙火 +${effect.amount}${effect.source === 'perDormOccupant' ? '／宿舍每人' : effect.source === 'perGroupOutsideDorm' ? `／每名${effect.group}（最多 ${effect.max} 名）` : ''}${effect.when === 'high' ? '（心情 > 12）' : effect.when === 'low' ? '（心情 ≤ 12）' : ''}`;
     case 'resourceScale': return `每 ${effect.per} 點人間煙火${effect.target === 'productivity' ? '生產力' : '訂單效率'} +${effect.amount}%`;
+    case 'global': return `所有${effect.product === 'gold' ? '赤金' : ''}${effect.target === 'MANUFACTURE' ? '製造站生產力' : '貿易站訂單效率'} ${signed(effect.value)}${effect.maxOnly ? '（取最高）' : ''}`;
+    case 'moodRoom': return `同設施所有人心情 ${effect.value < 0 ? `恢復 +${-effect.value}` : `消耗 +${effect.value}`}/時`;
     case 'orderMod': return { qualityAlpha: '提高高品質訂單（α）', qualityBeta: '提高高品質訂單（β）', pepe: '特別獨佔訂單', closure: '可露希爾特別訂單', twoGold: '赤金交付數固定為 2', breach: '交付數小於 4 視為違約訂單', breachBonus: `違約訂單赤金 +${effect.amount}`, invest: `4 赤金訂單龍門幣 +${effect.amount}` }[effect.mod];
     case 'remote': return `${effect.target === 'MANUFACTURE' ? '製造站' : '貿易站'}每名${effect.group}：${effect.effects.map(effectText).join('、')}`;
   }
@@ -133,6 +135,7 @@ function OptimizedView({ result, base, catalog, state, weights }: { result: Opti
       </ul>
     </div>
     <p className="recommend-verdict"><strong>整體效益 {result.start.total} → {result.objective.total}（{gain >= 0 ? '+' : ''}{gain}）</strong>：赤金站 {result.objective.gold}%、記錄站 {result.objective.record}%、貿易 {result.objective.trading}%、發電 {result.objective.power}%{result.objective.goldFactor < 1 ? `；赤金只夠 ${Math.round(result.objective.goldFactor * 100)}% 的訂單` : '；赤金足夠交付訂單'}。共替換 {result.moves} 次、評估 {result.evaluations.toLocaleString()} 種配置{result.timedOut ? '（達到時間上限而停止，可再按一次繼續）' : ''}。</p>
+    {result.moodFilled.length > 0 && <p className="fine-print">控制中樞空位以心情恢復技能補上：{result.moodFilled.map(id => definitions.get(id)?.displayName ?? id).join('、')}（延長中樞人員可工作時間，不影響產量）。</p>}
     {changed.length > 0 && <p className="callout">建議調整製造站產品：{changed.map(f => `${evaluation.facilities.find(item => item.facility.id === f.id)?.label} 改做${result.products[f.id] === 'gold' ? '赤金' : '作戰記錄'}`).join('、')}（套用時一併變更）。</p>}
     <div className="recommend-grid">{evaluation.facilities.filter(item => item.operators.length).map(item => <article key={item.facility.id} className="recommend-card">
       <h3>{item.label}{item.facility.type === 'manufacturing' && <span className="tag muted">{item.facility.product === 'gold' ? '赤金' : '作戰記錄'}</span>}</h3>

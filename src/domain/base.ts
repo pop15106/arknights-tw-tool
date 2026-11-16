@@ -24,6 +24,10 @@ export type SkillEffect =
   | { kind: 'perGroup'; scope: 'room' | 'base'; group: string; max?: number; per: SkillEffect }
   /** 控制中樞對其他設施中某陣營幹員的加成：每名符合者在其所在設施各給一次。 */
   | { kind: 'remote'; target: 'MANUFACTURE' | 'TRADING'; group: string; effects: SkillEffect[] }
+  /** 控制中樞對所有製造站／貿易站的加成；maxOnly 為「同種效果取最高」。 */
+  | { kind: 'global'; target: 'MANUFACTURE' | 'TRADING'; value: number; product?: 'gold'; maxOnly: boolean }
+  /** 同設施內所有幹員的心情消耗調整（負值＝恢復）。 */
+  | { kind: 'moodRoom'; value: number }
   /** 改變貿易站訂單內容的技能（品質、特殊訂單、違約、投資），數值依 PRTS 同步的訂單參數計算。 */
   /** 產生人間煙火：flat 為固定值（可限心情高／低時）；perGroupOutsideDorm 為宿舍外每名某陣營幹員；perDormOccupant 為宿舍每名幹員。 */
   | { kind: 'resource'; resource: '人間煙火'; source: 'flat' | 'perGroupOutsideDorm' | 'perDormOccupant'; amount: number; when?: 'high' | 'low'; group?: string; max?: number }
@@ -70,6 +74,9 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^(?:自身)?心情每小時消耗${NUM}$`, 'u'), effect: m => ({ kind: 'moodCost', value: Number(m[1]) }) },
   { pattern: new RegExp(`^訂單(?:獲取|獲得)效率${NUM}%$`, 'u'), effect: m => ({ kind: 'order', value: Number(m[1]) }) },
   { pattern: new RegExp(`^且?訂單上限${NUM}$`, 'u'), effect: m => ({ kind: 'orderLimit', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^所有(製造站|貿易站)(?:生產力|訂單(?:獲取|獲得)?效率)${NUM}%（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'global', target: m[1] === '製造站' ? 'MANUFACTURE' : 'TRADING', value: Number(m[2]), maxOnly: true }) },
+  { pattern: new RegExp(`^所有生產貴金屬類配方的製造站生產力${NUM}%$`, 'u'), effect: m => ({ kind: 'global', target: 'MANUFACTURE', value: Number(m[1]), product: 'gold', maxOnly: false }) },
+  { pattern: new RegExp(`^控制中樞內所有幹員的心情每小時恢復\\+([\\d.]+)$`, 'u'), effect: m => ({ kind: 'moodRoom', value: -Number(m[1]) }) },
   { pattern: new RegExp(`^無人機充能速度${NUM}%$`, 'u'), effect: m => ({ kind: 'drone', value: Number(m[1]) }) },
   { pattern: new RegExp(`^自身心情每小時恢復${NUM}$`, 'u'), effect: m => ({ kind: 'moodRecoverSelf', value: Number(m[1]) }) },
   { pattern: new RegExp(`^該宿舍內所有幹員的心情每小時恢復${NUM}（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'moodRecoverAll', value: Number(m[1]) }) },
@@ -353,6 +360,24 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
       }
     }
   }
+  // 控制中樞的全域加成：同種效果取最高者只取最大值，其餘相加。
+  const globals = new Map<string, { max: number; sum: number; sources: string[] }>();
+  for (const control of facilities.filter(result => result.facility.type === 'control')) for (const op of control.operators) for (const skill of op.skills) for (const effect of skill.applied ?? []) {
+    if (effect.kind !== 'global') continue;
+    const key = `${effect.target}:${effect.product ?? ''}`;
+    const entry = globals.get(key) ?? { max: 0, sum: 0, sources: [] };
+    if (effect.maxOnly) entry.max = Math.max(entry.max, effect.value); else entry.sum += effect.value;
+    entry.sources.push(`${op.name}「${skill.active!.name}」`);
+    globals.set(key, entry);
+  }
+  for (const [key, entry] of globals) {
+    const [target, product] = key.split(':');
+    for (const result of facilities.filter(item => ROOM_OF[item.facility.type] === target && (!product || item.facility.product === product))) {
+      const value = round(entry.max + entry.sum);
+      if (target === 'MANUFACTURE') result.totals.productivity = round(result.totals.productivity + value); else result.totals.order = round(result.totals.order + value);
+      result.remote.push({ from: '控制中樞', skill: entry.sources.join('、'), text: '全域加成', value, kind: target === 'MANUFACTURE' ? 'productivity' : 'order' });
+    }
+  }
   for (const [roomType, count] of counts) {
     const room = rooms.get(roomType);
     if (room && room.maxCount && count > room.maxCount) issues.push(`${room.name}最多 ${room.maxCount} 座，目前設定 ${count} 座。`);
@@ -634,9 +659,10 @@ export function baseStatistics(evaluation: BaseEvaluation, catalog: BaseCatalog)
     const base = catalog.mood.costPerHour[roomType]?.[facility.level - 1] ?? 0;
     if (base <= 0 || !result.operators.length) continue;
     let worst: ShiftStat | undefined;
+    const roomMood = result.operators.reduce((sum, op) => sum + op.skills.reduce((inner, skill) => inner + (skill.applies ? (skill.applied ?? []).filter(effect => effect.kind === 'moodRoom').reduce((a, effect) => a + scalar(effect), 0) : 0), 0), 0);
     for (const op of result.operators) {
       const delta = op.skills.reduce((sum, skill) => sum + (skill.applies ? (skill.applied ?? []).filter(effect => effect.kind === 'moodCost').reduce((a, effect) => a + effect.value, 0) : 0), 0);
-      const rate = Math.max(0.05, base + delta);
+      const rate = Math.max(0.05, base + delta + roomMood);
       const max = catalog.mood.maxByOperator?.[op.operatorId] ?? catalog.mood.max;
       const hours = round(max / rate);
       if (!worst || hours < worst.hours) worst = { facilityId: facility.id, label: result.label, hours, operator: op.name, rate: round(rate) };
@@ -697,7 +723,7 @@ export function baseObjective(evaluation: BaseEvaluation, catalog: BaseCatalog, 
   return { total, manufacture: round(gold + record), gold: round(gold), record: round(record), trading: round(trading), power: round(power), goldFactor: round(goldFactor) };
 }
 
-export interface OptimizeResult { assignments: Record<string, string[]>; products: Record<string, 'gold' | 'record'>; objective: BaseObjective; start: BaseObjective; moves: number; evaluations: number; timedOut: boolean }
+export interface OptimizeResult { assignments: Record<string, string[]>; products: Record<string, 'gold' | 'record'>; moodFilled: string[]; objective: BaseObjective; start: BaseObjective; moves: number; evaluations: number; timedOut: boolean }
 
 export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { timeBudgetMs?: number; start?: Record<string, string[]>; weights?: ObjectiveWeights } = {}): OptimizeResult {
   const deadline = Date.now() + (options.timeBudgetMs ?? 4000);
@@ -758,7 +784,21 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
       }
     }
   }
-  return { assignments: current, products, objective: best, start: startObjective, moves, evaluations, timedOut };
+  // 控制中樞剩餘空位：以心情技能補滿（中樞全員恢復×人數＋自身消耗減少），不影響整體效益。
+  const moodFilled: string[] = [];
+  for (const facility of base.facilities.filter(item => item.type === 'control')) {
+    const free = capacity(facility) - current[facility.id].length;
+    if (free <= 0) continue;
+    const used = usedCharacters(current);
+    const benefit = (row: OwnedOperator) => (catalog.operators[row.operatorId] ?? []).reduce((sum, slot) => {
+      const active = slotResult(slot, row, catalog).active;
+      if (!active || active.roomType !== 'CONTROL') return sum;
+      return sum + parseSkill(active).effects.reduce((inner, effect) => inner + (effect.kind === 'moodRoom' ? -effect.value * capacity(facility) : effect.kind === 'moodCost' ? -effect.value : 0), 0);
+    }, 0);
+    const picks = owned.filter(row => !used.has(characterOf(row.operatorId))).map(row => ({ id: row.operatorId, value: benefit(row) })).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
+    for (const pick of picks.slice(0, free)) { current[facility.id].push(pick.id); moodFilled.push(pick.id); }
+  }
+  return { assignments: current, products, moodFilled, objective: best, start: startObjective, moves, evaluations, timedOut };
 }
 
 /* ------------------------------------------------------------------ */
