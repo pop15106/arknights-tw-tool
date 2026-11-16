@@ -943,3 +943,4 @@ h2 { font-weight: 800; }
 .recruit-op.owned { border-style: solid; }
 .recruit-op small { font-weight: 400; color: var(--muted); }
 .recruit-op.r6 { color: var(--accent); } .recruit-op.r5 { color: var(--amber); } .recruit-op.r4 { color: #a77de0; } .recruit-op.r3 { color: #3d9be9; }
+.stats-table tr.best td { font-weight: 800; color: var(--accent); }
