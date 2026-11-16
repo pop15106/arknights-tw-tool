@@ -442,3 +442,20 @@ test('班次模擬：心情逐步下降、歸零時間、整班平均產量與�
   // 宿舍 5 級：2.0＋0.0004×5000＝4.0／時；消耗 24 → 6 小時；兩班輪替可休息 16 小時以上
   assert.equal(sim.rest?.dormRate, 4); assert.equal(sim.rest?.restHours, 6); assert.ok(sim.rest?.feasible);
 });
+
+test('宿舍：單人恢復取最高、全宿舍恢復同一人疊加後取最高（招募位、發電站、宿舍等級）、休息以最快宿舍計', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const add = (id: string, description: string, operator: string) => { catalog.skills[id] = { id, name: id, roomType: 'DORMITORY', description }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('single', '進駐宿舍時，使該宿舍內除自身以外心情未滿的某個幹員每小時恢復+0.7（同種效果取最高）；同時自身心情每小時恢復+0.1', 'demo-1');
+  add('recruit', '進駐宿舍時，該宿舍內所有幹員心情每小時恢復+0.15，同時每個招募位（不包含初始招募位）額外+0.05恢復效果（疊加後的最終值同種效果取最高）', 'demo-2');
+  add('plants', '進駐宿舍時，該宿舍內所有幹員的心情每小時恢復+0.1，同時每有1間發電站，則恢復效果額外+0.05（疊加後的最終值同種效果取最高）', 'demo-3');
+  assert.deepEqual(parseSkill(catalog.skills.single).effects.map(e => e.kind), ['dormSingle', 'moodRecoverSelf']);
+  const facilities: Facility[] = [{ id: 'd1', type: 'dormitory', level: 5 }, { id: 'd2', type: 'dormitory', level: 1 }, { id: 'p1', type: 'power', level: 1 }, { id: 'p2', type: 'power', level: 1 }, { id: 'm', type: 'manufacturing', level: 3, product: 'gold' }];
+  const base = { facilities, onlineSlots: [], recruitSlots: 3, assignments: { d1: ['demo-1', 'demo-2', 'demo-3'], d2: [], m: ['demo-4'] } };
+  const dorm = evaluateBase(base as never, catalog, state.roster, definitions).facilities[0];
+  assert.equal(dorm.totals.dormSingle, 0.7);
+  assert.equal(dorm.totals.moodRecoverAll, 0.3, 'demo-2：0.15＋3×0.05＝0.30；demo-3：0.1＋2×0.05＝0.20 → 取最高 0.30');
+  const sim = simulateShift(base as never, catalog, state.roster, definitions, { hours: 12 });
+  assert.equal(sim.rest?.dormRate, 2 + 2 + 0.3 + 0.7, '5 級宿舍：基礎 2.0＋氛圍 2.0＋全體 0.3＋單人 0.7');
+});

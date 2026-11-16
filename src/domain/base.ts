@@ -37,6 +37,10 @@ export type SkillEffect =
   | { kind: 'perMoodDrop'; per: number; effect: SkillEffect }
   /** 同設施除自身以外每名處於工作狀態（心情 > 0）的幹員給一次 effect。 */
   | { kind: 'perOtherWorking'; effect: SkillEffect }
+  /** 宿舍：讓該宿舍某位心情未滿的其他幹員每小時恢復（同種效果取最高）。 */
+  | { kind: 'dormSingle'; value: number }
+  /** 依招募位數、發電站數或本設施等級倍增 effect。 */
+  | { kind: 'scaleBy'; by: 'recruitSlots' | 'powerPlants' | 'roomLevel'; per: number; effect: SkillEffect }
   /** 控制中樞：其他設施內處於工作狀態的幹員心情每小時調整（負值＝恢復）。 */
   | { kind: 'workingMood'; value: number }
   /** 同設施內所有幹員的心情消耗調整（負值＝恢復）。 */
@@ -114,12 +118,18 @@ const CLAUSES: { pattern: RegExp; effect: (match: RegExpMatchArray) => SkillEffe
   { pattern: new RegExp(`^(?:貿易站|製造站)內除自身以外每名處於工作狀態的幹員${NUM}%訂單獲取效率$`, 'u'), effect: m => ({ kind: 'perOtherWorking', effect: { kind: 'order', value: Number(m[1]) } }) },
   { pattern: new RegExp(`^無人機充能速度${NUM}%$`, 'u'), effect: m => ({ kind: 'drone', value: Number(m[1]) }) },
   { pattern: new RegExp(`^自身心情每小時恢復${NUM}$`, 'u'), effect: m => ({ kind: 'moodRecoverSelf', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^使該宿舍內除自身以外心情未滿的某個幹員每小時恢復\\+([\\d.]+)（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'dormSingle', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^同時每個招募位（不包含初始招募位）\\+([\\d.]+)恢復效果（疊加後的最終值同種效果取最高）$`, 'u'), effect: m => ({ kind: 'scaleBy', by: 'recruitSlots', per: 1, effect: { kind: 'moodRecoverAll', value: Number(m[1]) } }) },
+  { pattern: new RegExp(`^同時目前宿舍每級為恢復效果\\+([\\d.]+)（疊加後的最終值同種效果取最高）$`, 'u'), effect: m => ({ kind: 'scaleBy', by: 'roomLevel', per: 1, effect: { kind: 'moodRecoverAll', value: Number(m[1]) } }) },
+  { pattern: new RegExp(`^基建內（不包含副手及活動室使用者）每名(.+?)幹員為該宿舍內所有幹員心情每小時恢復速度\\+([\\d.]+)（最多生效(\\d+)名，且同種效果取最高）$`, 'u'), effect: m => ({ kind: 'perGroup', scope: 'base', group: m[1], max: Number(m[3]), per: { kind: 'moodRecoverAll', value: Number(m[2]) } }) },
+  { pattern: new RegExp(`^該宿舍內除自身以外所有幹員的心情每小時恢復${NUM}（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'dormSingle', value: Number(m[1]) }) },
+  { pattern: new RegExp(`^該宿舍內所有幹員(?:的)?心情每小時恢復${NUM}$`, 'u'), effect: m => ({ kind: 'moodRecoverAll', value: Number(m[1]) }) },
   { pattern: new RegExp(`^該宿舍內所有幹員的心情每小時恢復${NUM}（同種效果取最高）$`, 'u'), effect: m => ({ kind: 'moodRecoverAll', value: Number(m[1]) }) },
 ];
 
 function parseClause(raw: string): SkillEffect | null {
   // 搭配條件中的「額外」只是語氣；「當前／目前貿易站」只是指本設施。
-  const clause = raw.trim().replace(/額外(?=[+-]|提升)/u, '').replace(/^(?:當前|目前)(?:貿易站|製造站)/u, '');
+  const clause = raw.trim().replace(/^同時/u, '').replace(/額外(?=[+-]|提升)/u, '').replace(/^(?:當前|目前)(?:貿易站|製造站)/u, '');
   const rule = CLAUSES.map(item => ({ item, match: clause.match(item.pattern) })).find(entry => entry.match);
   return rule?.match ? rule.item.effect(rule.match) : null;
 }
@@ -187,7 +197,14 @@ function parseResourceClause(parts: string[], index: number, previous: SkillEffe
 
 function parseClauses(text: string): SkillEffect[] | null {
   const effects: SkillEffect[] = [];
-  const parts = text.split(/[，；]/u).map(part => part.trim()).filter(Boolean);
+  // 以逗號／分號分句，但不切開全形括號內的逗號（例如「（最多生效2名，且同種效果取最高）」）。
+  const parts: string[] = [];
+  let depth = 0, current = '';
+  for (const char of text) {
+    if (char === '（') depth++; else if (char === '）') depth = Math.max(0, depth - 1);
+    if ((char === '，' || char === '；') && depth === 0) { if (current.trim()) parts.push(current.trim()); current = ''; } else current += char;
+  }
+  if (current.trim()) parts.push(current.trim());
   for (let index = 0; index < parts.length; index++) {
     const part = parts[index];
     // 控制中樞：「每個進駐在製造站的某陣營幹員(，)生產力+N%(，……)」，其後子句都是對該陣營幹員的效果。
@@ -212,6 +229,14 @@ function parseClauses(text: string): SkillEffect[] | null {
     const resource = parseResourceClause(parts, index, effects);
     if (resource === null) return null;
     if (resource) { effects.push(...resource.effects); index += resource.consumed - 1; continue; }
+    const plants = part.match(/^同時每有(\d+)間發電站$/u);
+    const plantBonus = plants && parts[index + 1]?.match(/^則恢復效果(?:額外)?\+([\d.]+)（疊加後的最終值同種效果取最高）$/u);
+    if (plants) { if (!plantBonus) return null; effects.push({ kind: 'scaleBy', by: 'powerPlants', per: Number(plants[1]), effect: { kind: 'moodRecoverAll', value: Number(plantBonus[1]) } }); index++; continue; }
+    if (part === '如果該宿舍內有其他幹員') {
+      const each = parts[index + 1]?.match(/^則每人(?:額外)?為自身心情每小時恢復\+([\d.]+)$/u);
+      if (!each) return null;
+      effects.push({ kind: 'perOtherWorking', effect: { kind: 'moodRecoverSelf', value: Number(each[1]) } }); index++; continue;
+    }
     // 「如果本次訓練專精技能至N級，則訓練速度(額外)+M%」被逗號拆成兩句，在此接回。
     const mastery = part.match(/^如果本次訓練專精技能至(\d)級$/u);
     if (mastery) {
@@ -341,7 +366,9 @@ export interface FacilityResult {
   capacity: number;
   operators: OperatorInRoom[];
   /** 已計入的數值；只包含白名單技能與資料表提供的基礎加成。 */
-  totals: { basic: number; productivity: number; order: number; drone: number; moodRecoverAll: number; moodCost: number[]; clue: number; contact: number; training: number; byproduct: number };
+  totals: { basic: number; productivity: number; order: number; drone: number; moodRecoverAll: number; moodCost: number[]; clue: number; contact: number; training: number; byproduct: number; dormSingle: number };
+  /** 各幹員提供的全宿舍恢復合計（疊加後再於幹員間取最高）。 */
+  allByOp: Record<string, number>;
   /** 已生效但句型未支援、因此沒有計入的技能。 */
   unsupported: { operatorId: string; skill: BaseSkill }[];
   /** 搭配技能的搭檔不在同一設施，條件效果沒有計入。 */
@@ -382,7 +409,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     const roomType = ROOM_OF[facility.type], room = rooms.get(roomType);
     const label = `${FACILITY_LABEL[facility.type]} ${base.facilities.slice(0, index + 1).filter(item => item.type === facility.type).length}`;
     counts.set(roomType, (counts.get(roomType) ?? 0) + 1);
-    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [], clue: 0, contact: 0, training: 0, byproduct: 0 }, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], remote: [], issues: [] };
+    const result: FacilityResult = { facility, label, room, capacity: 0, operators: [], totals: { basic: 0, productivity: 0, order: 0, drone: 0, moodRecoverAll: 0, moodCost: [], clue: 0, contact: 0, training: 0, byproduct: 0, dormSingle: 0 }, allByOp: {}, unsupported: [], uncertain: [], notApplicable: [], comboMissing: [], remote: [], issues: [] };
     if (!room) { result.issues.push('資料包沒有此設施的資料。'); return result; }
     const phase = room.phases[facility.level - 1];
     if (!phase) { result.issues.push(`等級超過資料上限（最高 ${room.phases.length} 級）。`); }
@@ -424,6 +451,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           // 心情條件：依目前心情決定是否生效或倍數。
           if (effect.kind === 'whenMood') return (moodOf(operatorId) > 12) === (effect.cond === 'high') ? effect.effect : null;
           if (effect.kind === 'perMoodDrop') { const count = Math.floor((maxMood(operatorId) - moodOf(operatorId)) / effect.per); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
+          if (effect.kind === 'scaleBy') { const count = Math.floor((effect.by === 'recruitSlots' ? base.recruitSlots ?? 0 : effect.by === 'powerPlants' ? base.facilities.filter(item => item.type === 'power').length : facility.level) / effect.per); return count && 'value' in effect.effect ? { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect : null; }
           if (effect.kind === 'perOtherWorking') return 'value' in effect.effect && assigned.length > 1 ? { ...effect.effect, value: round(effect.effect.value * (assigned.length - 1)) } as SkillEffect : null;
           return effect;
         }).filter((effect): effect is SkillEffect => !!effect).map(effect => {
@@ -437,7 +465,8 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           if (effect.kind === 'productivity') result.totals.productivity += effect.value;
           else if (effect.kind === 'order') result.totals.order += effect.value;
           else if (effect.kind === 'drone') result.totals.drone += effect.value;
-          else if (effect.kind === 'moodRecoverAll') result.totals.moodRecoverAll = Math.max(result.totals.moodRecoverAll, effect.value);
+          else if (effect.kind === 'moodRecoverAll') { result.allByOp[operatorId] = round((result.allByOp[operatorId] ?? 0) + effect.value); result.totals.moodRecoverAll = Math.max(result.totals.moodRecoverAll, result.allByOp[operatorId]); }
+          else if (effect.kind === 'dormSingle') result.totals.dormSingle = Math.max(result.totals.dormSingle, effect.value);
           else if (effect.kind === 'moodCost') result.totals.moodCost.push(effect.value);
           else if (effect.kind === 'clue') { if (!effect.alone || assigned.length === 1) result.totals.clue += effect.value; }
           else if (effect.kind === 'contact') result.totals.contact += effect.perDormLevel ? effect.value * dormLevels : effect.value;
@@ -494,8 +523,9 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     if (pool === pools.high && round2 === 0) sources.set(effect.to, [...(sources.get(effect.to) ?? []), `${label} 由${effect.from}轉化 +${units}`]);
   }
   const used = (resource: string) => Math.min(pools.high.get(resource) ?? 0, pools.low.get(resource) ?? 0);
-  const addToTotals = (result: FacilityResult, effect: SkillEffect) => {
+  const addToTotals = (result: FacilityResult, effect: SkillEffect, operatorId?: string) => {
     if (!('value' in effect)) return;
+    if (effect.kind === 'moodRecoverAll' && operatorId) { result.allByOp[operatorId] = round((result.allByOp[operatorId] ?? 0) + effect.value); result.totals.moodRecoverAll = Math.max(result.totals.moodRecoverAll, result.allByOp[operatorId]); return; }
     if (effect.kind === 'productivity' && productMatches(effect, result.facility)) result.totals.productivity = round(result.totals.productivity + effect.value);
     else if (effect.kind === 'order') result.totals.order = round(result.totals.order + effect.value);
     else if (effect.kind === 'clue') result.totals.clue = round(result.totals.clue + effect.value);
@@ -510,9 +540,9 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
         const count = Math.floor(used(effect.resource) / effect.per);
         if (!count || !('value' in effect.effect)) continue;
         const scaled = { ...effect.effect, value: round(effect.effect.value * count) } as SkillEffect;
-        extra.push(scaled); addToTotals(result, scaled);
+        extra.push(scaled); addToTotals(result, scaled, op.operatorId);
         result.remote.push({ from: op.name, skill: skill.active!.name, text: `${effect.resource} ${used(effect.resource)} 點`, value: scalar(scaled), kind: scaled.kind === 'order' ? 'order' : 'productivity' });
-      } else if (effect.kind === 'resourceThreshold' && used(effect.resource) >= effect.min) { extra.push(effect.effect); addToTotals(result, effect.effect); }
+      } else if (effect.kind === 'resourceThreshold' && used(effect.resource) >= effect.min) { extra.push(effect.effect); addToTotals(result, effect.effect, op.operatorId); }
     }
     if (extra.length) skill.applied = [...(skill.applied ?? []), ...extra];
   }
@@ -1081,10 +1111,11 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
   const dormRates = dorms.map(facility => {
     const result = finalEval.facilities.find(item => item.facility.id === facility.id);
     const atmosphere = Math.min(facility.atmosphere ?? facility.level * 1000, facility.level * 1000);
-    return (catalog.mood?.dormRecover?.[facility.level - 1] ?? 0) + 0.0004 * atmosphere + (result?.totals.moodRecoverAll ?? 0);
+    // 最累的人安排在該宿舍，單人恢復技能也給他。
+    return (catalog.mood?.dormRecover?.[facility.level - 1] ?? 0) + 0.0004 * atmosphere + (result?.totals.moodRecoverAll ?? 0) + (result?.totals.dormSingle ?? 0);
   }).filter(rate => rate > 0);
   const consumed = Math.max(0, ...Object.entries(moods).map(([id, mood]) => maxMood(id) - mood));
-  const dormRate = dormRates.length ? round(dormRates.reduce((a, b) => a + b, 0) / dormRates.length) : 0;
+  const dormRate = dormRates.length ? round(Math.max(...dormRates)) : 0;
   const shifts = Math.max(1, Math.round(24 / hours));
   const available = round(hours * Math.max(1, shifts - 1));
   const rest = dormRate > 0 ? { consumed: round(consumed), dormRate, restHours: round(consumed / dormRate), available, feasible: consumed / dormRate <= available } : null;
