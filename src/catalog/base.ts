@@ -16,7 +16,14 @@ export interface BaseCatalog {
   skills: Record<string, BaseSkill>;
   /** 幹員 → 技能欄；每欄依序是同一技能的升級版本，後者解鎖後取代前者。 */
   operators: Record<string, BaseSkillSlot[][]>;
+  /** 製造配方（秒數為 100% 生產力時每件所需時間；weight 為倉庫佔用量）。 */
+  formulas?: { gold: BaseFormula; records: (BaseFormula & { level: number; exp: number })[] };
+  /** 製造站各等級倉庫容量。 */
+  outputCapacity?: number[];
+  /** 心情：上限與各設施各等級的基礎每小時消耗（皆換算成遊戲顯示單位）。 */
+  mood?: { max: number; costPerHour: Partial<Record<BaseRoomType, number[]>>; maxByOperator?: Record<string, number> };
 }
+export interface BaseFormula { itemId: string; name: string; seconds: number; weight: number }
 
 /** 移除 <@cc.vup>、<$cc.bd_b1>、</> 等遊戲標記，只保留文字。 */
 export function plainGameText(value: unknown): string {
@@ -28,7 +35,7 @@ function obj(value: unknown, label: string): Row {
   return value as Row;
 }
 
-export function buildBaseCatalog(building: unknown, operatorIds: readonly string[], version: string, source: string): BaseCatalog {
+export function buildBaseCatalog(building: unknown, operatorIds: readonly string[], version: string, source: string, items?: unknown): BaseCatalog {
   const data = obj(building, '基建表');
   const roomsRaw = obj(data.rooms, '設施表'), buffsRaw = obj(data.buffs, '技能表'), charsRaw = obj(data.chars, '幹員基建表');
   const rooms = BASE_ROOM_TYPES.map(id => {
@@ -58,5 +65,20 @@ export function buildBaseCatalog(building: unknown, operatorIds: readonly string
     return [id, { id, name: plainGameText(buff.buffName) || id, roomType: String(buff.roomType ?? ''), description: plainGameText(buff.description) || '來源未提供說明。' }];
   }));
   const percent = (value: unknown) => Math.round((Number(value) || 0) * 10000) / 100;
-  return { source, version, rooms, basicSpeedPercent: { MANUFACTURE: percent(data.manufactData?.basicSpeedBuff), TRADING: percent(data.tradingData?.basicSpeedBuff) }, skills, operators };
+  // 心情單位：manpowerDisplayFactor（360000）＝顯示的 1 點；manpowerCost 為每秒消耗。
+  const factor = Number(data.manpowerDisplayFactor) || 0;
+  const mood = factor > 0 ? {
+    max: 24,
+    costPerHour: Object.fromEntries(BASE_ROOM_TYPES.map(id => [id, (roomsRaw[id]?.phases ?? []).map((phase: Row) => Math.round((Number(phase.manpowerCost) || 0) * 3600 / factor * 1000) / 1000)])),
+    maxByOperator: Object.fromEntries(operatorIds.filter(id => Number(charsRaw[id]?.maxManpower) > 0 && Math.abs(Number(charsRaw[id].maxManpower) / factor - 24) > 1e-6).map(id => [id, Number(charsRaw[id].maxManpower) / factor])),
+  } : undefined;
+  const formulaRows = Object.values(data.manufactFormulas ?? {}) as Row[];
+  const formula = (row: Row | undefined): BaseFormula | undefined => row && Number(row.costPoint) > 0 ? { itemId: String(row.itemId), name: plainGameText((items as Row | undefined)?.items?.[row.itemId]?.name) || String(row.itemId), seconds: Number(row.costPoint), weight: Number(row.weight) || 1 } : undefined;
+  const gold = formula(formulaRows.find(row => row.formulaType === 'F_GOLD'));
+  const expItems = (items as Row | undefined)?.expItems ?? {};
+  const records = formulaRows.filter(row => row.formulaType === 'F_EXP' && Number(expItems[row.itemId]?.gainExp) > 0)
+    .map(row => ({ ...formula(row)!, level: Number(row.requireRooms?.[0]?.roomLevel) || 1, exp: Number(expItems[row.itemId].gainExp) })).sort((a, b) => a.level - b.level);
+  const capacity = Array.isArray(data.manufactData?.phases) ? data.manufactData.phases.map((phase: Row) => Number(phase.outputCapacity) || 0) : undefined;
+  return { source, version, rooms, basicSpeedPercent: { MANUFACTURE: percent(data.manufactData?.basicSpeedBuff), TRADING: percent(data.tradingData?.basicSpeedBuff) }, skills, operators,
+    ...(gold && records.length ? { formulas: { gold, records } } : {}), ...(capacity ? { outputCapacity: capacity } : {}), ...(mood ? { mood } : {}) };
 }

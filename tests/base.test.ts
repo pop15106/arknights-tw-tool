@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseCatalog, plainGameText } from '../src/catalog/base.ts';
-import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, unlockState, type Facility } from '../src/domain/base.ts';
+import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, unlockState, type Facility } from '../src/domain/base.ts';
 import { createDemoBaseCatalog, createDemoDataset, createDemoImport } from '../src/demo.ts';
 import { createEmptyState, known, unknown, validateAppState, type OwnedOperator } from '../src/domain/model.ts';
 import { applyImport, previewImport } from '../src/domain/import.ts';
@@ -147,4 +147,35 @@ test('練卡建議：列出確定未解鎖的下一版本與可計算增益，�
   const unknownRow = { ...row, fields: { ...row.fields, elite: unknown('t') } };
   const result = trainingAdvice(catalog, [unknownRow], definitions, { ownedOnly: true });
   assert.equal(result.entries.length, 0);
+});
+
+test('基建統計：赤金與經驗依配方秒數與已計入生產力計算，換班依最先耗盡心情者', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const facilities: Facility[] = [{ id: 'g', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'r', type: 'manufacturing', level: 3, product: 'record' }, { id: 'd', type: 'dormitory', level: 1 }];
+  const evaluation = evaluateBase({ facilities, onlineSlots: [], assignments: { g: ['demo-3'], r: ['demo-4'], d: ['demo-5'] } }, catalog, state.roster, definitions);
+  const stats = baseStatistics(evaluation, catalog);
+  assert.ok(stats.available);
+  // 赤金：+1 基礎 +30 精煉 → 86400×1.31÷4320 = 26.2 條／日
+  assert.equal(stats.goldPerDay, 26.2);
+  // 記錄（3 級→III，1000 經驗、10800 秒）：+1 +30 → 86400×1.31÷10800 = 10.48 件 → 10480 經驗
+  assert.equal(stats.expPerDay, 10480);
+  // 宿舍不消耗心情，不列入；其餘基礎 1/時 → 24 小時 → 每天一班
+  assert.ok(stats.shifts.every(s => s.label.startsWith('製造站')));
+  assert.equal(stats.shifts[0].hours, 24);
+  // 心情可撐 24 小時，但赤金倉庫約 24.73 小時、記錄倉庫約 12.6 小時會滿 → 依倉庫取兩班制
+  assert.equal(stats.suggestion?.shifts, 2); assert.match(stats.suggestion!.text, /倉庫/);
+  // 倉庫：容量 54 ÷ 重量 2 = 27 條；26.2 條／日 → 約 24.73 小時
+  assert.equal(stats.manufacture.find(m => m.product === 'gold')?.storageItems, 27);
+});
+
+test('換班建議：心情消耗越快，班數越多；技能的心情消耗調整會計入', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  catalog.skills['demo-tired'] = { id: 'demo-tired', name: '示範・加班', roomType: 'MANUFACTURE', description: '進駐製造站時，生產力+30%，心情每小時消耗+1' };
+  catalog.operators['demo-3'] = [[{ buffId: 'demo-tired', elite: 0, level: 1 }]];
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const evaluation = evaluateBase({ facilities: [{ id: 'g', type: 'manufacturing', level: 3, product: 'gold' }], onlineSlots: [], assignments: { g: ['demo-3'] } }, catalog, state.roster, definitions);
+  const stats = baseStatistics(evaluation, catalog);
+  assert.equal(stats.shifts[0].hours, 12); assert.equal(stats.shifts[0].rate, 2);
+  assert.match(stats.suggestion!.text, /^兩班制，每 12 小時換班；最先累的人約 12 小時/);
 });

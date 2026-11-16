@@ -7,6 +7,7 @@ import { Icon } from './Icon';
 import { Modal } from './Modal';
 import { BaseMap } from './BaseMap';
 import { BaseTraining } from './BaseTraining';
+import { BaseStats } from './BaseStats';
 
 type Base = Settings['base'];
 const TYPES: FacilityType[] = ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'];
@@ -224,6 +225,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
         <button type="button" className="button primary" disabled={busy || !dirty || draft.facilities.length > 20} onClick={() => onSave(draft)}>{dirty ? '保存配置' : '已保存'}</button>
       </div>
     </div>
+    {draft.facilities.length > 0 && <BaseStats evaluation={evaluation} catalog={catalog}/>}
     <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApply={assignments => update({ ...draft, assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
     {evaluation.issues.length > 0 && <div className="callout danger" role="status"><strong>配置有 {evaluation.issues.length} 個問題</strong><ul>{evaluation.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
     {!draft.facilities.length && <section className="empty-inline base-empty"><strong>先建立設施配置</strong><span>選一個常見布局作為起點，或逐一新增設施；之後可以再調整等級與數量。</span>

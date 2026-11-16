@@ -57,6 +57,12 @@ export function createDemoBaseCatalog(): BaseCatalog {
       ...(['MEETING', 'HIRE', 'TRAINING', 'WORKSHOP'] as const).map(id => ({ id, name: { MEETING: '會客室', HIRE: '辦公室', TRAINING: '訓練室', WORKSHOP: '加工站' }[id], maxCount: 1, phases: [-10, -30, -60].map(electricity => ({ maxStationedNum: id === 'HIRE' || id === 'WORKSHOP' ? 1 : 2, electricity })) })),
     ],
     basicSpeedPercent: { MANUFACTURE: 1, TRADING: 1 },
+    formulas: { gold: { itemId: 'demo-gold', name: '示範赤金', seconds: 4320, weight: 2 }, records: [
+      { itemId: 'demo-r1', name: '示範記錄 I', seconds: 2700, weight: 2, level: 1, exp: 200 },
+      { itemId: 'demo-r2', name: '示範記錄 II', seconds: 4800, weight: 3, level: 2, exp: 400 },
+      { itemId: 'demo-r3', name: '示範記錄 III', seconds: 10800, weight: 5, level: 3, exp: 1000 }] },
+    outputCapacity: [24, 36, 54],
+    mood: { max: 24, costPerHour: { CONTROL: [1, 1, 1, 1, 1], POWER: [1, 1, 1], MANUFACTURE: [1, 1, 1], TRADING: [1, 1, 1], DORMITORY: [0, 0, 0, 0, 0], MEETING: [1, 1, 1], HIRE: [1, 1, 1], TRAINING: [1, 1, 1], WORKSHOP: [1, 1, 1] } },
     skills,
     operators: {
       'demo-1': [slot(['demo-manu-1', 0, 1], ['demo-manu-2', 2, 1]), slot(['demo-ctrl', 1, 1])],
