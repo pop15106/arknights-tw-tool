@@ -68,3 +68,16 @@ test('理智規劃：一關多掉落合併計算、合成、無法取得的材�
   assert.deepEqual(crafted.crafts, [{ id: 'z', count: 2 }]);
   assert.equal(crafted.sanity, 36); assert.equal(crafted.craftLmd, 200);
 });
+
+test('台服未來活動預估：依近期兩服時間差中位數推估', async () => {
+  const { forecastTwEvents } = await import('../src/domain/stages.ts');
+  const day = 86400;
+  const cn = [1, 2, 3, 4].map(index => ({ id: `act${index}`, name: `CN${index}`, type: 'X', startTime: index * 30 * day, endTime: index * 30 * day + 14 * day, hasStage: true, isRerun: false }));
+  cn.push({ id: 'act5', name: '新活動', type: 'X', startTime: 150 * day, endTime: 164 * day, hasStage: true, isRerun: false });
+  const tw = [1, 2, 3, 4].map(index => ({ id: `act${index}`, name: `TW${index}`, type: 'X', startTime: new Date((index * 30 + 180 + index) * day * 1000).toISOString(), endTime: null, rewardEndTime: null, hasStage: true, isRerun: false }));
+  const result = forecastTwEvents(tw, cn, 0)!;
+  assert.deepEqual(result.rangeDays, [181, 184]);
+  assert.equal(result.offsetDays, 183);
+  assert.equal(result.forecasts[0].event.id, 'act5');
+  assert.equal(result.forecasts[0].predicted, (150 + 183) * day * 1000);
+});

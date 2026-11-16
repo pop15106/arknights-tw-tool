@@ -16,8 +16,8 @@ test('更新失敗保留前版指標；並發同步共用同一工作',async()=>
   const dir=await mkdtemp(path.join(os.tmpdir(),'ark-catalog-'));
   let fail=false, requests=0;
   const version='a'.repeat(40);
-  // PRTS 貿易站數據與企鵝物流掉落統計是額外的盡力同步，不計入主資料的請求次數。
-  const fetcher:typeof fetch=async input=>{if(!/^https:\/\/(prts\.wiki|penguin-stats\.io)\//.test(String(input)))requests++;if(fail)throw new Error('upstream private diagnostic');return new Response(JSON.stringify({sha:version,commit:{committer:{date}}}),{status:200});};
+  // PRTS 貿易站數據、企鵝物流掉落統計與陸服活動表是額外的盡力同步，不計入主資料的請求次數。
+  const fetcher:typeof fetch=async input=>{if(!/^https:\/\/(prts\.wiki|penguin-stats\.io|raw\.githubusercontent\.com\/Kengxxiao)\//.test(String(input)))requests++;if(fail)throw new Error('upstream private diagnostic');return new Response(JSON.stringify({sha:version,commit:{committer:{date}}}),{status:200});};
   const store=createGameDataStore({cacheDirectory:dir,assetDirectory:path.join(dir,'assets'),fetcher,build:async()=>fixture(version)});
   try {
     await store.seed({} as never,{commit:version,sourceUpdatedAt:date,syncedAt:date});

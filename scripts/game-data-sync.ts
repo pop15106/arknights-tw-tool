@@ -129,6 +129,20 @@ export function createGameDataStore(options: {
     await writeFile(temporary, JSON.stringify({ enemies }), { flag: 'wx' }); await rename(temporary, file);
     return { stageId, levelId, enemies };
   }
+  // 陸服活動時間表（Kengxxiao/ArknightsGameData 公開鏡像）：只保存活動基本資訊，供台服未來活動預估；失敗保留舊檔。
+  const cnEventsFile = path.join(cache, 'cn-events.json');
+  async function loadCnEvents(): Promise<{ fetchedAt: string; source: string; events: unknown[] } | null> {
+    try { const value = JSON.parse(await readFile(cnEventsFile, 'utf8')); return Array.isArray(value?.events) ? value : null; } catch { return null; }
+  }
+  async function refreshCnEvents(): Promise<void> {
+    const table = JSON.parse((await bytes('https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/activity_table.json', 40 * 1024 * 1024)).toString('utf8'));
+    const events = Object.entries((table?.basicInfo ?? {}) as Record<string, Record<string, unknown>>).filter(([id, row]) => /^[A-Za-z0-9_]{1,40}$/u.test(id) && Number.isFinite(row?.startTime))
+      .map(([id, row]) => ({ id, name: String(row.name ?? id).slice(0, 60), type: String(row.type ?? ''), startTime: Number(row.startTime), endTime: Number(row.endTime) || 0, hasStage: row.hasStage === true, isRerun: row.isReplicate === true }));
+    if (events.length < 50) throw new Error('陸服活動表資料不足。');
+    await mkdir(cache, { recursive: true });
+    const temporary = `${cnEventsFile}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify({ fetchedAt: new Date().toISOString(), source: 'Kengxxiao/ArknightsGameData zh_CN activity_table', events }), { flag: 'wx' }); await rename(temporary, cnEventsFile);
+  }
   async function images(snapshot: GameDataSnapshot): Promise<void> {
     await mkdir(assets, { recursive: true });
     const queue = [...snapshot.dataset.operators];
@@ -168,7 +182,7 @@ export function createGameDataStore(options: {
       if (!validVersion(commit.sha) || !Number.isFinite(Date.parse(commit.commit?.committer?.date))) throw new Error('來源版本無效。');
       // 快取損壞不能阻止重新同步；改用備援快照時一律重建以修好指標。
       const previous = await load().catch(() => null);
-      if (previous && !recovered && previous.status.version === commit.sha && previous.status.catalogRevision === CATALOG_REVISION && previous.status.moduleSource?.version === MODULE_DATA_COMMIT) { await images(previous); await refreshTrading().catch(() => undefined); await refreshDrops().catch(() => undefined); lastError = undefined; delete previous.status.lastError; return previous; }
+      if (previous && !recovered && previous.status.version === commit.sha && previous.status.catalogRevision === CATALOG_REVISION && previous.status.moduleSource?.version === MODULE_DATA_COMMIT) { await images(previous); await refreshTrading().catch(() => undefined); await refreshDrops().catch(() => undefined); await refreshCnEvents().catch(() => undefined); lastError = undefined; delete previous.status.lastError; return previous; }
       const tables = {} as GameDataTables;
       for (const [key, filename] of Object.entries(TABLES)) tables[key as keyof GameDataTables] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${DATA_REPO}/${commit.sha}/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
       for (const [key, filename] of Object.entries({ battleEquip: 'battle_equip_table.json', favor: 'favor_table.json', teams: 'handbook_team_table.json' })) tables[key as 'battleEquip' | 'favor' | 'teams'] = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/${filename}`, 24 * 1024 * 1024)).toString('utf8'));
@@ -176,7 +190,7 @@ export function createGameDataStore(options: {
       tables.enemyHandbook = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/enemy_handbook_table.json`, 24 * 1024 * 1024)).toString('utf8'));
       tables.enemyDatabase = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/levels/enemydata/enemy_database.json`, 32 * 1024 * 1024)).toString('utf8'));
       const published = await publish(tables, { commit: commit.sha, sourceUpdatedAt: commit.commit.committer.date, syncedAt: new Date().toISOString() });
-      await refreshTrading().catch(() => undefined); await refreshDrops().catch(() => undefined);
+      await refreshTrading().catch(() => undefined); await refreshDrops().catch(() => undefined); await refreshCnEvents().catch(() => undefined);
       return published;
     } catch { lastError = '遊戲資料更新失敗；上一版資料已保留。'; throw new Error(lastError); }
   }
@@ -184,7 +198,7 @@ export function createGameDataStore(options: {
     if (!active) active = update().finally(() => { active = undefined; });
     return active;
   }
-  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies };
+  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents };
 }
 
 const defaultStore = createGameDataStore();
@@ -194,3 +208,4 @@ export const seedGameData = defaultStore.seed;
 export const loadTradingData = defaultStore.loadTrading;
 export const loadDropsData = defaultStore.loadDrops;
 export const stageEnemiesData = defaultStore.stageEnemies;
+export const loadCnEventsData = defaultStore.loadCnEvents;

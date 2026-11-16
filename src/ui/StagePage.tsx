@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { GrowthCatalog } from '../catalog/growth';
-import { DROP_TYPE, eventPhase, materialSources, OCCURRENCE, stagesOfEvent, type EventPhase, type GameEvent } from '../domain/stages';
+import { DROP_TYPE, eventPhase, forecastTwEvents, materialSources, OCCURRENCE, stagesOfEvent, type CnEvent, type EventPhase, type GameEvent } from '../domain/stages';
+import { useEffect } from 'preact/hooks';
 import { useStageData } from './gameData';
 import { useGrowthCatalog } from './GrowthPage';
 
@@ -27,6 +28,8 @@ export function StagePage({ isDemo }: { isDemo: boolean }) {
   const [itemId, setItemId] = useState('');
   const [expanded, setExpanded] = useState(false);
   const now = useMemo(() => Date.now(), [data]);
+  const [cn, setCn] = useState<{ fetchedAt: string; events: CnEvent[] } | null>(null);
+  useEffect(() => { if (isDemo) return; const controller = new AbortController(); void fetch('/api/game-data/cn-events', { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }).then(async response => { const body = await response.json().catch(() => null); if (response.ok && Array.isArray(body?.events)) setCn(body); }).catch(() => undefined); return () => controller.abort(); }, [isDemo]);
   if (error) return <section className="panel"><h2>關卡與活動</h2><p className="callout warning">{error}</p></section>;
   if (!data) return <section className="panel"><h2>關卡與活動</h2><p className="fine-print">讀取遊戲資料中…</p></section>;
   const name = (id: string) => catalog?.items[id]?.name ?? id;
@@ -40,6 +43,14 @@ export function StagePage({ isDemo }: { isDemo: boolean }) {
         <label className="checkbox-line"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.currentTarget.checked)}/><span>也顯示沒有關卡的活動（簽到、登入等）</span></label>
         <p className="fine-print">時間以台灣時間顯示；資料來自繁中服活動表。已結束只列出 30 天內的活動。</p>
       </section>
+      {(() => { const forecast = cn ? forecastTwEvents(data.events, cn.events, now) : null; return forecast && forecast.forecasts.length > 0 && <section className="panel" aria-label="未來活動預估">
+        <h3>未來活動預估（依陸服時間表）</h3>
+        <p className="fine-print">最近 {forecast.basis.length} 個兩服都有的活動，台服比陸服晚 {forecast.rangeDays[0]}～{forecast.rangeDays[1]} 天開始（中位數 {forecast.offsetDays} 天）。以下是陸服已開、台服尚未出現的活動，以中位數推估；活動名稱是陸服的簡體名稱，台服可能更名、調換順序或不實裝。</p>
+        <div className="table-scroll"><table className="stats-table"><thead><tr><th>活動（陸服名稱）</th><th>陸服開始</th><th>台服預估</th><th>可能範圍</th></tr></thead><tbody>
+          {forecast.forecasts.slice(0, 12).map(item => <tr key={item.event.id}><td>{item.event.name}</td><td>{date(new Date(item.event.startTime * 1000).toISOString())}</td><td><strong>{new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone: 'Asia/Taipei' }).format(new Date(item.predicted))}</strong></td><td>{new Intl.DateTimeFormat('zh-TW', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Taipei' }).format(new Date(item.earliest))}～{new Intl.DateTimeFormat('zh-TW', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Taipei' }).format(new Date(item.latest))}</td></tr>)}
+        </tbody></table></div>
+        <details className="plain-details"><summary>推估依據</summary><ul className="gap-list">{forecast.basis.map(item => <li key={item.id}>{item.name}：台服晚 {item.days} 天</li>)}</ul></details>
+      </section>; })()}
       {groups.filter(group => group.list.length).map(group => <section key={group.phase} className="panel" aria-label={PHASE[group.phase]}>
         <h3>{PHASE[group.phase]}（{group.list.length}）</h3>
         <div className="event-grid">{group.list.map(event => {

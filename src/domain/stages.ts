@@ -134,3 +134,24 @@ export async function farmingPlan(need: Record<string, number>, stages: readonly
   const craftList = crafts.map((id, k) => ({ id, count: Math.ceil(result.x[candidates.length + k] - 1e-6) })).filter(item => item.count > 0);
   return { runs, crafts: craftList, sanity: runs.reduce((sum, item) => sum + item.sanity, 0), craftLmd: craftList.reduce((sum, item) => sum + item.count * recipes[item.id].gold, 0), unmet };
 }
+
+/* ------------------------------------------------------------------ */
+/* 台服未來活動預估：台服大致沿用陸服的活動順序。用兩服都有的近期活動算出     */
+/* 開始時間差（中位數與範圍），推估陸服已開、台服尚未出現的活動何時到來。      */
+/* ------------------------------------------------------------------ */
+export interface CnEvent { id: string; name: string; type: string; startTime: number; endTime: number; hasStage: boolean; isRerun: boolean }
+export interface EventForecast { event: CnEvent; predicted: number; earliest: number; latest: number }
+export function forecastTwEvents(twEvents: readonly GameEvent[], cnEvents: readonly CnEvent[], now: number, sample = 8): { offsetDays: number; rangeDays: [number, number]; basis: { id: string; name: string; days: number }[]; forecasts: EventForecast[] } | null {
+  const tw = new Map(twEvents.map(event => [event.id, event]));
+  const pairs = cnEvents.filter(event => event.hasStage && !event.isRerun && tw.get(event.id)?.startTime)
+    .map(event => ({ id: event.id, name: tw.get(event.id)!.name, cnStart: event.startTime, days: (Date.parse(tw.get(event.id)!.startTime!) / 1000 - event.startTime) / 86400 }))
+    .filter(pair => pair.days > 0).sort((a, b) => a.cnStart - b.cnStart).slice(-sample);
+  if (pairs.length < 3) return null;
+  const days = pairs.map(pair => pair.days).sort((a, b) => a - b);
+  const median = days[Math.floor(days.length / 2)];
+  const latestMatched = pairs.at(-1)!.cnStart;
+  const forecasts = cnEvents.filter(event => event.hasStage && !event.isRerun && !tw.has(event.id) && event.startTime > latestMatched - 60 * 86400)
+    .map(event => ({ event, predicted: (event.startTime + median * 86400) * 1000, earliest: (event.startTime + days[0] * 86400) * 1000, latest: (event.startTime + days.at(-1)! * 86400) * 1000 }))
+    .filter(item => item.latest >= now - 7 * 86400_000).sort((a, b) => a.predicted - b.predicted);
+  return { offsetDays: Math.round(median), rangeDays: [Math.round(days[0]), Math.round(days.at(-1)!)], basis: pairs.map(pair => ({ id: pair.id, name: pair.name, days: Math.round(pair.days) })), forecasts };
+}
