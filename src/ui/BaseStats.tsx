@@ -3,6 +3,7 @@ import { baseStatistics, droneOptions, simulateShift, type BaseEvaluation } from
 import type { AppState, Settings } from '../domain/model';
 import { DEFAULT_TRADING } from '../catalog/trading';
 import { ShiftReminder } from './ShiftReminder';
+import { MoodChart } from './MoodChart';
 
 const fmt = (value: number, digits = 1) => value.toLocaleString('zh-TW', { maximumFractionDigits: digits });
 
@@ -73,6 +74,7 @@ export function BaseStats({ evaluation, catalog, base, state }: { evaluation: Ba
       <div className="sim-compare">
         {([['赤金', 'goldPerDay', '條'], ['經驗', 'expPerDay', ''], ['龍門幣', 'lmdPerDay', '']] as const).map(([label, key, unit]) => <div key={key}><span>{label}／日</span><strong>{fmt(simulation.average[key], key === 'goldPerDay' ? 1 : 0)}{unit}</strong><small>開班時 {fmt(simulation.start[key], key === 'goldPerDay' ? 1 : 0)}{simulation.average[key] < simulation.start[key] ? '，班中有人停工或技能失效' : simulation.average[key] > simulation.start[key] ? '，心情條件技能在班中生效' : ''}</small></div>)}
       </div>
+      <MoodChart series={simulation.timeline} step={simulation.step} max={catalog.mood?.max ?? 24}/>
       {simulation.zeroAt.length > 0 ? <p className="callout warning">班中心情歸零而停工：{simulation.zeroAt.map(item => `${item.name}（${item.label}，第 ${item.hours} 小時）`).join('、')}。可縮短換班間隔或換上心情消耗較低的幹員。</p> : <p className="fine-print">整班沒有人心情歸零。</p>}
       {simulation.rest && <p className={`callout ${simulation.rest.feasible ? '' : 'danger'}`}>休息：本班最多消耗 {fmt(simulation.rest.consumed)} 點心情；安排在恢復最快的宿舍為 {fmt(simulation.rest.dormRate, 2)}／時（基礎＋0.0004×氛圍＋全宿舍技能＋單人恢復技能），回滿約需 {fmt(simulation.rest.restHours)} 小時，輪替中可休息 {fmt(simulation.rest.available)} 小時 → {simulation.rest.feasible ? '輪替可行' : '休息不足，下一班開工時心情不會滿'}。</p>}
       <details className="plain-details"><summary>各設施開班時與整班平均</summary><table className="stats-table"><thead><tr><th>設施</th><th>開班時</th><th>整班平均</th></tr></thead><tbody>{simulation.facilities.filter(item => item.start || item.average).map(item => <tr key={item.facilityId}><td>{item.label}</td><td>{fmt(item.start)} {item.unit}</td><td>{fmt(item.average)} {item.unit}</td></tr>)}</tbody></table></details>

@@ -1651,6 +1651,8 @@ export interface ShiftSimulation {
   facilities: { facilityId: string; label: string; start: number; average: number; unit: string }[];
   zeroAt: { operatorId: string; name: string; label: string; hours: number }[];
   rest: { consumed: number; dormRate: number; restHours: number; available: number; feasible: boolean } | null;
+  /** 每位上班幹員在各時間點（0、step、2·step…）的心情。 */
+  timeline: { operatorId: string; name: string; label: string; values: number[] }[];
 }
 
 export function simulateShift(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, options: { hours: number; step?: number }): ShiftSimulation {
@@ -1678,6 +1680,8 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
   const tradingLimits = (catalog.trading ?? DEFAULT_TRADING).limits;
   const steps = Math.max(1, Math.round(hours / step));
   const names = new Map(base.facilities.map((facility, index) => [facility.id, evaluateBase(base, catalog, [], definitions).facilities[index]?.label ?? facility.id]));
+  const track = new Map<string, number[]>(Object.keys(moods).map(id => [id, [moods[id]]]));
+  const where = new Map<string, string>();
   for (let i = 0; i < steps; i++) {
     const evaluation = evaluateBase(base, catalog, roster, definitions, moods, i * step + step / 2, Object.fromEntries(Object.entries(orders).map(([id, value]) => [id, Math.floor(value)])));
     const stats = baseStatistics(evaluation, catalog);
@@ -1694,7 +1698,9 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
       const next = Math.min(maxMood(item.operatorId), Math.max(0, moods[item.operatorId] - item.rate * step));
       if (next <= 0 && !zeroAt.has(item.operatorId)) zeroAt.set(item.operatorId, { label: item.label, hours: round((i + 1) * step) });
       moods[item.operatorId] = next;
+      where.set(item.operatorId, item.label);
     }
+    for (const [id, values] of track) values.push(Math.round(moods[id] * 100) / 100);
     // 貿易站訂單數：依當下訂單效率累積，達上限即停（換班時收取歸零）。
     for (const item of stats.trading) {
       const result = evaluation.facilities.find(entry => entry.facility.id === item.facilityId);
@@ -1738,6 +1744,7 @@ export function simulateShift(base: Settings['base'], catalog: BaseCatalog, rost
   return {
     hours, step, average, start,
     facilities: [...sums].map(([facilityId, entry]) => ({ facilityId, label: entry.label, start: round(entry.start), average: round(entry.total / steps), unit: entry.unit })),
+    timeline: [...track].map(([operatorId, values]) => ({ operatorId, name: definitions.get(operatorId)?.displayName ?? operatorId, label: where.get(operatorId) ?? '', values })),
     zeroAt: [...zeroAt].map(([operatorId, entry]) => ({ operatorId, name: definitions.get(operatorId)?.displayName ?? operatorId, ...entry })).sort((a, b) => a.hours - b.hours),
     rest,
   };
