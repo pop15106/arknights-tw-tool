@@ -48,7 +48,8 @@ flowchart TD
 
 | 層次 | 主要程式 | 責任 |
 | --- | --- | --- |
-| 主介面 | `src/App.tsx`、`BatchEditor.tsx`、`OperatorEncyclopedia.tsx` | 工作區、導航、預覽、保存、逐列草稿及圖鑑 |
+| 主介面 | `src/App.tsx`（資料流與保存）、`src/ui/`（版面框架、幹員庫、設定、匯入／預覽／詳情／復原面板、主題）、`BatchEditor.tsx`、`OperatorEncyclopedia.tsx` | 工作區、導航、預覽、保存、逐列草稿及圖鑑；面板內部狀態（衝突決策、搜尋）隨面板開關自動重置 |
+| 設計系統 | `src/styles.css` | 顏色、間距與圓角 token；深色預設，淺色跟隨系統或右上角手動切換（只存在這台裝置） |
 | 領域層 | `src/domain/` | 資料契約、欄位證據、合併、批次差異與查詢；未知、零、不適用分開 |
 | 儲存層 | `src/storage/` | IndexedDB 交易、修訂檢查、備份與復原；舊分頁不能靜默覆蓋新資料 |
 | 匯入層 | `src/importers/` | 一般 JSON、SKPORT 封裝及 OCR 候選驗證；以穩定 ID 合併 |

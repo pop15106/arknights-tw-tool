@@ -103,10 +103,10 @@ function ModuleDescription({ module, row }: { module: Module; row: OwnedOperator
 
 export function OperatorEncyclopedia({ definition, row }: { definition: OperatorDefinition; row: OwnedOperator }) {
   const talents = definition.talents ?? [];
-  const originalModulesOnly = definition.modules.length > 0 && definition.modules.every(module => module.type === 'original' || module.kind.toUpperCase() === 'ORIGINAL');
+  const originalModulesOnly = definition.modules.length > 0 && definition.modules.every(isOriginalModule);
   const confirmed = ['elite', 'level', 'potential'].every(field => row.fields[field]?.manuallyConfirmed);
   return <section className="operator-encyclopedia" aria-label="幹員資料與能力說明">
-    <div className="encyclopedia-profile"><OperatorPortrait definition={definition} large/><div><span className="operator-rarity" role="img" aria-label={`${definition.rarity} 星`}>{'✦'.repeat(definition.rarity)}</span><h3>{definition.displayName}</h3><p>{definition.profession} · {definition.branch}<br/>{definition.faction}</p></div></div>
+    <div className={`encyclopedia-profile rarity-${definition.rarity}`}><OperatorPortrait definition={definition} large/><div><span className="operator-rarity" role="img" aria-label={`${definition.rarity} 星`}>{'★'.repeat(definition.rarity)}</span><h3>{definition.displayName}</h3><p>{definition.profession} · {definition.branch}<br/>{definition.faction}</p></div></div>
     <h3>技能說明</h3><p className="fine-print">選擇等級可查看資料包的中文說明；切換說明不會改變你的養成紀錄，也不代表已解鎖或已專精。</p>
     <div className="encyclopedia-list">{definition.skills.map(skill => <SkillDescription key={`${row.operatorId}-${skill.id}`} skill={skill} row={row}/>)}</div>
     <h3 className="encyclopedia-subheading">天賦與解鎖條件</h3><p className="fine-print">以下保留資料包中的各條件版本，不代表全部同時生效或可相加。條件依目前紀錄比對；未知養成值不視為已達成。</p>
