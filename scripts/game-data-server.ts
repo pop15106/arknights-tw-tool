@@ -4,7 +4,10 @@ import { pathToFileURL } from 'node:url';
 import type { GameDataSnapshot } from './game-data-sync.ts';
 
 const DEFAULT_PORT = 5188;
-const VITE_ORIGINS = ['http://127.0.0.1:5173', 'http://127.0.0.1:4173'];
+// 只接受 127.0.0.1 的任意連接埠（例如 5173 被占用時改用 5174）；外部網域與 DNS 重新綁定仍會被擋下。
+const LOOPBACK_HOST = /^127\.0\.0\.1:\d{2,5}$/u;
+const isLoopbackHost = (value: string | undefined) => !!value && LOOPBACK_HOST.test(value);
+const isLoopbackOrigin = (value: string | undefined) => !!value && value.startsWith('http://') && isLoopbackHost(value.slice('http://'.length));
 interface ServerOptions {
   port?: number;
   load?: () => Promise<GameDataSnapshot | null>;
@@ -59,7 +62,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     try {
-      if (req.headers.host !== host && !['127.0.0.1:5173', '127.0.0.1:4173'].includes(req.headers.host ?? '')) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
+      if (req.headers.host !== host && !isLoopbackHost(req.headers.host)) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
       if (req.headers.authorization !== undefined) throw new ApiError(400, 'CREDENTIALS', '公開資料服務不接受帳號憑證。');
       const raw = req.url ?? '';
       if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') || raw.includes('#') || raw.length > 2048) throw new ApiError(400, 'PATH', '網址格式無效。');
@@ -73,7 +76,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
         if (!allowedQuery.includes(key) || url.searchParams.getAll(key).length !== 1) throw new ApiError(400, 'QUERY', '查詢參數無效。');
       }
       if (isSync) {
-        if (req.headers['x-game-data-sync'] !== '1' || ![origin, ...VITE_ORIGINS].includes(req.headers.origin ?? '')
+        if (req.headers['x-game-data-sync'] !== '1' || !(req.headers.origin === origin || isLoopbackOrigin(req.headers.origin))
           || (req.headers['sec-fetch-site'] !== undefined && !['same-origin', 'same-site'].includes(String(req.headers['sec-fetch-site'])))) {
           throw new ApiError(403, 'ORIGIN', '同步只接受本機頁面明確發出的請求。');
         }

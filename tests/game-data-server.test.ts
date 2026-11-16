@@ -81,12 +81,12 @@ test('分頁在篩選後計算 total；查詢有界且拒絕未知及重複參�
   assert.equal((await fetch(`${f.origin}/api/game-data/status?token=synthetic-secret`)).status, 400);
 });
 
-test('所有路由驗證 Host；僅接受實際 loopback 或 Vite 代理 Host', async t => {
+test('所有路由驗證 Host；只接受 127.0.0.1 的連接埠（Vite 換埠時仍可用）', async t => {
   const f = await fixture(t);
-  for (const host of ['attacker.test', 'localhost:5188', '127.0.0.1:9999']) {
+  for (const host of ['attacker.test', 'localhost:5188', '127.0.0.1.attacker.test:5173', '127.0.0.1', '127.0.0.1:5173.evil']) {
     assert.equal((await rawRequest(f.origin, '/api/game-data/status', { Host: host })).status, 403);
   }
-  for (const host of ['127.0.0.1:5173', '127.0.0.1:4173']) {
+  for (const host of ['127.0.0.1:5173', '127.0.0.1:4173', '127.0.0.1:5174']) {
     assert.equal((await rawRequest(f.origin, '/api/game-data/status', { Host: host })).status, 200);
   }
   assert.equal((await fetch(`${f.origin}/api/game-data/status`, { headers: { Authorization: 'Bearer SYNTHETIC_SECRET' } })).status, 400);
