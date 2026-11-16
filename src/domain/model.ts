@@ -99,6 +99,10 @@ export interface Settings {
     onlineSlots: string[];
     /** 設施 ID → 進駐幹員 ID。只是配置草稿，不代表遊戲內現況。 */
     assignments?: Record<string, string[]>;
+    /** 訓練室：正在專精的幹員職業與目標專精等級（影響訓練加速技能）。 */
+    training?: { profession?: string; mastery?: 1 | 2 | 3 };
+    /** 加工站：主要加工類別（影響副產品技能）。 */
+    workshop?: 'elite' | 'skill' | 'base' | 'any';
   };
   analysis: { mode: 'story' | 'integrated-strategies' | 'reclamation' | 'stationary-security' | 'defense'; goal: string; budget: number };
   lastBackupAt?: string;
@@ -330,12 +334,18 @@ export function parseImportText(textValue: string): ImportDocument { return vali
 
 function validateSettings(value: unknown): void {
   const settings = object(value, ['base', 'analysis', 'lastBackupAt'], ['base', 'analysis']);
-  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
+  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments', 'training', 'workshop'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
   for (const item of base.facilities) {
     const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
     if (facility.product !== undefined) choice(facility.product, ['gold', 'record', 'lmd'], '產品'); if (facility.atmosphere !== undefined) integer(facility.atmosphere, 0, 10000, '氛圍');
   }
   unique((base.facilities as { id: string }[]).map(f => f.id), '設施');
+  if (base.training !== undefined) {
+    const training = object(base.training, ['profession', 'mastery'], []);
+    if (training.profession !== undefined) choice(training.profession, ['先鋒', '近衛', '重裝', '狙擊', '術師', '醫療', '輔助', '特種'], '訓練職業');
+    if (training.mastery !== undefined) choice(training.mastery, [1, 2, 3], '目標專精等級');
+  }
+  if (base.workshop !== undefined) choice(base.workshop, ['elite', 'skill', 'base', 'any'], '加工類別');
   if (base.assignments !== undefined) {
     // 幹員是否仍在幹員庫由基建頁提示，不在此阻擋，避免撤銷匯入後整庫無法保存。
     const facilityIds = (base.facilities as { id: string }[]).map(f => f.id);

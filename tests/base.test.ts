@@ -360,3 +360,26 @@ test('控制中樞：全域加成取最高、赤金限定加成相加；心情�
   assert.ok(opt.assignments.c.includes('demo-6'), '最佳化會把加成最高的中樞技能排進去');
   assert.ok(opt.moodFilled.includes('demo-8') || opt.assignments.c.includes('demo-8'));
 });
+
+test('功能設施：會客室（含只有自己時）、辦公室（含宿舍等級）、訓練室（依職業與專精）、加工站（依類別）', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const add = (id: string, roomType: string, description: string, operator: string) => { catalog.skills[id] = { id, name: id, roomType, description }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('m1', 'MEETING', '進駐會客室時，線索蒐集速度提升20%，且更容易獲得黑鋼國際線索', 'demo-1');
+  add('m2', 'MEETING', '進駐會客室時，如果會客室內只有自身處於工作狀態時，線索蒐集速度提升30%，心情每小時消耗+1', 'demo-2');
+  add('h1', 'HIRE', '進駐人力辦公室時，人脈資源的聯絡速度+20%，每間宿舍每級額外+1%人脈資源的聯絡速度', 'demo-3');
+  add('t1', 'TRAINING', '進駐訓練室協助位時，重裝幹員的專精技能訓練速度+30%，如果本次訓練專精技能至3級，則訓練速度額外+45%', 'demo-4');
+  add('w1', 'WORKSHOP', '進駐加工站加工精英材料時，副產品的產出機率提升70%', 'demo-5');
+  assert.match(parseSkill(catalog.skills.m1).ignoredCondition!, /黑鋼/);
+  assert.equal(parseSkill(catalog.skills.w1).effects[0].kind === 'byproduct' && (parseSkill(catalog.skills.w1).effects[0] as { category: string }).category, 'elite');
+  const facilities: Facility[] = [{ id: 'me', type: 'meeting', level: 3 }, { id: 'of', type: 'office', level: 3 }, { id: 'tr', type: 'training', level: 3 }, { id: 'ws', type: 'workshop', level: 3 }, { id: 'd1', type: 'dormitory', level: 5 }, { id: 'd2', type: 'dormitory', level: 3 }];
+  const run = (extra: Partial<{ training: { profession?: string; mastery?: 1 | 2 | 3 }; workshop: 'elite' | 'skill' | 'base' | 'any' }>, meeting = ['demo-1', 'demo-2']) =>
+    evaluateBase({ facilities, onlineSlots: [], assignments: { me: meeting, of: ['demo-3'], tr: ['demo-4'], ws: ['demo-5'] }, ...extra } as never, catalog, state.roster, definitions).facilities;
+  let [me, of, tr, ws] = run({});
+  assert.equal(me.totals.clue, 20, '兩人同房，只有自己時的技能不生效');
+  assert.equal(of.totals.contact, 20 + 8, '宿舍等級 5＋3 = 8');
+  assert.equal(tr.totals.training, 0, '未設定職業時不計職業限定加成');
+  assert.equal(ws.totals.byproduct, 0);
+  [me, of, tr, ws] = run({ training: { profession: '重裝', mastery: 3 }, workshop: 'elite' }, ['demo-2']);
+  assert.equal(me.totals.clue, 30); assert.equal(tr.totals.training, 75); assert.equal(ws.totals.byproduct, 70);
+});

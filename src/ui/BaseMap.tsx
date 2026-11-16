@@ -15,6 +15,10 @@ function metric(result: FacilityResult): string | null {
   if (room === 'MANUFACTURE') return `生產力 ${signed(result.totals.basic + result.totals.productivity)}`;
   if (room === 'TRADING') return `訂單效率 ${signed(result.totals.basic + result.totals.order)}`;
   if (room === 'POWER') return `無人機 ${signed(result.totals.drone)}`;
+  if (room === 'MEETING' && result.totals.clue) return `線索 +${result.totals.clue}%`;
+  if (room === 'HIRE' && result.totals.contact) return `聯絡 +${result.totals.contact}%`;
+  if (room === 'TRAINING' && result.totals.training) return `專精訓練 +${result.totals.training}%`;
+  if (room === 'WORKSHOP' && result.totals.byproduct) return `副產品 +${result.totals.byproduct}%`;
   if (room === 'DORMITORY') return result.totals.moodRecoverAll ? `全宿舍恢復 ${signed(result.totals.moodRecoverAll, '/時')}` : null;
   return null;
 }

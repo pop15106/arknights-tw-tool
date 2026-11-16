@@ -27,6 +27,10 @@ function effectText(effect: SkillEffect): string {
     case 'perGroup': return `${effect.scope === 'room' ? '同設施' : '基建內'}每名${effect.group}：${effectText(effect.per)}${effect.max ? `（最多 ${effect.max} 名）` : ''}`;
     case 'resource': return `人間煙火 +${effect.amount}${effect.source === 'perDormOccupant' ? '／宿舍每人' : effect.source === 'perGroupOutsideDorm' ? `／每名${effect.group}（最多 ${effect.max} 名）` : ''}${effect.when === 'high' ? '（心情 > 12）' : effect.when === 'low' ? '（心情 ≤ 12）' : ''}`;
     case 'resourceScale': return `每 ${effect.per} 點人間煙火${effect.target === 'productivity' ? '生產力' : '訂單效率'} +${effect.amount}%`;
+    case 'clue': return `線索蒐集速度 +${effect.value}%${effect.alone ? '（會客室只有自己工作時）' : ''}`;
+    case 'contact': return `聯絡速度 +${effect.value}%${effect.perDormLevel ? '／宿舍每級' : ''}`;
+    case 'training': return `${effect.professions ? effect.professions.join('、') : ''}專精訓練 +${effect.value}%${effect.atMastery ? `（訓練至專精 ${effect.atMastery}）` : ''}`;
+    case 'byproduct': return `副產品機率 +${effect.value}%（${{ elite: '精英材料', skill: '技巧概要', base: '基建材料', any: '任意材料' }[effect.category]}）`;
     case 'global': return `所有${effect.product === 'gold' ? '赤金' : ''}${effect.target === 'MANUFACTURE' ? '製造站生產力' : '貿易站訂單效率'} ${signed(effect.value)}${effect.maxOnly ? '（取最高）' : ''}`;
     case 'moodRoom': return `同設施所有人心情 ${effect.value < 0 ? `恢復 +${-effect.value}` : `消耗 +${effect.value}`}/時`;
     case 'orderMod': return { qualityAlpha: '提高高品質訂單（α）', qualityBeta: '提高高品質訂單（β）', pepe: '特別獨佔訂單', closure: '可露希爾特別訂單', twoGold: '赤金交付數固定為 2', breach: '交付數小於 4 視為違約訂單', breachBonus: `違約訂單赤金 +${effect.amount}`, invest: `4 赤金訂單龍門幣 +${effect.amount}` }[effect.mod];
@@ -53,9 +57,9 @@ function useBaseCatalog(isDemo: boolean, attempt: number) {
   return { catalog, error };
 }
 
-function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, onAssign, onUnassign }: {
+function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, onAssign, onUnassign, onSettings }: {
   result: FacilityResult; catalog: BaseCatalog; state: AppState; base: Base; busy: boolean;
-  onChange: (patch: Partial<Facility>) => void; onRemove: () => void; onAssign: (operatorId: string) => void; onUnassign: (operatorId: string) => void;
+  onChange: (patch: Partial<Facility>) => void; onRemove: () => void; onAssign: (operatorId: string) => void; onUnassign: (operatorId: string) => void; onSettings: (patch: Partial<Base>) => void;
 }) {
   const { facility, room } = result;
   const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
@@ -76,6 +80,9 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
     </header>
     <div className="facility-controls">
       <label><span>等級</span><select className="filter" value={facility.level} disabled={busy} onChange={event => onChange({ level: Number(event.currentTarget.value) })}>{(room?.phases ?? [{}]).map((_, index) => <option key={index} value={index + 1}>{index + 1} 級</option>)}</select></label>
+      {facility.type === 'training' && <><label><span>訓練中的職業</span><select className="filter" value={base.training?.profession ?? ''} disabled={busy} onChange={event => onSettings({ training: { ...base.training, profession: event.currentTarget.value || undefined } })}><option value="">未設定（只計通用加成）</option>{['先鋒', '近衛', '重裝', '狙擊', '術師', '醫療', '輔助', '特種'].map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+        <label><span>目標專精</span><select className="filter" value={base.training?.mastery ?? ''} disabled={busy} onChange={event => onSettings({ training: { ...base.training, mastery: event.currentTarget.value ? Number(event.currentTarget.value) as 1 | 2 | 3 : undefined } })}><option value="">未設定</option>{[1, 2, 3].map(item => <option key={item} value={item}>專精 {item}</option>)}</select></label></>}
+      {facility.type === 'workshop' && <label><span>主要加工</span><select className="filter" value={base.workshop ?? ''} disabled={busy} onChange={event => onSettings({ workshop: (event.currentTarget.value || undefined) as Base['workshop'] })}><option value="">未設定（只計任意材料加成）</option><option value="elite">精英材料</option><option value="skill">技巧概要</option><option value="base">基建材料</option></select></label>}
       {facility.type === 'manufacturing' && <label><span>產品</span><select className="filter" value={facility.product ?? ''} disabled={busy} onChange={event => onChange({ product: event.currentTarget.value as Facility['product'] })}><option value="" disabled>選擇產品</option><option value="gold">{PRODUCT_LABEL.gold}</option><option value="record">{PRODUCT_LABEL.record}</option></select></label>}
     </div>
     {metrics.length > 0 && <dl className="facility-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}{(roomType === 'MANUFACTURE' || roomType === 'TRADING') && <div><dt>其中基礎</dt><dd>{signed(result.totals.basic)}</dd></div>}</dl>}
@@ -134,7 +141,7 @@ function OptimizedView({ result, base, catalog, state, weights }: { result: Opti
         <li>宿舍沿用單人推薦，不參與最佳化。</li>
       </ul>
     </div>
-    <p className="recommend-verdict"><strong>整體效益 {result.start.total} → {result.objective.total}（{gain >= 0 ? '+' : ''}{gain}）</strong>：赤金站 {result.objective.gold}%、記錄站 {result.objective.record}%、貿易 {result.objective.trading}%、發電 {result.objective.power}%{result.objective.goldFactor < 1 ? `；赤金只夠 ${Math.round(result.objective.goldFactor * 100)}% 的訂單` : '；赤金足夠交付訂單'}。共替換 {result.moves} 次、評估 {result.evaluations.toLocaleString()} 種配置{result.timedOut ? '（達到時間上限而停止，可再按一次繼續）' : ''}。</p>
+    <p className="recommend-verdict"><strong>整體效益 {result.start.total} → {result.objective.total}（{gain >= 0 ? '+' : ''}{gain}）</strong>：赤金站 {result.objective.gold}%、記錄站 {result.objective.record}%、貿易 {result.objective.trading}%、發電 {result.objective.power}%、線索 {result.objective.clue}%、聯絡 {result.objective.contact}%、訓練 {result.objective.training}%、副產品 {result.objective.byproduct}%{result.objective.goldFactor < 1 ? `；赤金只夠 ${Math.round(result.objective.goldFactor * 100)}% 的訂單` : '；赤金足夠交付訂單'}。共替換 {result.moves} 次、評估 {result.evaluations.toLocaleString()} 種配置{result.timedOut ? '（達到時間上限而停止，可再按一次繼續）' : ''}。</p>
     {result.moodFilled.length > 0 && <p className="fine-print">控制中樞空位以心情恢復技能補上：{result.moodFilled.map(id => definitions.get(id)?.displayName ?? id).join('、')}（延長中樞人員可工作時間，不影響產量）。</p>}
     {changed.length > 0 && <p className="callout">建議調整製造站產品：{changed.map(f => `${evaluation.facilities.find(item => item.facility.id === f.id)?.label} 改做${result.products[f.id] === 'gold' ? '赤金' : '作戰記錄'}`).join('、')}（套用時一併變更）。</p>}
     <div className="recommend-grid">{evaluation.facilities.filter(item => item.operators.length).map(item => <article key={item.facility.id} className="recommend-card">
@@ -202,7 +209,7 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLa
   const [optimized, setOptimized] = useState<OptimizeResult | null>(null);
   const [running, setRunning] = useState(false);
   // 權重只存在這台裝置；讀寫失敗時用預設值。
-  const [weights, setWeights] = useState<ObjectiveWeights>(() => { try { const saved = JSON.parse(localStorage.getItem('arknights-tw-base-weights') ?? 'null'); return saved && ['gold', 'record', 'trading', 'power'].every(key => typeof saved[key] === 'number') ? saved : DEFAULT_WEIGHTS; } catch { return DEFAULT_WEIGHTS; } });
+  const [weights, setWeights] = useState<ObjectiveWeights>(() => { try { const saved = JSON.parse(localStorage.getItem('arknights-tw-base-weights') ?? 'null'); return saved && ['gold', 'record', 'trading', 'power'].every(key => typeof saved[key] === 'number') ? { ...DEFAULT_WEIGHTS, ...saved } : DEFAULT_WEIGHTS; } catch { return DEFAULT_WEIGHTS; } });
   const updateWeight = (key: keyof ObjectiveWeights, value: number) => { const next = { ...weights, [key]: value }; setWeights(next); try { localStorage.setItem('arknights-tw-base-weights', JSON.stringify(next)); } catch { /* 不影響使用 */ } };
   const [optimizedWeights, setOptimizedWeights] = useState<ObjectiveWeights | null>(null);
   const generate = () => {
@@ -249,7 +256,7 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLa
     {message && <p className="fine-print" role="status">{message}</p>}
     <fieldset className="weight-panel">
       <legend>你比較重視哪一項？（整體最佳化的權重）</legend>
-      {([['gold', '赤金'], ['record', '作戰記錄'], ['trading', '龍門幣'], ['power', '無人機']] as const).map(([key, label]) => <label key={key} className="weight-row">
+      {([['gold', '赤金'], ['record', '作戰記錄'], ['trading', '龍門幣'], ['power', '無人機'], ['clue', '線索'], ['contact', '聯絡（公招）'], ['training', '專精訓練'], ['byproduct', '加工副產品']] as const).map(([key, label]) => <label key={key} className="weight-row">
         <span>{label}</span>
         <input type="range" min="0" max="3" step="0.5" value={weights[key]} aria-label={`${label}權重`} onInput={event => updateWeight(key, Number(event.currentTarget.value))}/>
         <b>{weights[key] === 0 ? '不考慮' : `×${weights[key]}`}</b>
@@ -313,7 +320,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
   const editingResult = editing ? evaluation.facilities.find(result => result.facility.id === editing) : undefined;
   const renderCard = (result: FacilityResult) => <FacilityCard key={result.facility.id} result={result} catalog={catalog} state={state} base={draft} busy={busy}
     onChange={patch => patchFacility(result.facility.id, patch)} onRemove={() => { removeFacility(result.facility.id); setEditing(null); }}
-    onAssign={id => assign(result.facility.id, id)} onUnassign={id => unassign(result.facility.id, id)}/>;
+    onAssign={id => assign(result.facility.id, id)} onUnassign={id => unassign(result.facility.id, id)} onSettings={patch => update({ ...draft, ...patch })}/>;
 
   return <div className="base-page">
     {isDemo && <p className="callout warning">示範庫使用自製的虛構基建技能與數值，只用來體驗操作，不代表遊戲規則。</p>}
