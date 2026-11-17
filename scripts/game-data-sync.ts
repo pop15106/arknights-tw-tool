@@ -13,6 +13,7 @@ export type { GameDataSnapshot } from '../src/catalog/build.ts';
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TABLES = { characters: 'character_table.json', patches: 'char_patch_table.json', skills: 'skill_table.json', modules: 'uniequip_table.json', stages: 'stage_table.json', activities: 'activity_table.json', items: 'item_table.json', building: 'building_data.json', constants: 'gamedata_const.json', gacha: 'gacha_table.json' } as const;
 const PNG = Buffer.from([137,80,78,71,13,10,26,10]);
+const PORTRAIT_SOURCE = 'https://raw.githubusercontent.com/ArknightsAssets/ArknightsAssets2/cn/assets/dyn/arts/charportraits';
 const validVersion = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/u.test(value);
 type Source = { commit: string; sourceUpdatedAt: string; syncedAt: string };
 
@@ -225,7 +226,38 @@ export function createGameDataStore(options: {
     if (!active) active = update().finally(() => { active = undefined; });
     return active;
   }
-  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
+  /**
+   * 依精英階段的立繪：{id}_1.png（精英 0／1）與 {id}_2.png（精英 2，部分低星幹員沒有）。
+   * 來源是公開的 ArknightsAssets2（陸服資源，台服幹員都包含在內）；已下載的檔案略過，404 視為「沒有這張」。
+   */
+  async function syncPortraits(onProgress?: (done: number, total: number) => void): Promise<{ downloaded: number; skipped: number; missing: number; failed: number }> {
+    const snapshot = await load();
+    if (!snapshot) throw new Error('請先更新遊戲資料。');
+    await mkdir(assets, { recursive: true });
+    const names = snapshot.dataset.operators.filter(op => /^char_[A-Za-z0-9_.-]+$/u.test(op.id) && !op.id.includes('..')).flatMap(op => [`${op.id}_1`, `${op.id}_2`]);
+    const result = { downloaded: 0, skipped: 0, missing: 0, failed: 0 };
+    let done = 0;
+    const queue = [...names];
+    await Promise.all(Array.from({ length: 6 }, async () => {
+      while (queue.length) {
+        const name = queue.shift()!;
+        const target = path.join(assets, `${name}.png`);
+        try {
+          if (await fileExists(target)) { result.skipped++; continue; }
+          const response = await fetcher(`${PORTRAIT_SOURCE}/${encodeURIComponent(name)}.png`, { method: 'HEAD', redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(20_000) });
+          if (response.status === 404) { result.missing++; continue; }
+          const image = await bytes(`${PORTRAIT_SOURCE}/${encodeURIComponent(name)}.png`, 2 * 1024 * 1024);
+          if (!image.subarray(0, 8).equals(PNG)) throw new Error('not png');
+          const temporary = `${target}.${crypto.randomUUID()}.tmp`;
+          await writeFile(temporary, image, { flag: 'wx' }); await rename(temporary, target);
+          result.downloaded++;
+        } catch { result.failed++; }
+        finally { done++; onProgress?.(done, names.length); }
+      }
+    }));
+    return result;
+  }
+  return { syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
 }
 
 const defaultStore = createGameDataStore();
@@ -237,3 +269,4 @@ export const loadDropsData = defaultStore.loadDrops;
 export const stageEnemiesData = defaultStore.stageEnemies;
 export const loadCnEventsData = defaultStore.loadCnEvents;
 export const rogueAnalysisData = defaultStore.rogueAnalysis;
+export const syncPortraitsData = defaultStore.syncPortraits;

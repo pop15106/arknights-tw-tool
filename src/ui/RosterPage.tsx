@@ -9,6 +9,7 @@ const PAGE_SIZE = 48;
 type Filters = Required<Pick<RosterQuery, 'rarity' | 'elite' | 'status' | 'sort'>> & { search: string; profession: string };
 const DEFAULT_FILTERS: Filters = { search: '', profession: 'all', rarity: 'all', elite: 'all', status: 'all', sort: 'id' };
 
+const eliteValue = (row: OwnedOperator) => { const entry = row.fields.elite; return entry?.status === 'known' && typeof entry.value === 'number' ? entry.value : undefined; };
 function stat(row: OwnedOperator, field: string): { text: string; unknown: boolean } {
   const evidence = row.fields[field];
   const unknown = !evidence || evidence.status === 'unknown';
@@ -21,7 +22,7 @@ function OperatorCard({ row, definition, isDemo, onOpen }: { row: OwnedOperator;
   return <article className={`operator-card rarity-${definition.rarity}`} data-testid="operator-card">
     <button type="button" className="operator-card-hit" aria-label={`檢視與修正 ${definition.displayName}（${definition.profession}）`} onClick={onOpen}/>
     <div className="operator-art">
-      <OperatorPortrait definition={definition}/>
+      <OperatorPortrait definition={definition} elite={eliteValue(row)}/>
       <span className="operator-stars" role="img" aria-label={`${definition.rarity} 星`}>{'★'.repeat(definition.rarity)}</span>
       <span className="operator-profession">{definition.profession}</span>
     </div>
