@@ -107,15 +107,15 @@ test('由原始 building_data 投影：只保留需要欄位與已知幹員', ()
   assert.throws(() => buildBaseCatalog({ ...raw, rooms: {} }, [], 'v', 's'), /設施/);
 });
 
-test('推薦配置：全域依分數分配、不重複、不超過容量，控制中樞不推薦', async () => {
+test('推薦配置：全域依分數分配、不重複、不超過容量；控制中樞只排能提升整體效益者', async () => {
   const state = await demoState(), catalog = createDemoBaseCatalog();
   const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
   const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 'm1', type: 'manufacturing', level: 2, product: 'gold' }, { id: 'm2', type: 'manufacturing', level: 1, product: 'record' }, { id: 't', type: 'trading', level: 1 }];
   const rec = recommendBase({ facilities, onlineSlots: [] }, catalog, state.roster, definitions);
   const all = Object.values(rec.assignments).flat();
   assert.equal(new Set(all).size, all.length);
-  assert.deepEqual(rec.assignments.c, []);
-  assert.ok(rec.facilities[0].note?.includes('不推薦'));
+  assert.ok(rec.facilities[0].note?.includes('整體效益'));
+  for (const pick of rec.facilities[0].picks) assert.ok(pick.score > 0, pick.name);
   assert.ok(rec.assignments.m1.length <= 2 && rec.assignments.m2.length <= 1 && rec.assignments.t.length <= 1);
   assert.ok(rec.assignments.m1.includes('demo-3'), '赤金技能應排進赤金製造站');
   assert.deepEqual(rec.assignments.m2, ['demo-4'], '作戰記錄技能應排進作戰記錄製造站');
@@ -252,6 +252,21 @@ test('陣營：同設施、全基建（含上限）與控制中樞跨設施加�
   assert.equal(trade.remote[0].value, 5);
   assert.equal(manu.totals.productivity, 6, '基建內甲團 3 名但上限 2 名 → +6');
   assert.ok(control.unsupported.some(item => item.skill.id === 'g-tag'), '騎士是隱藏標籤，沒有成員資料 → 未計入');
+});
+
+test('推薦配置：控制中樞依跨設施加成挑人，與下方配置一致', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.meta = { 'demo-2': { groups: ['乙團'] } };
+  catalog.skills['g-ctrl'] = { id: 'g-ctrl', name: '示範・指揮', roomType: 'CONTROL', description: '進駐控制中樞時，每個進駐在貿易站的乙團幹員，訂單獲得效率+5%' };
+  catalog.operators['demo-5'] = [[{ buffId: 'g-ctrl', elite: 0, level: 1 }]];
+  // 貿易站要有赤金來源（製造站）與電力，訂單效率才會反映在整體效益上。
+  const facilities: Facility[] = [{ id: 'c', type: 'control', level: 5 }, { id: 't', type: 'trading', level: 1 }, { id: 'm', type: 'manufacturing', level: 3, product: 'gold' }, { id: 'p', type: 'power', level: 3 }];
+  const rec = recommendBase({ facilities, onlineSlots: [] }, catalog, state.roster, definitions);
+  assert.ok(rec.assignments.t.includes('demo-2'));
+  assert.ok(rec.assignments.c.includes('demo-5'), '中樞技能能加成貿易站的乙團幹員，應被推薦');
+  const card = rec.facilities.find(item => item.facilityId === 'c')!;
+  assert.deepEqual(card.picks.map(pick => pick.operatorId), rec.assignments.c, '上方卡片與下方配置一致');
 });
 
 test('同一角色的不同形態不能同時進駐，推薦也只排一處', async () => {

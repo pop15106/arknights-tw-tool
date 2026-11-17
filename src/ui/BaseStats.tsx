@@ -62,6 +62,7 @@ export function BaseStats({ evaluation, catalog, base, state }: { evaluation: Ba
         </tbody></table>
         {stats.trading.filter(item => item.notes.length).map(item => <p key={item.facilityId} className="fine-print">{item.label}：{item.notes.join('；')}。</p>)}
       </div>}
+      <OtherFacilities evaluation={evaluation}/>
       <div>
         <h3>各設施可工作時長</h3>
         {stats.shifts.length ? <table className="stats-table"><thead><tr><th>設施</th><th>最先累的人</th><th>心情消耗</th><th>可工作</th></tr></thead><tbody>
@@ -93,4 +94,24 @@ export function BaseStats({ evaluation, catalog, base, state }: { evaluation: Ba
       <li>宿舍恢復＝基礎（資料表 1 級 1.6～5 級 2.0）＋0.0004×氛圍（PRTS；未設定時以該等級上限計）＋全宿舍恢復技能（同一人的加成疊加後，幹員間取最高）＋單人恢復技能（假設給最累的人）；休息時間以恢復最快的宿舍計算。</li>
     </ul></details>
   </section>;
+}
+
+/** 會客室、辦公室、訓練室、加工站：不算進赤金／經驗／龍門幣，但同樣是基建的一部分，另外列出加成。 */
+function OtherFacilities({ evaluation }: { evaluation: BaseEvaluation }) {
+  const rows = evaluation.facilities.filter(result => ['meeting', 'office', 'training', 'workshop'].includes(result.facility.type)).map(result => {
+    const type = result.facility.type;
+    const value = type === 'meeting' ? `線索收集速度 +${fmt(result.totals.clue)}%`
+      : type === 'office' ? `聯絡（公招刷新）速度 +${fmt(result.totals.contact)}%`
+      : type === 'training' ? `專精訓練速度 +${fmt(result.totals.training)}%`
+      : result.workshop ? `${result.workshop.name}：每點心情產出 +${fmt(result.workshop.efficiency)}%` : `副產品機率 +${fmt(result.totals.byproduct)}%`;
+    return { id: result.facility.id, label: result.label, names: result.operators.map(op => op.name).join('、'), value, empty: !result.operators.length };
+  });
+  if (!rows.length) return null;
+  return <div>
+    <h3>其他設施</h3>
+    <table className="stats-table"><thead><tr><th>設施</th><th>進駐</th><th>加成</th></tr></thead><tbody>
+      {rows.map(row => <tr key={row.id}><td>{row.label}</td><td>{row.empty ? '尚未排人' : row.names}</td><td>{row.empty ? '—' : row.value}</td></tr>)}
+    </tbody></table>
+    <p className="fine-print">這些設施不產出赤金、經驗或龍門幣，所以不列入上方的每日產量；加成來自可解析的技能（含控制中樞的跨設施加成）。訓練室只計協助位，加工站要先選配方才會套用配方條件。</p>
+  </div>;
 }
