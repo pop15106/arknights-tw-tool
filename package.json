@@ -5,6 +5,8 @@
   "type": "module",
   "engines": { "node": ">=22.22.0" },
   "scripts": {
+    "start": "node --experimental-strip-types scripts/start.ts",
+    "start:fast": "node --experimental-strip-types scripts/start.ts --fast",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
