@@ -162,12 +162,17 @@ export async function verifyDatasetChecksum(dataset: Dataset): Promise<void> {
 }
 
 type Obj = Record<string, unknown>;
+/** 驗證失敗時帶出出錯的物件與欄位，讓修復只動那一個位置。 */
+export class FieldError extends Error {
+  readonly kind: 'unknown' | 'missing'; readonly target: Obj; readonly key: string;
+  constructor(message: string, kind: 'unknown' | 'missing', target: Obj, key: string) { super(message); this.kind = kind; this.target = target; this.key = key; }
+}
 export function object(value: unknown, allowed: readonly string[], required: readonly string[] = allowed): Obj {
   if (!value || typeof value !== 'object' || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new Error('格式錯誤：需要一般 JSON 物件。');
   const result = value as Obj;
-  for (const key of Object.keys(result)) if (!allowed.includes(key)) throw new Error(`包含未允許欄位：${key}。請勿匯入憑證或帳號識別資訊。`);
+  for (const key of Object.keys(result)) if (!allowed.includes(key)) throw new FieldError(`包含未允許欄位：${key}。請勿匯入憑證或帳號識別資訊。`, 'unknown', result, key);
   for (const key of Object.keys(result)) if (result[key] === undefined) throw new Error(`${key} 不能是 undefined；請省略選填欄位或使用明確的未知狀態。`);
-  for (const key of required) if (!Object.hasOwn(result, key)) throw new Error(`缺少必要欄位：${key}。`);
+  for (const key of required) if (!Object.hasOwn(result, key)) throw new FieldError(`缺少必要欄位：${key}。`, 'missing', result, key);
   return result;
 }
 function text(value: unknown, label: string, max = 180): asserts value is string {

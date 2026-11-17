@@ -1,4 +1,4 @@
-import { hashValue, validateAppState, verifyDatasetChecksum, type AppState } from '../domain/model.ts';
+import { canonical, FieldError, hashValue, validateAppState, verifyDatasetChecksum, type AppState } from '../domain/model.ts';
 import { createBackup } from './backup.ts';
 
 const STORE_NAME = 'state';
@@ -72,47 +72,76 @@ export function readRawState(db: IDBDatabase): Promise<unknown> {
 }
 
 const isPlain = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
-function removeFirst(value: unknown, key: string): boolean {
-  if (Array.isArray(value)) return value.some(item => removeFirst(item, key));
-  if (!isPlain(value)) return false;
-  if (Object.hasOwn(value, key)) { delete value[key]; return true; }
-  return Object.values(value).some(item => removeFirst(item, key));
-}
+const checksumOk = async (dataset: unknown) => isPlain(dataset) && isPlain(dataset.metadata) && await hashValue(dataset.operators) === dataset.metadata.checksum;
 
 /**
- * 其他版本寫入了本版不認得的欄位時，逐一移除這些欄位，直到整份資料通過驗證。
- * 只移除「未允許欄位」；其他錯誤（缺欄位、格式錯）一律停止，不猜測修補。
+ * 其他版本寫入了本版不認得的內容時，逐項修到通過驗證為止：
+ * - 未允許欄位：只刪除驗證器指出的那個物件上的那個欄位（不會誤刪同名的正常欄位）。
+ * - 匯入紀錄缺少衝突決定（其他版本可「稍後審閱」）：該衝突當時沒有改動幹員庫，補記為「保留現有值」。
+ * 其他錯誤（缺必要欄位、格式錯、原本就壞掉的校驗值）一律停止，不猜測修補。
  */
-export async function repairUnknownFields(raw: unknown): Promise<{ state: AppState; removed: string[] }> {
+export async function repairUnknownFields(raw: unknown): Promise<{ state: AppState; removed: string[]; undecided: number }> {
   const value = structuredClone(raw);
   const removed: string[] = [];
-  for (let attempt = 0; attempt < 100; attempt++) {
+  let undecided = 0;
+  // 修復前的校驗值必須本來就正確；修復只允許因移除欄位而重算。
+  const rawOk = isPlain(raw) ? [await checksumOk(raw.dataset), !isPlain(raw.undo) || await checksumOk(raw.undo.dataset)] : [false, false];
+  const batches = isPlain(value) && Array.isArray(value.batches) ? value.batches : [];
+  const touched = new WeakMap<object, Set<string>>();
+  // 只修「實際存在於資料中」的物件；驗證器有時檢查的是當場建立的暫時物件，修它不會有任何效果。
+  const stored = new WeakSet<object>();
+  const collect = (node: unknown): void => { if (node && typeof node === 'object' && !stored.has(node)) { stored.add(node); for (const child of Object.values(node)) collect(child); } };
+  collect(value);
+  // 每一輪都修好資料中一個沒修過的位置（重複或不在資料中就停止）；位置有限，所以必定結束，不設固定次數上限。
+  for (;;) {
     try { validateAppState(value); break; }
     catch (error) {
-      const key = error instanceof Error ? error.message.match(/^包含未允許欄位：(.+?)。/u)?.[1] : undefined;
-      if (!key || !removeFirst(value, key)) throw error;
-      removed.push(key);
+      if (!(error instanceof FieldError) || !stored.has(error.target)) throw error;
+      // 同一位置修過還是錯（例如驗證器檢查的是暫時物件），表示無法安全修復。
+      const seen = touched.get(error.target) ?? new Set<string>();
+      if (seen.has(error.key)) throw error;
+      seen.add(error.key); touched.set(error.target, seen);
+      if (error.kind === 'unknown') { delete error.target[error.key]; removed.push(error.key); continue; }
+      const batch = batches.find(item => isPlain(item) && item.decisions === error.target);
+      if (isPlain(batch) && batch.kind === 'import' && Array.isArray(batch.conflicts) && batch.conflicts.some(conflict => isPlain(conflict) && conflict.id === error.key)) {
+        // 驗證器確認是「匯入紀錄缺衝突決定」後，所有匯入紀錄的未決定衝突一次補齊，避免每補一筆就重驗整份資料。
+        for (const item of batches) {
+          if (!isPlain(item) || item.kind !== 'import' || !isPlain(item.decisions) || !Array.isArray(item.conflicts)) continue;
+          const decisions = item.decisions;
+          for (const conflict of item.conflicts) if (isPlain(conflict) && typeof conflict.id === 'string' && !Object.hasOwn(decisions, conflict.id)) { decisions[conflict.id] = 'keep'; undecided++; }
+        }
+        continue;
+      }
+      throw error;
     }
   }
   const state = validateAppState(value);
-  // 欄位若位在幹員定義內會改變校驗值；移除後依剩餘內容重新計算。
-  for (const dataset of [state.dataset, state.undo?.dataset]) {
-    if (!dataset) continue;
-    try { await verifyDatasetChecksum(dataset); } catch { if (removed.length) dataset.metadata.checksum = await hashValue(dataset.operators); else throw new Error('資料集校驗值不符，未修改原資料。'); }
+  const datasets = [state.dataset, state.undo?.dataset];
+  for (const [index, dataset] of datasets.entries()) {
+    if (!dataset || await checksumOk(dataset)) continue;
+    if (!rawOk[index] || !removed.length) throw new Error('資料集校驗值不符，未修改原資料。');
+    dataset.metadata.checksum = await hashValue(dataset.operators);
   }
-  return { state, removed: [...new Set(removed)] };
+  return { state, removed: [...new Set(removed)], undecided };
 }
 
-/** 用修復後的資料覆寫目前內容（原內容無法通過驗證，所以不比對修訂版本）。 */
-export async function overwriteRepaired(db: IDBDatabase, repaired: AppState): Promise<void> {
+/** 用修復後的資料覆寫目前內容。寫入前確認資料庫仍是修復時讀到的原樣，避免蓋掉其他分頁的新改動。 */
+export async function overwriteRepaired(db: IDBDatabase, repaired: AppState, original: unknown): Promise<void> {
   const state = structuredClone(validateAppState(repaired));
   await createBackup(state);
+  const expected = canonical(original);
   return new Promise((resolve, reject) => {
+    let failure: unknown;
     try {
       const transaction = db.transaction(STORE_NAME, 'readwrite');
-      transaction.objectStore(STORE_NAME).put(state, ACTIVE_KEY);
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(ACTIVE_KEY);
+      request.onsuccess = () => {
+        if (canonical(request.result) !== expected) { failure = new Error('其他分頁已更新資料，已取消修復。請重新讀取後再試。'); transaction.abort(); return; }
+        store.put(state, ACTIVE_KEY);
+      };
       transaction.oncomplete = () => resolve();
-      transaction.onabort = () => reject(storageError(transaction.error));
+      transaction.onabort = () => reject(storageError(failure ?? transaction.error));
     } catch (error) { reject(storageError(error)); }
   });
 }

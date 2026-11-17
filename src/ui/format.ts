@@ -1,3 +1,4 @@
+import { FieldError } from '../domain/model';
 import type { Evidence, FieldConflict, OperatorDefinition } from '../domain/model';
 
 export function formatDate(value?: string): string {
@@ -40,7 +41,7 @@ export function friendlyError(error: unknown): string {
   if (error instanceof DOMException && error.name === 'QuotaExceededError') return '本機儲存空間不足，本次變更沒有保存。請先下載備份，再釋出空間後重試。';
   if (error instanceof Error && /revision|另一|修訂|並行|過期|stale|concurrent/i.test(error.message)) return `${error.message} 請重新整理以讀取最新資料，再重新預覽。`;
   // 只顯示本工具自行拋出的訊息；瀏覽器內建錯誤（TypeError、DOMException 等）多為英文且不易理解。
-  return error instanceof Error && error.constructor === Error ? error.message : '操作未完成，原資料未修改。請重試或先下載備份。';
+  return error instanceof Error && (error.constructor === Error || error instanceof FieldError) ? error.message : '操作未完成，原資料未修改。請重試或先下載備份。';
 }
 
 export const mb = (bytes: number, digits = 2) => (bytes / 1024 / 1024).toFixed(digits);
