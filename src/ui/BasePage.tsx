@@ -8,6 +8,7 @@ import { Modal } from './Modal';
 import { BaseMap, mapImage } from './BaseMap';
 import { BaseTraining } from './BaseTraining';
 import { BaseStats } from './BaseStats';
+import { OperatorPicker } from './OperatorPicker';
 import { BaseRotation } from './BaseRotation';
 
 type Base = Settings['base'];
@@ -178,14 +179,7 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
         })}{!op.skills.some(skill => skill.applies) && <span className="fine-print">沒有{FACILITY_LABEL[facility.type]}技能{roomType === 'MANUFACTURE' || roomType === 'TRADING' ? '，只計基礎加成' : ''}</span>}</div>
       </li>)}
     </ul>
-    {!full && <label className="facility-add"><span className="sr-only">加入幹員到{result.label}</span><select className="filter" value="" disabled={busy || !candidates.length} onChange={event => { const id = event.currentTarget.value; if (id) onAssign(id); }}>
-      <option value="">{candidates.length ? '＋ 加入幹員' : '沒有可加入的幹員'}</option>
-      {(['ready', 'unknown', 'none'] as const).map(group => {
-        const items = candidates.filter(item => item.state === group);
-        if (!items.length) return null;
-        return <optgroup key={group} label={group === 'ready' ? '有已解鎖的此設施技能' : group === 'unknown' ? '技能解鎖待核對' : '沒有此設施技能'}>{items.map(item => <option key={item.operatorId} value={item.operatorId}>{item.name}{item.summary ? `｜${item.summary}` : ''}{item.score ? `（已計入 ${signed(item.score, '')}）` : ''}</option>)}</optgroup>;
-      })}
-    </select></label>}
+    {!full && <div className="facility-add"><OperatorPicker candidates={candidates} definitions={definitions} label={result.label} disabled={busy} onPick={onAssign}/></div>}
     {(result.unsupported.length > 0 || result.notApplicable.length > 0) && <details className="plain-details facility-notes"><summary>未計入與不適用的技能（{result.unsupported.length + result.notApplicable.length}）</summary>
       <ul>{result.unsupported.map(item => <li key={`u-${item.operatorId}-${item.skill.id}`}><strong>{definitions.get(item.operatorId)?.displayName}・{item.skill.name}</strong>：條件型或聯動效果，尚未支援計算。<br/><span className="fine-print">{item.skill.description}</span></li>)}
         {result.notApplicable.map(item => <li key={`n-${item.operatorId}-${item.skill.id}`}><strong>{definitions.get(item.operatorId)?.displayName}・{item.skill.name}</strong>：不適用目前產品。</li>)}</ul>

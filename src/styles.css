@@ -622,6 +622,28 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .skill-chip.amber summary em { color: var(--amber); }
 .skill-chip.muted { opacity: .7; }
 .facility-add .filter { width: 100%; min-height: 36px; font-size: 13px; }
+.facility-add .picker-open { width: 100%; }
+.operator-picker { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface, #fff); }
+.picker-top { display: flex; gap: 6px; }
+.picker-top .text-input { flex: 1; min-width: 0; min-height: 36px; }
+.picker-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.picker-chips .chip { border: 1px solid var(--line); background: transparent; color: inherit; border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.picker-chips .chip small { opacity: .65; margin-left: 2px; }
+.picker-chips .chip.active { background: var(--accent, #e8590c); border-color: var(--accent, #e8590c); color: #fff; }
+.picker-chips .chip.active small { color: #fff; opacity: .85; }
+.picker-chips .chip:disabled { opacity: .35; cursor: default; }
+.picker-chips.branch { padding-left: 10px; border-left: 3px solid var(--line); }
+.picker-chips .chip.small { font-size: 12px; padding: 3px 9px; }
+.picker-toggle { font-size: 13px; }
+.picker-list { max-height: 360px; overflow-y: auto; display: grid; gap: 8px; }
+.picker-list h4 { margin: 4px 0; font-size: 12px; opacity: .7; position: sticky; top: 0; background: var(--surface, #fff); padding: 2px 0; }
+.picker-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.picker-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name score" "skill score"; gap: 2px 8px; text-align: left; background: none; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; color: inherit; cursor: pointer; }
+.picker-row:hover, .picker-row:focus-visible { border-color: var(--accent, #e8590c); }
+.picker-name { grid-area: name; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.picker-name small { opacity: .65; font-size: 12px; }
+.picker-skill { grid-area: skill; font-size: 12px; opacity: .8; }
+.picker-score { grid-area: score; align-self: center; font-weight: 700; color: var(--accent, #e8590c); }
 .facility-notes { margin-top: 0; }
 .facility-notes ul { display: grid; gap: 8px; font-size: 12.5px; }
 .base-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
