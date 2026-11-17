@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { cachedLoad, clearGameDataCache, peekCache } from './gameData';
 import type { AppState, Settings } from '../domain/model';
 import type { BaseCatalog } from '../catalog/base';
-import { candidatesFor, compareLayout, DEFAULT_WEIGHTS, evaluateBase, LAYOUTS, layoutFacilities, optimizeBase, type LayoutComparison, type ObjectiveWeights, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect, type WorkshopTarget } from '../domain/base';
+import { candidatesFor, dormBreakdown, type DormBreakdown, compareLayout, DEFAULT_WEIGHTS, evaluateBase, LAYOUTS, layoutFacilities, optimizeBase, type LayoutComparison, type ObjectiveWeights, recommendBase, type BaseRecommendation, type OptimizeResult, FACILITY_LABEL, parseSkill, PRODUCT_LABEL, ROOM_OF, type Facility, type FacilityResult, type FacilityType, type SkillEffect, type WorkshopTarget } from '../domain/base';
 import { createDemoBaseCatalog } from '../demo';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -9,6 +10,7 @@ import { BaseMap, mapImage } from './BaseMap';
 import { BaseTraining } from './BaseTraining';
 import { BaseStats } from './BaseStats';
 import { OperatorPicker } from './OperatorPicker';
+import { usePersistentDraft } from './persistentDraft';
 import { BaseRotation } from './BaseRotation';
 
 type Base = Settings['base'];
@@ -89,26 +91,28 @@ export function effectText(effect: SkillEffect): string {
 }
 
 export function useBaseCatalog(isDemo: boolean, attempt: number) {
-  const [catalog, setCatalog] = useState<BaseCatalog | null>(isDemo ? createDemoBaseCatalog() : null);
+  const [catalog, setCatalog] = useState<BaseCatalog | null>(() => isDemo ? createDemoBaseCatalog() : peekCache<BaseCatalog>('base') ?? null);
   const [error, setError] = useState('');
+  const firstAttempt = useRef(attempt);
   useEffect(() => {
     if (isDemo) { setCatalog(createDemoBaseCatalog()); setError(''); return; }
-    const controller = new AbortController();
-    setCatalog(null); setError('');
-    void fetch('/api/game-data/base', { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' })
-      .then(async response => {
-        const body = await response.json().catch(() => null) as (BaseCatalog & { error?: { message?: string } }) | null;
-        if (!response.ok || !body || !Array.isArray(body.rooms) || !body.skills || !body.operators) throw new Error(body?.error?.message ?? '');
-        setCatalog(body);
-      })
-      .catch(err => { if (!controller.signal.aborted) setError(err instanceof Error && err.message ? err.message : '無法讀取基建資料，請確認已執行 npm run game-data 並在設定更新遊戲資料。'); });
-    return () => controller.abort();
+    // 按「重試」或更新遊戲資料後（attempt 改變）才丟掉快取重新讀。
+    if (attempt !== firstAttempt.current) { clearGameDataCache('base'); firstAttempt.current = attempt; setCatalog(null); }
+    setError('');
+    let active = true;
+    cachedLoad<BaseCatalog>('base', async () => {
+      const response = await fetch('/api/game-data/base', { credentials: 'omit', redirect: 'error', cache: 'no-store' });
+      const body = await response.json().catch(() => null) as (BaseCatalog & { error?: { message?: string } }) | null;
+      if (!response.ok || !body || !Array.isArray(body.rooms) || !body.skills || !body.operators) throw new Error(body?.error?.message ?? '');
+      return body;
+    }).then(value => { if (active) setCatalog(value); }, err => { if (active) setError(err instanceof Error && err.message ? err.message : '無法讀取基建資料，請確認已執行 npm run game-data 並在設定更新遊戲資料。'); });
+    return () => { active = false; };
   }, [isDemo, attempt]);
   return { catalog, error };
 }
 
-function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, onAssign, onUnassign, onSettings }: {
-  result: FacilityResult; catalog: BaseCatalog; state: AppState; base: Base; busy: boolean;
+function FacilityCard({ result, catalog, state, base, busy, dorm, onChange, onRemove, onAssign, onUnassign, onSettings }: {
+  result: FacilityResult; catalog: BaseCatalog; state: AppState; base: Base; busy: boolean; dorm?: DormBreakdown | null;
   onChange: (patch: Partial<Facility>) => void; onRemove: () => void; onAssign: (operatorId: string) => void; onUnassign: (operatorId: string) => void; onSettings: (patch: Partial<Base>) => void;
 }) {
   const { facility, room } = result;
@@ -121,7 +125,6 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
   if (roomType === 'MANUFACTURE') metrics.push(['生產力（已計入）', signed(result.totals.basic + result.totals.productivity)]);
   if (roomType === 'TRADING') metrics.push(['訂單效率（已計入）', signed(result.totals.basic + result.totals.order)]);
   if (roomType === 'POWER') metrics.push(['無人機充能（已計入）', signed(result.totals.drone)]);
-  if (roomType === 'DORMITORY') metrics.push(['全宿舍恢復（已計入）', signed(result.totals.moodRecoverAll, '/時')]);
   const incomplete = result.unsupported.length + result.uncertain.length;
   return <article className={`facility-card facility-${facility.type}`} aria-label={result.label}>
     <header className="facility-head">
@@ -138,6 +141,7 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
         {Object.entries(WORKSHOP_TYPE_LABEL).map(([type, label]) => <optgroup key={type} label={`${label}（指定配方）`}>{(catalog.workshop ?? []).filter(item => item.type === type).map(item => <option key={item.id} value={`f:${item.id}`}>{item.name}（心情 {item.mood}）</option>)}</optgroup>)}
       </select></label>}
       {facility.type === 'power' && <label><span>無人機上限</span><input className="text-input" type="number" min={0} max={999} placeholder="未設定（視為滿等）" value={base.droneCap ?? ''} disabled={busy} onChange={event => { const value = event.currentTarget.value; onSettings({ droneCap: value === '' ? undefined : Math.max(0, Math.min(999, Math.round(Number(value)))) }); }}/></label>}
+      {facility.type === 'dormitory' && <label><span>氛圍（0～{facility.level * 1000}）</span><input className="text-input" type="number" min={0} max={facility.level * 1000} step={100} placeholder={`未設定（視為滿 ${facility.level * 1000}）`} value={facility.atmosphere ?? ''} disabled={busy} onInput={event => { const value = event.currentTarget.value; onChange({ atmosphere: value === '' ? undefined : Math.max(0, Math.min(facility.level * 1000, Math.round(Number(value)))) }); }}/></label>}
       {facility.type === 'meeting' && <label className="checkbox-line"><input type="checkbox" checked={!!base.clueExchange} disabled={busy} onChange={event => onSettings({ clueExchange: event.currentTarget.checked || undefined })}/><span>線索交流中</span></label>}
       {facility.type === 'manufacturing' && <label><span>產品</span><select className="filter" value={facility.product ?? ''} disabled={busy} onChange={event => onChange({ product: event.currentTarget.value as Facility['product'] })}><option value="" disabled>選擇產品</option><option value="gold">{PRODUCT_LABEL.gold}</option><option value="record">{PRODUCT_LABEL.record}</option></select></label>}
     </div>
@@ -153,6 +157,17 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
       </div>;
     })()}
     {metrics.length > 0 && <dl className="facility-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}{(roomType === 'MANUFACTURE' || roomType === 'TRADING') && <div><dt>其中基礎</dt><dd>{signed(result.totals.basic)}</dd></div>}</dl>}
+    {dorm && result.operators.length > 0 && <div className="dorm-breakdown">
+      <strong>心情恢復／時（每位幹員＝下列加總＋自身恢復）</strong>
+      <dl className="facility-metrics">
+        <div><dt>宿舍基礎（{facility.level} 級）</dt><dd>+{dorm.base}</dd></div>
+        <div><dt>氛圍 {dorm.atmosphere}{facility.atmosphere === undefined ? '（預設滿）' : ''}</dt><dd>+{dorm.atmosphereBonus}</dd></div>
+        <div><dt>全宿舍（取最高）</dt><dd>+{dorm.all}</dd></div>
+        {dorm.global > 0 && <div><dt>控制中樞（所有宿舍）</dt><dd>+{dorm.global}</dd></div>}
+      </dl>
+      {dorm.single > 0 && <p className="fine-print">另有單人恢復 +{dorm.single}/時（同種取最高）：只給心情未滿的其中一位，不加在每個人身上。</p>}
+      {dorm.below.map(item => <p key={item.threshold} className="fine-print">心情 {item.threshold} 以下的幹員額外 +{item.value}/時。</p>)}
+    </div>}
     {result.workshop && <p className="facility-remote">{result.workshop.name}：每次心情 {result.workshop.baseMood} → {result.workshop.mood}、副產品機率 {Math.round(result.workshop.baseRate * 1000) / 10}% → {Math.round(result.workshop.rate * 1000) / 10}%、每點心情產出 {signed(result.workshop.efficiency)}{result.workshop.gold ? `、每次 ${result.workshop.gold} 龍門幣` : ''}{result.workshop.notes.length ? `（${result.workshop.notes.join('；')}）` : ''}</p>}
     {result.remote.length > 0 && <p className="facility-remote">控制中樞加成：{result.remote.map(item => `${item.from}「${item.skill}」${item.text} ${item.value >= 0 ? '+' : ''}${item.value}%`).join('；')}</p>}
     {incomplete > 0 && <p className="facility-warning"><Icon name="alert" size={14}/>有 {incomplete} 個技能未計入或待核對，合計不完整。</p>}
@@ -160,7 +175,7 @@ function FacilityCard({ result, catalog, state, base, busy, onChange, onRemove, 
     {result.notes.map(note => <p key={note} className="fine-print">{note}</p>)}
     <ul className="facility-slots">
       {result.operators.map(op => <li key={op.operatorId}>
-        <div className="slot-head"><strong>{op.name}</strong><button type="button" className="button ghost small" disabled={busy} onClick={() => onUnassign(op.operatorId)} aria-label={`將${op.name}移出${result.label}`}>移出</button></div>
+        <div className="slot-head"><strong>{op.name}</strong>{(() => { const row = dorm?.operators.find(item => item.operatorId === op.operatorId); return row ? <span className="dorm-rate" title={row.exclusive ? '此幹員不吃其他來源的恢復效果' : `基礎＋氛圍＋全宿舍${row.global ? '＋中樞' : ''}${row.group ? '＋陣營' : ''}${row.self ? `＋自身 ${row.self}` : ''}`}>恢復 {row.total}/時{row.exclusive ? '（僅自身）' : ''}</span> : null; })()}<button type="button" className="button ghost small" disabled={busy} onClick={() => onUnassign(op.operatorId)} aria-label={`將${op.name}移出${result.label}`}>移出</button></div>
         <div className="slot-skills">{op.skills.filter(skill => skill.applies).map((skill, index) => {
           const shown = skill.active ?? skill.maybeUpgraded ?? skill.next?.skill;
           if (!shown) return null;
@@ -268,15 +283,26 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLa
   const [status, setStatus] = useState<DataStatus | null>(null);
   const [message, setMessage] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [result, setResult] = useState<BaseRecommendation | null>(null);
-  const [optimized, setOptimized] = useState<OptimizeResult | null>(null);
+  // 推薦與最佳化結果記在這台裝置：切到別頁再回來（或重開）不用重算；設施布局或幹員庫改變後才失效。
+  const fingerprint = `${state.revision}|${JSON.stringify(base.facilities)}`;
+  const [stored] = useState(() => { try { const value = JSON.parse(localStorage.getItem('arknights-tw-base-result') ?? 'null'); return value?.fingerprint === fingerprint ? value as { result: BaseRecommendation | null; optimized: OptimizeResult | null; weights: ObjectiveWeights | null } : null; } catch { return null; } });
+  const [result, setResult] = useState<BaseRecommendation | null>(stored?.result ?? null);
+  const [optimized, setOptimized] = useState<OptimizeResult | null>(stored?.optimized ?? null);
   const [running, setRunning] = useState(false);
   // 權重只存在這台裝置；讀寫失敗時用預設值。
   const [weights, setWeights] = useState<ObjectiveWeights>(() => { try { const saved = JSON.parse(localStorage.getItem('arknights-tw-base-weights') ?? 'null'); return saved && ['gold', 'record', 'trading', 'power'].every(key => typeof saved[key] === 'number') ? { ...DEFAULT_WEIGHTS, ...saved } : DEFAULT_WEIGHTS; } catch { return DEFAULT_WEIGHTS; } });
   const updateWeight = (key: keyof ObjectiveWeights, value: number) => { const next = { ...weights, [key]: value }; setWeights(next); try { localStorage.setItem('arknights-tw-base-weights', JSON.stringify(next)); } catch { /* 不影響使用 */ } };
-  const [optimizedWeights, setOptimizedWeights] = useState<ObjectiveWeights | null>(null);
+  const [optimizedWeights, setOptimizedWeights] = useState<ObjectiveWeights | null>(stored?.weights ?? null);
+  // 結果是依「產生當下」的布局與幹員庫算的，存檔時用當時的指紋，之後布局改了就不會被誤還原。
+  const [resultKey, setResultKey] = useState(stored ? fingerprint : '');
+  useEffect(() => {
+    try {
+      if (result || optimized) localStorage.setItem('arknights-tw-base-result', JSON.stringify({ fingerprint: resultKey, result, optimized, weights: optimizedWeights }));
+      else localStorage.removeItem('arknights-tw-base-result');
+    } catch { /* 空間不足時只在本次有效 */ }
+  }, [result, optimized, optimizedWeights, resultKey]);
   const generate = () => {
-    setOptimizedWeights(weights);
+    setOptimizedWeights(weights); setResultKey(fingerprint);
     const recommendation = recommendBase(base, catalog, state.roster, definitions, weights);
     setResult(recommendation); setOptimized(null); setRunning(true);
     // 讓畫面先顯示「計算中」，再進行整體最佳化（約數秒）。
@@ -294,7 +320,7 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLa
       const response = await fetch('/api/game-data/status', { credentials: 'omit', redirect: 'error', cache: 'no-store' });
       if (!response.ok) throw new Error('暫時無法讀取資料版本。');
       setStatus(await response.json() as DataStatus);
-      if (sync) { setMessage('已確認為目前可取得的最新繁中服資料。'); setResult(null); onRefreshed(); }
+      if (sync) { setMessage('已確認為目前可取得的最新繁中服資料。'); setResult(null); clearGameDataCache(); onRefreshed(); }
     } catch (error) { setMessage(error instanceof Error && error.constructor === Error ? error.message : '暫時無法讀取資料版本。'); }
     finally { setSyncing(false); }
   };
@@ -358,13 +384,13 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLa
 export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isDemo: boolean; busy: boolean; onSave: (base: Base) => void }) {
   const [attempt, setAttempt] = useState(0);
   const { catalog, error } = useBaseCatalog(isDemo, attempt);
-  const [draft, setDraft] = useState<Base>(state.settings.base);
+  // 未保存的配置暫存在這台裝置：切到別頁或關掉再開都會保留，保存後才清掉。
+  const { draft, setDraft, restored, discard } = usePersistentDraft<Base>('base', state.settings.base);
   const [addType, setAddType] = useState<FacilityType>('manufacturing');
   const [view, setView] = useState<'map' | 'list' | 'training'>(() => { try { const saved = localStorage.getItem('arknights-tw-base-view'); return saved === 'list' || saved === 'training' ? saved : 'map'; } catch { return 'map'; } });
   const [editing, setEditing] = useState<string | null>(null);
   useEffect(() => { try { localStorage.setItem('arknights-tw-base-view', view); } catch { /* 不影響使用 */ } }, [view]);
   const saved = JSON.stringify(state.settings.base);
-  useEffect(() => { setDraft(state.settings.base); }, [saved]);
   const dirty = JSON.stringify(draft) !== saved;
 
   if (error) return <section className="panel planned"><span className="tag amber">需要基建資料</span><h2>還沒有可用的基建資料</h2><p>{error}</p><div className="inline-actions"><button type="button" className="button secondary" onClick={() => setAttempt(value => value + 1)}>重新讀取</button></div></section>;
@@ -382,7 +408,7 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
   const { produced, consumed } = evaluation.electricity;
   const unsupportedTotal = evaluation.facilities.reduce((sum, f) => sum + f.unsupported.length + f.uncertain.length, 0);
   const editingResult = editing ? evaluation.facilities.find(result => result.facility.id === editing) : undefined;
-  const renderCard = (result: FacilityResult) => <FacilityCard key={result.facility.id} result={result} catalog={catalog} state={state} base={draft} busy={busy}
+  const renderCard = (result: FacilityResult) => <FacilityCard key={result.facility.id} result={result} catalog={catalog} state={state} base={draft} busy={busy} dorm={result.facility.type === 'dormitory' ? dormBreakdown(evaluation, result.facility.id, catalog) : null}
     onChange={patch => patchFacility(result.facility.id, patch)} onRemove={() => { removeFacility(result.facility.id); setEditing(null); }}
     onAssign={id => assign(result.facility.id, id)} onUnassign={id => unassign(result.facility.id, id)} onSettings={patch => update({ ...draft, ...patch })}/>;
 
@@ -393,10 +419,11 @@ export function BasePage({ state, isDemo, busy, onSave }: { state: AppState; isD
       <div className={`stat ${consumed > produced ? 'danger' : ''}`}><span className="stat-value">{produced - consumed}</span><span className="stat-label">剩餘電力<small>發電 {produced} · 用電 {consumed}</small></span></div>
       <div className={`stat ${unsupportedTotal ? 'amber' : ''}`}><span className="stat-value">{unsupportedTotal}</span><span className="stat-label">未計入／待核對技能<small>不當作零效果</small></span></div>
       <div className="base-actions">
-        <button type="button" className="button ghost small" disabled={busy || !dirty} onClick={() => setDraft(state.settings.base)}>還原</button>
+        <button type="button" className="button ghost small" disabled={busy || !dirty} onClick={discard}>還原</button>
         <button type="button" className="button primary" disabled={busy || !dirty || draft.facilities.length > 20} onClick={() => onSave(draft)}>{dirty ? '保存配置' : '已保存'}</button>
       </div>
     </div>
+    {dirty && <p className="callout draft-note">{restored ? '已還原你上次還沒保存的配置。' : '有還沒保存的變更。'}草稿會自動暫存在這台電腦，切換頁面或關掉再開都還在；確認後按「保存配置」，不要了按「還原」。</p>}
     {draft.facilities.length > 0 && <BaseStats evaluation={evaluation} catalog={catalog} base={draft} state={state}/>}
     <RecommendPanel state={state} isDemo={isDemo} busy={busy} catalog={catalog} base={draft} onApplyLayout={(facilities, assignments) => update({ ...draft, facilities, assignments })} onApply={(assignments, products) => update({ ...draft, facilities: draft.facilities.map(f => products?.[f.id] ? { ...f, product: products[f.id] } : f), assignments })} onRefreshed={() => setAttempt(value => value + 1)}/>
     {evaluation.issues.length > 0 && <div className="callout danger" role="status"><strong>配置有 {evaluation.issues.length} 個問題</strong><ul>{evaluation.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}

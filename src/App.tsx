@@ -42,7 +42,13 @@ export default function App() {
   const namespace = 'personal' as Namespace;
   const [state, setState] = useState<AppState | null>(null);
   const [initError, setInitError] = useState('');
-  const [page, setPage] = useState<Page>(() => guideSeen() ? '幹員庫' : '導覽');
+  // 第一次開啟進導覽；之後停在上次看的頁面（記在這台裝置）。
+  const [page, setPage] = useState<Page>(() => {
+    if (!guideSeen()) return '導覽';
+    try { const last = localStorage.getItem('arknights-tw-last-page'); if (last && NAV.some(item => item.label === last)) return last as Page; } catch { /* 讀不到就用預設 */ }
+    return '幹員庫';
+  });
+  useEffect(() => { try { localStorage.setItem('arknights-tw-last-page', page); } catch { /* 不影響使用 */ } }, [page]);
   const [settingsHint, setSettingsHint] = useState(() => !settingsVisited());
   // 第一次打開「設定」後，側欄的指路小人就收起來。
   useEffect(() => { if (page === '設定' && settingsHint) { markSettingsVisited(); setSettingsHint(false); } }, [page, settingsHint]);
@@ -220,7 +226,7 @@ export default function App() {
       {nav(false)}
       {settingsHint && page !== '設定' && <SettingsHint onGo={() => goto('設定')} onDismiss={() => { markSettingsVisited(); setSettingsHint(false); }}/>}
       <div className="sidebar-footer">
-        <p>本機優先 · 無帳號連線<br/>版本 1.4.2</p>
+        <p>本機優先 · 無帳號連線<br/>版本 1.4.3</p>
       </div>
     </aside>
     <div className="main">

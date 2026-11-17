@@ -92,11 +92,14 @@ function Mascot({ size }: { size: number }) {
 
 /** 幹員 Q 版小人：有下載就播放透明背景的動畫，否則顯示原創小角色。 */
 function Chibi({ charId, manifest, size = 180 }: { charId: string; manifest: GuideManifest | null; size?: number }) {
-  const [failed, setFailed] = useState(false);
-  const src = manifest?.chibi[charId];
+  // 載入失敗只記住「哪個檔案」失敗：素材重新下載（網址帶下載時間）或換角色後會再試一次，不會一直停在替代小角色。
+  const [failedSrc, setFailedSrc] = useState('');
+  const file = manifest?.chibi[charId];
+  const src = file ? `${file}${file.includes('?') ? '&' : '?'}v=${encodeURIComponent(manifest!.syncedAt)}` : undefined;
+  const failed = !!src && failedSrc === src;
   if (!src || failed) return <div className="guide-chibi" style={{ width: `${size}px`, height: `${Math.round(size * 0.75)}px` }}><Mascot size={size * 0.6}/></div>;
   return <div className="guide-chibi" style={{ width: `${size}px`, height: `${Math.round(size * 0.75)}px` }}>
-    <video key={src} src={src} autoplay loop muted playsInline width={size} onError={() => setFailed(true)} aria-label={`${GUIDE_CAST.find(item => item.charId === charId)?.name ?? ''} Q 版動畫`}/>
+    <video key={src} src={src} autoplay loop muted playsInline width={size} onError={() => setFailedSrc(src)} aria-label={`${GUIDE_CAST.find(item => item.charId === charId)?.name ?? ''} Q 版動畫`}/>
   </div>;
 }
 

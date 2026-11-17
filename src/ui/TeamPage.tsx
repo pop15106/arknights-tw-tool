@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'preact/hooks';
+import { useMemo, useRef, useState } from 'preact/hooks';
+import { useRemembered } from './persistentDraft';
 import type { AppState, OperatorDefinition } from '../domain/model';
 import { analyzeSynergies, DEBUFF_PARTNER, type SynergyLink } from '../domain/synergy';
 import { useBaseCatalog } from './BasePage';
@@ -23,7 +24,8 @@ const KIND_ORDER: SynergyLink['target']['kind'][] = ['operator', 'group', 'profe
 const KIND_LABEL: Record<SynergyLink['target']['kind'], string> = { operator: '指定幹員', group: '陣營', profession: '職業', branch: '分支', rarity: '星級', position: '位置' };
 
 export function TeamPage({ state, isDemo, onSaveNotes, onBuzzMode }: { state: AppState; isDemo: boolean; onSaveNotes?: (notes: NonNullable<AppState['settings']['reviewNotes']>) => void; onBuzzMode?: (mode: NonNullable<AppState['settings']['communityBuzz']>) => void }) {
-  const [tab, setTab] = useState<'synergy' | 'squad' | 'stage' | 'review' | 'rogue'>('synergy');
+  type TeamTab = 'synergy' | 'squad' | 'stage' | 'review' | 'rogue';
+  const [tab, setTab] = useRemembered<TeamTab>('team-tab', 'synergy', (value): value is TeamTab => ['synergy', 'squad', 'stage', 'review', 'rogue'].includes(value as string));
   const tabs = <div className="segmented" role="tablist">{([['synergy', '幹員相性'], ['squad', '編隊建議'], ['stage', '依關卡推薦'], ['review', '幹員簡評'], ['rogue', '模式分析']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
   return <div className="team-page">
     {tab === 'synergy' && <SynergyTab state={state} isDemo={isDemo} tabs={tabs}/>}
@@ -210,9 +212,28 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
   const community = useCommunity();
   const { catalog: growth } = useGrowthCatalog(isDemo);
   const { catalog: base } = useBaseCatalog(isDemo, 0);
-  const [operatorId, setOperatorId] = useState('');
+  // 正在看的幹員與還沒保存的筆記記在這台裝置：切到別頁、關掉再開都還在。
+  const [operatorId, setOperatorId] = useRemembered<string>('review-operator', '', (value): value is string => typeof value === 'string');
   const [query, setQuery] = useState('');
-  const [notes, setNotes] = useState<Record<string, string>>({});
+  // 筆記草稿綁定「哪位幹員＋當時已保存的筆記」：已保存的筆記變了（保存、從備份復原）就丟掉草稿，避免蓋掉新資料。
+  const savedNotesJson = JSON.stringify(state.settings.reviewNotes?.[operatorId] ?? {});
+  const [notes, setNotes] = useState<Record<string, string>>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('arknights-tw-draft:review-notes') ?? 'null') as { operatorId?: string; saved?: string; notes?: Record<string, string> } | null;
+      return stored && stored.operatorId === operatorId && stored.saved === savedNotesJson && stored.notes && typeof stored.notes === 'object' ? stored.notes : {};
+    } catch { return {}; }
+  });
+  const notesBaseline = useRef(`${operatorId}|${savedNotesJson}`);
+  useEffect(() => {
+    const next = `${operatorId}|${savedNotesJson}`;
+    if (notesBaseline.current !== next) { notesBaseline.current = next; setNotes({}); }
+  }, [operatorId, savedNotesJson]);
+  useEffect(() => {
+    try {
+      if (Object.keys(notes).length) localStorage.setItem('arknights-tw-draft:review-notes', JSON.stringify({ operatorId, saved: savedNotesJson, notes }));
+      else localStorage.removeItem('arknights-tw-draft:review-notes');
+    } catch { /* 不影響使用 */ }
+  }, [notes, operatorId, savedNotesJson]);
   const definitions = state.dataset.operators;
   // hook 要在提前 return 之前呼叫，順序才固定。
   const rogue = useRogueFits(isDemo, state, growth, base);
@@ -228,7 +249,7 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
   const note = (key: string) => notes[key] ?? saved[key] ?? '';
   const dirty = definition && Object.keys(notes).some(key => (notes[key] ?? '') !== (saved[key] ?? ''));
   const list = (items: { kind: string; name: string; description: string }[]) => <ul className="gap-list">{items.map(item => <li key={item.description}>{item.kind}「{item.name}」：{item.description}</li>)}</ul>;
-  const noteBox = (key: string) => <textarea className="text-area review-note" maxLength={1000} placeholder="我的筆記（只存在這台裝置）" value={note(key)} onInput={event => setNotes(current => ({ ...current, [key]: event.currentTarget.value }))}/>;
+  const noteBox = (key: string) => <textarea className="text-area review-note" maxLength={1000} placeholder="我的筆記（只存在這台裝置）" value={note(key)} onInput={event => setNotes({ ...notes, [key]: event.currentTarget.value })}/>;
   return <>
     <section className="panel">
       {head}

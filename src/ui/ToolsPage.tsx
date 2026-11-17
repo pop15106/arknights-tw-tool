@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useRemembered } from './persistentDraft';
 import type { RecruitCatalog } from '../catalog/recruit';
 import type { AppState } from '../domain/model';
 import { recruitCombos } from '../domain/recruit';
@@ -24,7 +25,7 @@ function useRecruitCatalog(isDemo: boolean) {
 
 export type ToolTab = 'recruit' | 'mastery' | 'advice' | 'checkup';
 export function ToolsPage({ state, isDemo, extra }: { state: AppState; isDemo: boolean; extra?: Partial<Record<ToolTab, (tabs: preact.JSX.Element) => preact.JSX.Element>> }) {
-  const [tab, setTab] = useState<ToolTab>('recruit');
+  const [tab, setTab] = useRemembered<ToolTab>('tools-tab', 'recruit', (value): value is ToolTab => ['recruit', 'advice', 'mastery', 'checkup'].includes(value as string));
   const tabs = <div className="segmented" role="tablist">{([['recruit', '公招計算'], ['advice', '專精建議'], ['mastery', '專精時間'], ['checkup', '帳號體檢']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
   return <div className="team-page">
     {tab === 'recruit' && <RecruitTab state={state} isDemo={isDemo} tabs={tabs}/>}

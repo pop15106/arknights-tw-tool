@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { usePersistentDraft } from './persistentDraft';
 import type { GrowthCatalog } from '../catalog/growth';
 import type { AppState, OperatorDefinition, Settings } from '../domain/model';
 import { currentState, emptyTarget, expandRecipes, expToRecords, growthCost, LMD_ITEM, type GrowthCost, type GrowthState } from '../domain/growth';
 import { OperatorPortrait } from '../OperatorEncyclopedia';
 import { Icon } from './Icon';
-import { useStageData } from './gameData';
+import { useStageData, cachedLoad, peekCache } from './gameData';
 import { parseDepot, type DepotImport } from '../domain/depot';
 import { bestAcquire, farmingPlan, materialSources, OCCURRENCE, type Acquire, type FarmingPlan } from '../domain/stages';
 
@@ -13,19 +14,18 @@ const fmt = (value: number) => value.toLocaleString('zh-TW');
 const ELITE = ['精零', '精一', '精二'];
 
 export function useGrowthCatalog(isDemo: boolean) {
-  const [catalog, setCatalog] = useState<GrowthCatalog | null>(null);
+  const [catalog, setCatalog] = useState<GrowthCatalog | null>(() => isDemo ? null : peekCache<GrowthCatalog>('growth') ?? null);
   const [error, setError] = useState('');
   useEffect(() => {
     if (isDemo) { setError('示範資料沒有養成成本；請切換到個人工作區並更新遊戲資料。'); return; }
-    const controller = new AbortController();
-    void fetch('/api/game-data/growth', { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' })
-      .then(async response => {
-        const body = await response.json().catch(() => null) as (GrowthCatalog & { error?: { message?: string } }) | null;
-        if (!response.ok || !body?.operators) throw new Error(body?.error?.message ?? '');
-        setCatalog(body);
-      })
-      .catch(err => { if (!controller.signal.aborted) setError(err instanceof Error && err.message ? err.message : '無法讀取養成資料，請確認已執行 npm run game-data 並在設定更新遊戲資料。'); });
-    return () => controller.abort();
+    let active = true;
+    cachedLoad<GrowthCatalog>('growth', async () => {
+      const response = await fetch('/api/game-data/growth', { credentials: 'omit', redirect: 'error', cache: 'no-store' });
+      const body = await response.json().catch(() => null) as (GrowthCatalog & { error?: { message?: string } }) | null;
+      if (!response.ok || !body?.operators) throw new Error(body?.error?.message ?? '');
+      return body;
+    }).then(value => { if (active) setCatalog(value); }, err => { if (active) setError(err instanceof Error && err.message ? err.message : '無法讀取養成資料，請確認已執行 npm run game-data 並在設定更新遊戲資料。'); });
+    return () => { active = false; };
   }, [isDemo]);
   return { catalog, error };
 }
@@ -49,7 +49,8 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
   const { catalog, error } = useGrowthCatalog(isDemo);
   const { data: stageData } = useStageData(isDemo);
   const now = useMemo(() => Date.now(), [stageData]);
-  const [draft, setDraft] = useState<Growth>(state.settings.growth ?? { plans: [] });
+  // 未保存的養成計畫暫存在這台裝置：切到別頁或關掉再開都會保留。
+  const { draft, setDraft, restored, discard } = usePersistentDraft<Growth>('growth', state.settings.growth ?? { plans: [] });
   const [query, setQuery] = useState('');
   const [depotText, setDepotText] = useState<string | null>(null);
   const [depot, setDepot] = useState<DepotImport | null>(null);
@@ -118,8 +119,8 @@ export function GrowthPage({ state, isDemo, busy, onSave }: { state: AppState; i
       <div className="inline-actions">
         <button type="button" className="button primary" disabled={busy || !dirty} onClick={() => onSave(draft)}>保存計畫</button>
         <button type="button" className="button secondary" disabled={busy} onClick={() => { setDepotText(depotText === null ? '' : null); setDepot(null); setDepotError(''); }}>匯入倉庫（MAA）</button>
-        {dirty && <button type="button" className="button ghost" disabled={busy} onClick={() => setDraft(state.settings.growth ?? { plans: [] })}>還原</button>}
-        <span className="fine-print">{dirty ? '有尚未保存的變更。' : '計畫與庫存只存在這台裝置。'}</span>
+        {dirty && <button type="button" className="button ghost" disabled={busy} onClick={discard}>還原</button>}
+        <span className="fine-print">{dirty ? `${restored ? '已還原上次還沒保存的計畫。' : '有尚未保存的變更。'}草稿會暫存在這台電腦，切換頁面或重開都還在。` : '計畫與庫存只存在這台裝置。'}</span>
       </div>
     </section>
 

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'preact/hooks';
+import { useRemembered } from './persistentDraft';
 import type { GrowthCatalog } from '../catalog/growth';
 import { DROP_TYPE, eventPhase, forecastTwEvents, materialSources, OCCURRENCE, stagesOfEvent, type CnEvent, type EventPhase, type GameEvent } from '../domain/stages';
 import { useEffect } from 'preact/hooks';
@@ -23,7 +24,7 @@ function remaining(event: GameEvent, now: number): string {
 export function StagePage({ isDemo }: { isDemo: boolean }) {
   const { data, error } = useStageData(isDemo);
   const { catalog } = useGrowthCatalog(isDemo);
-  const [tab, setTab] = useState<'events' | 'farm'>('events');
+  const [tab, setTab] = useRemembered<'events' | 'farm'>('stage-tab', 'events', (value): value is 'events' | 'farm' => value === 'events' || value === 'farm');
   const [showAll, setShowAll] = useState(false);
   const [itemId, setItemId] = useState('');
   const [expanded, setExpanded] = useState(false);
