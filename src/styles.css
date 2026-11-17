@@ -991,3 +991,8 @@ h2 { font-weight: 800; }
 .shift-reminder .telegram-setup .text-input { width: min(320px, 100%); } .shift-reminder .telegram-setup .text-input[inputmode="numeric"] { width: 150px; }
 .portrait-sync { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line, rgba(0,0,0,.12)); } .portrait-sync h3 { margin: 0 0 6px; }
 .outfit-picker { display: grid; gap: 4px; margin: 0 0 14px; } .outfit-picker > span { font-weight: 600; } .outfit-picker select { max-width: 420px; }
+.community-block { margin: 8px 0; } .community-pick { line-height: 1.6; }
+.community-tag { display: inline-block; padding: 0 6px; border-radius: 6px; font-size: .8em; background: var(--surface-2, rgba(0,0,0,.06)); }
+.community-pick.stance-recommend .community-tag { background: rgba(46, 160, 67, .16); }
+.community-pick.stance-avoid .community-tag { background: rgba(220, 53, 69, .16); }
+.synergy-card.owned { outline: 2px solid rgba(46, 160, 67, .45); }

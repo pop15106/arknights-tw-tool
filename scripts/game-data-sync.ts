@@ -2,6 +2,7 @@ import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/pro
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { parseCommunity, type CommunityData } from '../src/catalog/community.ts';
 import { buildSkinCatalog, SKIN_ID, skinFileName, skinPortraitId, type SkinCatalog } from '../src/catalog/skins.ts';
 import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DATA_COMMIT, type GameDataSnapshot, type GameDataTables } from '../src/catalog/build.ts';
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
@@ -14,6 +15,7 @@ export type { GameDataSnapshot } from '../src/catalog/build.ts';
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TABLES = { characters: 'character_table.json', patches: 'char_patch_table.json', skills: 'skill_table.json', modules: 'uniequip_table.json', stages: 'stage_table.json', activities: 'activity_table.json', items: 'item_table.json', building: 'building_data.json', constants: 'gamedata_const.json', gacha: 'gacha_table.json' } as const;
 const PNG = Buffer.from([137,80,78,71,13,10,26,10]);
+const COMMUNITY_SOURCE = 'https://raw.githubusercontent.com/pop15106/arknights-tw-tool/main/data/community/rogue.json';
 const PORTRAIT_SOURCE = 'https://raw.githubusercontent.com/ArknightsAssets/ArknightsAssets2/cn/assets/dyn/arts/charportraits';
 const validVersion = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/u.test(value);
 type Source = { commit: string; sourceUpdatedAt: string; syncedAt: string };
@@ -282,7 +284,24 @@ export function createGameDataStore(options: {
     }
     return `/assets/operators/${skinFileName(skinId)}`;
   }
-  return { loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
+  /** 社群評價：已同步的本機版本優先，否則用 repo 內附的版本。兩者都經過格式驗證。 */
+  async function loadCommunity(): Promise<CommunityData> {
+    const bundled = parseCommunity(JSON.parse(await readFile(path.join(project, 'data/community/rogue.json'), 'utf8')));
+    try {
+      const synced = parseCommunity(JSON.parse(await readFile(path.join(cache, 'community.json'), 'utf8')));
+      return synced.updatedAt >= bundled.updatedAt ? synced : bundled;
+    } catch { return bundled; }
+  }
+  /** 下載 GitHub 上的最新社群評價；格式不符就不覆蓋，保留現有資料。 */
+  async function syncCommunity(): Promise<CommunityData> {
+    const latest = parseCommunity(JSON.parse((await bytes(COMMUNITY_SOURCE, 4 * 1024 * 1024)).toString('utf8')));
+    await mkdir(cache, { recursive: true });
+    const file = path.join(cache, 'community.json');
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(latest), { flag: 'wx' }); await rename(temporary, file);
+    return loadCommunity();
+  }
+  return { loadCommunity, syncCommunity, loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
 }
 
 const defaultStore = createGameDataStore();
@@ -297,3 +316,5 @@ export const rogueAnalysisData = defaultStore.rogueAnalysis;
 export const syncPortraitsData = defaultStore.syncPortraits;
 export const loadSkinsData = defaultStore.loadSkins;
 export const skinPortraitData = defaultStore.skinPortrait;
+export const loadCommunityData = defaultStore.loadCommunity;
+export const syncCommunityData = defaultStore.syncCommunity;
