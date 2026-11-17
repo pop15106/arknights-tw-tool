@@ -61,3 +61,21 @@ test('資料讀取：已同步的較新版本優先；同步檔損壞時退回 r
   await writeFile(`${dir}/community.json`, '{"format":"broken"}');
   assert.equal((await store.loadCommunity()).updatedAt, good.updatedAt);
 });
+
+test('Codex 回饋：主題 ID 不必等關卡分析；與主題名稱同順序且社群資料都有對應', async () => {
+  const { IS_THEMES, IS_THEME_IDS } = await import('../src/domain/review.ts');
+  assert.equal(IS_THEME_IDS.length, IS_THEMES.length);
+  const data = parseCommunity(await bundled());
+  for (const id of IS_THEME_IDS) assert.ok(data.themes[id], `${id} 應有社群資料`);
+  // 回饋：天馬光環（治療）屬於重裝臨光，不是耀騎士臨光。
+  assert.ok(data.themes.rogue_1.picks.char_148_nearl?.some(pick => pick.reason.includes('天馬光環')));
+  assert.ok(!data.themes.rogue_1.picks.char_1014_nearl2?.some(pick => pick.reason.includes('天馬光環')));
+});
+
+test('Codex 回饋延伸：原文沒逐字出現幹員名的條目標示「依暱稱判讀」；奶羊歸純燼艾雅法拉', async () => {
+  const data = parseCommunity(await bundled());
+  const all = Object.values(data.themes).flatMap(theme => Object.values(theme.picks).flat());
+  assert.ok(all.filter(pick => pick.inferred).length >= 20);
+  assert.ok(data.themes.rogue_3.picks.char_1016_agoat2?.some(pick => pick.reason.startsWith('奶羊')));
+  assert.ok(!data.themes.rogue_3.picks.char_128_plosis?.some(pick => pick.reason.startsWith('奶羊')));
+});

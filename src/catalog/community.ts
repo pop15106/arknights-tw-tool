@@ -3,7 +3,8 @@
 // 所以這裡嚴格驗證：只接受已知來源的網址、限定欄位與長度，避免同步到不明內容。
 export type CommunitySource = 'bahamut' | 'bilibili' | 'prts';
 export type Stance = 'recommend' | 'situational' | 'avoid';
-export interface CommunityPick { source: CommunitySource; stance: Stance; reason: string; url: string; date?: string; author?: string; module?: boolean }
+/** inferred：原文用暱稱或簡稱，幹員是整理時判讀的（未逐字出現在原文）。 */
+export interface CommunityPick { source: CommunitySource; stance: Stance; reason: string; url: string; date?: string; author?: string; module?: boolean; inferred?: boolean }
 export interface CommunityCounter { threat: string; needs: string; url: string }
 export interface CommunityTheme { picks: Record<string, CommunityPick[]>; counters: CommunityCounter[]; notes?: string[] }
 export interface CommunityData {
@@ -49,7 +50,7 @@ export function parseCommunity(value: unknown): CommunityData {
         if (!isObj(item) || !SOURCES.includes(item.source as CommunitySource) || !['recommend', 'situational', 'avoid'].includes(item.stance as string)) throw new Error('社群評價的評價項目不正確。');
         if (item.date !== undefined && (typeof item.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(item.date))) throw new Error('社群評價的日期格式不正確。');
         return { source: item.source as CommunitySource, stance: item.stance as Stance, reason: text(item.reason, 120, '理由'), url: link(item.url),
-          ...(item.date ? { date: item.date as string } : {}), ...(item.author !== undefined ? { author: text(item.author, 60, '作者') } : {}), ...(item.module === true ? { module: true } : {}) };
+          ...(item.date ? { date: item.date as string } : {}), ...(item.author !== undefined ? { author: text(item.author, 60, '作者') } : {}), ...(item.module === true ? { module: true } : {}), ...(item.inferred === true ? { inferred: true } : {}) };
       });
     }
     const counters = theme.counters.slice(0, 100).map(item => {

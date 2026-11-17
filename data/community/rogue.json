@@ -26,7 +26,7 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "簡介「干員推薦」五星",
+      "reason": "簡介「幹員推薦」五星",
       "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
       "date": "2024-09-21",
       "author": "永世摇篮"
@@ -87,24 +87,15 @@
       "date": "2022-07-22"
      }
     ],
-    "char_1014_nearl2": [
-     {
-      "source": "bilibili",
-      "stance": "recommend",
-      "reason": "又肉又能奶，天馬光環增加全場治療量",
-      "url": "https://www.bilibili.com/read/cv21665972",
-      "date": "2023-02-06",
-      "author": "焕彩GG"
-     }
-    ],
     "char_1021_kroos2": [
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "提豐單核攻略的核心干員之一",
+      "reason": "提豐單核攻略的核心幹員之一",
       "url": "https://www.bilibili.com/video/BV1HN411n7D1",
       "date": "2023-09-27",
-      "author": "白倦今天也好疲倦啊"
+      "author": "白倦今天也好疲倦啊",
+      "inferred": true
      }
     ],
     "char_1026_gvial2": [
@@ -113,7 +104,8 @@
       "stance": "recommend",
       "reason": "精一發力，可帶非職業分隊刷角標的新保姆",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=7737",
-      "date": "2022-07-22"
+      "date": "2022-07-22",
+      "inferred": true
      }
     ],
     "char_1028_texas2": [
@@ -129,7 +121,7 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "簡介「干員推薦」物傷六星（EW）",
+      "reason": "簡介「幹員推薦」物傷六星（EW）",
       "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
       "date": "2024-09-21",
       "author": "永世摇篮"
@@ -139,7 +131,8 @@
       "stance": "recommend",
       "reason": "重返古堡N15狙醫核心，道中與結局守線都強；但高費、對空空窗使統治力不如其他期",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
-      "date": "2025-10-13"
+      "date": "2025-10-13",
+      "inferred": true
      }
     ],
     "char_1041_angel2": [
@@ -148,7 +141,8 @@
       "stance": "recommend",
       "reason": "低費精一發力、套盾保生存，可偷傀影攻速，被視為特種首抓",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
-      "date": "2025-10-13"
+      "date": "2025-10-13",
+      "inferred": true
      }
     ],
     "char_1042_phatm2": [
@@ -191,10 +185,11 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "提豐單核攻略的核心干員之一",
+      "reason": "提豐單核攻略的核心幹員之一",
       "url": "https://www.bilibili.com/video/BV1HN411n7D1",
       "date": "2023-09-27",
-      "author": "白倦今天也好疲倦啊"
+      "author": "白倦今天也好疲倦啊",
+      "inferred": true
      },
      {
       "source": "bahamut",
@@ -212,6 +207,17 @@
       "url": "https://www.bilibili.com/read/cv21665972",
       "date": "2023-02-06",
       "author": "焕彩GG"
+     }
+    ],
+    "char_148_nearl": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "又肉又能奶，天馬光環增加全場治療量",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG",
+      "inferred": true
      }
     ],
     "char_151_myrtle": [
@@ -374,7 +380,8 @@
       "reason": "災厄難度舒適開局，精二可保送3層以上",
       "url": "https://www.bilibili.com/read/cv15130002",
       "date": "2022-02-05",
-      "author": "白猫猫A-A"
+      "author": "白猫猫A-A",
+      "inferred": true
      },
      {
       "source": "bahamut",
@@ -426,7 +433,8 @@
       "reason": "近衛推薦抓42，配塞雷婭可法蒸傀影",
       "url": "https://www.bilibili.com/read/cv21665972",
       "date": "2023-02-06",
-      "author": "焕彩GG"
+      "author": "焕彩GG",
+      "inferred": true
      }
     ],
     "char_358_lisa": [
@@ -443,7 +451,7 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "簡介「干員推薦」法傷六星",
+      "reason": "簡介「幹員推薦」法傷六星",
       "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
       "date": "2024-09-21",
       "author": "永世摇篮"
@@ -462,7 +470,7 @@
      {
       "source": "prts",
       "stance": "situational",
-      "reason": "本主題的主題干員（古堡筆記Lv25獎勵）；頁面未給出強度評價",
+      "reason": "本主題的主題幹員（古堡筆記Lv25獎勵）；頁面未給出強度評價",
       "url": "https://prts.wiki/w/%E5%82%80%E5%BD%B1%E4%B8%8E%E7%8C%A9%E7%BA%A2%E5%AD%A4%E9%92%BB"
      }
     ],
@@ -515,10 +523,11 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "簡介「干員推薦」輔助類六星",
+      "reason": "簡介「幹員推薦」輔助類六星",
       "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
       "date": "2024-09-21",
-      "author": "永世摇篮"
+      "author": "永世摇篮",
+      "inferred": true
      }
     ],
     "char_4179_monstr": [
@@ -534,7 +543,7 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "簡介「干員推薦」物傷六星",
+      "reason": "簡介「幹員推薦」物傷六星",
       "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
       "date": "2024-09-21",
       "author": "永世摇篮"
@@ -601,27 +610,27 @@
    },
    "counters": [
     {
-     "threat": "卢西恩，“猩红血钻”（ISW-DF 覆水难收/别无所求等終局）",
+     "threat": "盧西恩，“猩紅血鑽”（ISW-DF 覆水難收/別無所求等終局）",
      "needs": "被阻擋時瞬移穿過並留幻影、未阻擋時40%閃避、無視40%防禦附神經損傷：需高阻擋/多段阻擋與法術或真傷爆發、治療",
      "url": "https://prts.wiki/w/%E5%8D%A2%E8%A5%BF%E6%81%A9%EF%BC%8C%E2%80%9C%E7%8C%A9%E7%BA%A2%E8%A1%80%E9%92%BB%E2%80%9D"
     },
     {
-     "threat": "“剧团喉舌”（ISW-DF 诸事不顺）",
+     "threat": "“劇團喉舌”（ISW-DF 諸事不順）",
      "needs": "本體永久無敵、減緩部署費用回復；擊殺「報幕助手」才使其掉血：需清召喚物的群攻/爆發，助手周圍持續真傷需治療",
      "url": "https://prts.wiki/w/%E2%80%9C%E5%89%A7%E5%9B%A2%E5%96%89%E8%88%8C%E2%80%9D"
     },
     {
-     "threat": "伤心的大锁（ISW-DF 别无所求）",
-     "needs": "30萬HP、自癒、全場攻擊2目標並周期法傷全場、持續刷怪：需高持續輸出與全隊治療；持有【空白遗书】可停其自癒",
+     "threat": "傷心的大鎖（ISW-DF 別無所求）",
+     "needs": "30萬HP、自癒、全場攻擊2目標並週期法傷全場、持續刷怪：需高持續輸出與全隊治療；持有【空白遺書】可停其自癒",
      "url": "https://prts.wiki/w/%E4%BC%A4%E5%BF%83%E7%9A%84%E5%A4%A7%E9%94%81"
     },
     {
-     "threat": "漂泊颂偶（ISW-DF 悦耳杀机等）",
+     "threat": "漂泊頌偶（ISW-DF 悅耳殺機等）",
      "needs": "未被阻擋時每秒對全場我方造成法術傷害：需及早阻擋",
      "url": "https://prts.wiki/w/%E6%BC%82%E6%B3%8A%E9%A2%82%E5%81%B6"
     },
     {
-     "threat": "“雪牝”/“霜牡”（ISW-DF 寒渊惜别）",
+     "threat": "“雪牝”/“霜牡”（ISW-DF 寒淵惜別）",
      "needs": "一方倒下另一方繼承能力並大幅強化，攻擊附寒冷、對凍結目標增傷：需同步擊殺（雙線爆發）、避免被凍結",
      "url": "https://prts.wiki/w/ISW-DF_%E5%AF%92%E6%B8%8A%E6%83%9C%E5%88%AB"
     },
@@ -678,29 +687,32 @@
       "reason": "打騎士結局推薦拿粉毛",
       "url": "https://www.bilibili.com/read/cv18866711",
       "date": "2022-09-30",
-      "author": "千爱要乐奈"
+      "author": "千爱要乐奈",
+      "inferred": true
      },
      {
       "source": "bahamut",
       "stance": "recommend",
       "reason": "三個技能皆有用的多功能對策輔助",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
-      "date": "2023-05-25"
+      "date": "2023-05-25",
+      "inferred": true
      }
     ],
     "char_1013_chen2": [
      {
       "source": "bilibili",
       "stance": "situational",
-      "reason": "其他結局不錯，但被騎士機制克制",
+      "reason": "其他結局不錯，但被騎士機制剋制",
       "url": "https://www.bilibili.com/read/cv18866711",
       "date": "2022-09-30",
-      "author": "千爱要乐奈"
+      "author": "千爱要乐奈",
+      "inferred": true
      },
      {
       "source": "bahamut",
       "stance": "situational",
-      "reason": "高台版叔叔負責清雜，四結局前不算必抓",
+      "reason": "高臺版叔叔負責清雜，四結局前不算必抓",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
       "date": "2023-05-25"
      }
@@ -709,16 +721,18 @@
      {
       "source": "bahamut",
       "stance": "recommend",
-      "reason": "水月性價比最高五星，暈眩與對空、精一即可開局",
+      "reason": "水月價效比最高五星，暈眩與對空、精一即可開局",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
-      "date": "2023-05-25"
+      "date": "2023-05-25",
+      "inferred": true
      },
      {
       "source": "bahamut",
       "stance": "situational",
       "reason": "N18數值跟不上，但精一就能暈眩仍划算",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
-      "date": "2025-10-13"
+      "date": "2025-10-13",
+      "inferred": true
      }
     ],
     "char_1026_gvial2": [
@@ -728,7 +742,8 @@
       "reason": "對小怪群、精英與boss都極優，極推薦",
       "url": "https://www.bilibili.com/read/cv18850364",
       "date": "2022-09-29",
-      "author": "inmNebel"
+      "author": "inmNebel",
+      "inferred": true
      }
     ],
     "char_1028_texas2": [
@@ -782,7 +797,8 @@
       "stance": "recommend",
       "reason": "N18非職業隊主流開局之一，道中低費展開也實用",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
-      "date": "2025-10-13"
+      "date": "2025-10-13",
+      "inferred": true
      }
     ],
     "char_1042_phatm2": [
@@ -808,7 +824,8 @@
       "stance": "recommend",
       "reason": "五星自帶技力光環，騎士永控與大蒂都有用",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
-      "date": "2023-05-25"
+      "date": "2023-05-25",
+      "inferred": true
      }
     ],
     "char_179_cgbird": [
@@ -897,7 +914,7 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "列為其它好用干員",
+      "reason": "列為其它好用幹員",
       "url": "https://www.bilibili.com/read/cv18866711",
       "date": "2022-09-30",
       "author": "千爱要乐奈"
@@ -917,10 +934,11 @@
      {
       "source": "bilibili",
       "stance": "avoid",
-      "reason": "被很多懸浮機制怪物克制",
+      "reason": "被很多懸浮機制怪物剋制",
       "url": "https://www.bilibili.com/read/cv18866711",
       "date": "2022-09-30",
-      "author": "千爱要乐奈"
+      "author": "千爱要乐奈",
+      "inferred": true
      }
     ],
     "char_377_gdglow": [
@@ -950,7 +968,8 @@
       "reason": "清爆破大錘與聚群怪，第一boss核心，優先度極高",
       "url": "https://www.bilibili.com/read/cv18850364",
       "date": "2022-09-29",
-      "author": "inmNebel"
+      "author": "inmNebel",
+      "inferred": true
      }
     ],
     "char_401_elysm": [
@@ -966,7 +985,7 @@
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "唯一推薦六星重裝，遠程清罰站怪、第二boss主C",
+      "reason": "唯一推薦六星重灌，遠端清罰站怪、第二boss主C",
       "url": "https://www.bilibili.com/read/cv18850364",
       "date": "2022-09-29",
       "author": "inmNebel"
@@ -982,7 +1001,7 @@
      {
       "source": "bahamut",
       "stance": "recommend",
-      "reason": "重裝少數推薦，可開局",
+      "reason": "重灌少數推薦，可開局",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
       "date": "2023-05-25"
      }
@@ -1029,7 +1048,8 @@
       "reason": "高壓波次最優解之一，但暖機拖累",
       "url": "https://www.bilibili.com/read/cv18850364",
       "date": "2022-09-29",
-      "author": "inmNebel"
+      "author": "inmNebel",
+      "inferred": true
      },
      {
       "source": "bilibili",
@@ -1052,7 +1072,8 @@
       "reason": "開局即巔峰，但常態不阻擋是問題",
       "url": "https://www.bilibili.com/read/cv18866711",
       "date": "2022-09-30",
-      "author": "千爱要乐奈"
+      "author": "千爱要乐奈",
+      "inferred": true
      }
     ],
     "char_4066_highmo": [
@@ -1083,7 +1104,7 @@
      {
       "source": "prts",
       "stance": "situational",
-      "reason": "本主題的主題干員（里程碑獎勵）；頁面未給出強度評價",
+      "reason": "本主題的主題幹員（里程碑獎勵）；頁面未給出強度評價",
       "url": "https://prts.wiki/w/%E6%B0%B4%E6%9C%88%E4%B8%8E%E6%B7%B1%E8%93%9D%E4%B9%8B%E6%A0%91"
      }
     ],
@@ -1103,7 +1124,8 @@
       "reason": "擊暈控制近地浮空怪，可擊落兩側浮空魚",
       "url": "https://www.bilibili.com/read/cv18850364",
       "date": "2022-09-29",
-      "author": "inmNebel"
+      "author": "inmNebel",
+      "inferred": true
      }
     ],
     "char_472_pasngr": [
@@ -1119,33 +1141,33 @@
    },
    "counters": [
     {
-     "threat": "伊莎玛拉，腐化之心（ISW-DF 大群所向）",
-     "needs": "初始形態治療3名敵人並召喚「伊莎玛拉之泪」充能變身，變身後攻擊3目標造成真傷：需在初始形態爆發擊破、優先處理之淚，並準備治療",
+     "threat": "伊莎瑪拉，腐化之心（ISW-DF 大群所向）",
+     "needs": "初始形態治療3名敵人並召喚「伊莎瑪拉之淚」充能變身，變身後攻擊3目標造成真傷：需在初始形態爆發擊破、優先處理之淚，並準備治療",
      "url": "https://prts.wiki/w/%E4%BC%8A%E8%8E%8E%E7%8E%9B%E6%8B%89%EF%BC%8C%E8%85%90%E5%8C%96%E4%B9%8B%E5%BF%83"
     },
     {
-     "threat": "伊祖米克，生态泉源（ISW-DF 人之光辉）",
-     "needs": "學習階段無敵並吸收子代成長、對全場法傷；阐释形態周期全場暈眩+每秒法傷：需速清子代、全隊治療與抗暈眩手段",
+     "threat": "伊祖米克，生態泉源（ISW-DF 人之光輝）",
+     "needs": "學習階段無敵並吸收子代成長、對全場法傷；闡釋形態週期全場暈眩+每秒法傷：需速清子代、全隊治療與抗暈眩手段",
      "url": "https://prts.wiki/w/%E4%BC%8A%E7%A5%96%E7%B1%B3%E5%85%8B%EF%BC%8C%E7%94%9F%E6%80%81%E6%B3%89%E6%BA%90"
     },
     {
-     "threat": "“偏执泡影”（ISW-DF 认知即重担）",
+     "threat": "“偏執泡影”（ISW-DF 認知即重擔）",
      "needs": "攻擊範圍內我方攻速大幅降低、同時打3~5目標附侵蝕損傷；近地懸浮可被暈眩/凍結等破除：需控場破懸浮與遠距離輸出",
      "url": "https://prts.wiki/w/%E2%80%9C%E5%81%8F%E6%89%A7%E6%B3%A1%E5%BD%B1%E2%80%9D"
     },
     {
-     "threat": "最后的骑士（ISW-DF “命运的宠儿”）",
-     "needs": "DEF 4000/RES 70、受擊對來源施寒冷、首次倒下進入不可阻擋衝鋒：需高爆發穿防，持【骑士骨血】防禦降80%",
+     "threat": "最後的騎士（ISW-DF “命運的寵兒”）",
+     "needs": "DEF 4000/RES 70、受擊對來源施寒冷、首次倒下進入不可阻擋衝鋒：需高爆發穿防，持【騎士骨血】防禦降80%",
      "url": "https://prts.wiki/w/%E6%9C%80%E5%90%8E%E7%9A%84%E9%AA%91%E5%A3%AB"
     },
     {
-     "threat": "“墓碑”（ISW-DF 险路勿近）",
-     "needs": "全場我方攻防減半、費用回復減半、再部署加倍，周期護盾：需低費高效干員與穩定輸出",
+     "threat": "“墓碑”（ISW-DF 險路勿近）",
+     "needs": "全場我方攻防減半、費用回復減半、再部署加倍，週期護盾：需低費高效幹員與穩定輸出",
      "url": "https://prts.wiki/w/%E2%80%9C%E5%A2%93%E7%A2%91%E2%80%9D"
     },
     {
-     "threat": "灯火/排异反应",
-     "needs": "目標生命受損會降灯火，低灯火易得排異反應減益：需零漏怪的穩定防線",
+     "threat": "燈火/排異反應",
+     "needs": "目標生命受損會降燈火，低燈火易得排異反應減益：需零漏怪的穩定防線",
      "url": "https://prts.wiki/w/%E6%B0%B4%E6%9C%88%E4%B8%8E%E6%B7%B1%E8%93%9D%E4%B9%8B%E6%A0%91"
     }
    ]
@@ -1169,6 +1191,15 @@
       "reason": "一至四結局皆列入，功能輔助型治療",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
       "date": "2024-03-04"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "奶羊為兩大真神之一，適合124結局",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒",
+      "inferred": true
      }
     ],
     "char_1020_reed2": [
@@ -1202,7 +1233,8 @@
       "reason": "開局很穩，中後期仍有一戰之力",
       "url": "https://www.bilibili.com/read/cv29920924",
       "date": "2024-01-22",
-      "author": "半只蜜饼"
+      "author": "半只蜜饼",
+      "inferred": true
      },
      {
       "source": "bahamut",
@@ -1241,7 +1273,7 @@
      {
       "source": "bahamut",
       "stance": "recommend",
-      "reason": "解決重裝無人開局問題，能扛傷又能對空",
+      "reason": "解決重灌無人開局問題，能扛傷又能對空",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
       "date": "2024-03-04"
      }
@@ -1268,27 +1300,18 @@
       "reason": "作者不常用：前四層無腦過但索敵亂，五層後易翻車",
       "url": "https://www.bilibili.com/read/cv37689124",
       "date": "2024-08-26",
-      "author": "淡金葡萄酒"
+      "author": "淡金葡萄酒",
+      "inferred": true
      }
     ],
     "char_1046_sbell2": [
      {
       "source": "bilibili",
       "stance": "recommend",
-      "reason": "（簡介）N15開局打四結局，新干員對薩米降維打擊",
+      "reason": "（簡介）N15開局打四結局，新幹員對薩米降維打擊",
       "url": "https://www.bilibili.com/video/BV1481EByEst",
       "date": "2025-11-05",
       "author": "赭青Hozonri"
-     }
-    ],
-    "char_128_plosis": [
-     {
-      "source": "bilibili",
-      "stance": "recommend",
-      "reason": "奶羊為兩大真神之一，適合124結局",
-      "url": "https://www.bilibili.com/read/cv37689124",
-      "date": "2024-08-26",
-      "author": "淡金葡萄酒"
      }
     ],
     "char_136_hsguma": [
@@ -1484,7 +1507,7 @@
      {
       "source": "prts",
       "stance": "situational",
-      "reason": "本主題的主題干員（里程碑獎勵）；頁面未給出強度評價",
+      "reason": "本主題的主題幹員（里程碑獎勵）；頁面未給出強度評價",
       "url": "https://prts.wiki/w/%E6%8E%A2%E7%B4%A2%E8%80%85%E7%9A%84%E9%93%B6%E5%87%87%E6%AD%A2%E5%A2%83"
      }
     ],
@@ -1558,7 +1581,8 @@
       "reason": "大範圍殲滅，精二前疲軟，養得起再抓",
       "url": "https://www.bilibili.com/read/cv37689124",
       "date": "2024-08-26",
-      "author": "淡金葡萄酒"
+      "author": "淡金葡萄酒",
+      "inferred": true
      }
     ],
     "char_4138_narant": [
@@ -1604,23 +1628,23 @@
    },
    "counters": [
     {
-     "threat": "“萨米的意志”（ISW-DF 巍峨银凇/深寒造像）",
-     "needs": "無法阻擋，冰凌打整列物傷、自然涌动暈眩並持續法傷；半血後減傷60%；需打積雪銀凇、分散站位與治療",
+     "threat": "“薩米的意志”（ISW-DF 巍峨銀凇/深寒造像）",
+     "needs": "無法阻擋，冰凌打整列物傷、自然湧動暈眩並持續法傷；半血後減傷60%；需打積雪銀凇、分散站位與治療",
      "url": "https://prts.wiki/w/%E2%80%9C%E8%90%A8%E7%B1%B3%E7%9A%84%E6%84%8F%E5%BF%97%E2%80%9D"
     },
     {
-     "threat": "“木裂”埃克提尔尼尔（ISW-DF 萨米之熵/虚无之偶）",
-     "needs": "DEF 3000，攻擊與周期施寒冷，失血後短暫不可阻擋並大幅減傷：需法術傷害、避開自我泯滅期間爆發",
+     "threat": "“木裂”埃克提爾尼爾（ISW-DF 薩米之熵/虛無之偶）",
+     "needs": "DEF 3000，攻擊與週期施寒冷，失血後短暫不可阻擋並大幅減傷：需法術傷害、避開自我泯滅期間爆發",
      "url": "https://prts.wiki/w/%E2%80%9C%E6%9C%A8%E8%A3%82%E2%80%9D%E5%9F%83%E5%85%8B%E6%8F%90%E5%B0%94%E5%B0%BC%E5%B0%94"
     },
     {
-     "threat": "哈兰杜汗/路加萨尔古斯（ISW-DF 时光之沙/迈入永恒）",
-     "needs": "雙王互相蓄力打對方周圍；一方倒下另一方大幅強化並轉打我方；哈兰DEF5000、路加RES90：需物法混合輸出並同步擊殺",
+     "threat": "哈蘭杜汗/路加薩爾古斯（ISW-DF 時光之沙/邁入永恆）",
+     "needs": "雙王互相蓄力打對方周圍；一方倒下另一方大幅強化並轉打我方；哈蘭DEF5000、路加RES90：需物法混合輸出並同步擊殺",
      "url": "https://prts.wiki/w/%E5%93%88%E5%85%B0%E6%9D%9C%E6%B1%97%EF%BC%8C%E5%A4%A7%E5%9C%B0%E4%B9%8B%E9%9E%AD"
     },
     {
-     "threat": "坍缩值/坍缩范式",
-     "needs": "戰鬥中目標生命受損+1坍縮值，累積觸發負面範式：需不漏怪的穩定防線",
+     "threat": "坍縮值/坍縮正規化",
+     "needs": "戰鬥中目標生命受損+1坍縮值，累積觸發負面正規化：需不漏怪的穩定防線",
      "url": "https://prts.wiki/w/%E6%8E%A2%E7%B4%A2%E8%80%85%E7%9A%84%E9%93%B6%E5%87%87%E6%AD%A2%E5%A2%83"
     }
    ]
@@ -1661,7 +1685,8 @@
       "stance": "recommend",
       "reason": "奎隆結局奶尼盧火首推全圖治療",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11187",
-      "date": "2025-04-23"
+      "date": "2025-04-23",
+      "inferred": true
      }
     ],
     "char_1035_wisdel": [
@@ -1738,7 +1763,7 @@
      {
       "source": "bahamut",
       "stance": "situational",
-      "reason": "高台隊常用的開局重裝，精一可用到底",
+      "reason": "高臺隊常用的開局重灌，精一可用到底",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
       "date": "2025-05-01"
      }
@@ -1778,7 +1803,8 @@
       "stance": "situational",
       "reason": "美願佔手與書是問題，作者認為多屬為用而用",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
-      "date": "2025-05-01"
+      "date": "2025-05-01",
+      "inferred": true
      }
     ],
     "char_254_vodfox": [
@@ -1973,7 +1999,7 @@
      {
       "source": "prts",
       "stance": "recommend",
-      "reason": "主題干員；PRTS註明其天賦可提供更多思維負荷",
+      "reason": "主題幹員；PRTS註明其天賦可提供更多思維負荷",
       "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
      }
     ],
@@ -2026,27 +2052,27 @@
    },
    "counters": [
     {
-     "threat": "弗莱蒙特，诸思之解答（ISW-DF 紧急授课/思维矫正）",
-     "needs": "RES 80，儲能時減傷；倒下/撤退干員被封入「放逐的黑棺」，二階段隨機重部署我方、附凋亡損傷：需物理爆發、擊破黑棺",
+     "threat": "弗萊蒙特，諸思之解答（ISW-DF 緊急授課/思維矯正）",
+     "needs": "RES 80，儲能時減傷；倒下/撤退幹員被封入「放逐的黑棺」，二階段隨機重部署我方、附凋亡損傷：需物理爆發、擊破黑棺",
      "url": "https://prts.wiki/w/%E5%BC%97%E8%8E%B1%E8%92%99%E7%89%B9%EF%BC%8C%E8%AF%B8%E6%80%9D%E4%B9%8B%E8%A7%A3%E7%AD%94"
     },
     {
-     "threat": "特雷西斯，黑冠尊主（ISW-DF 朝谒）",
-     "needs": "與特蕾西娅越近傷害越高、受傷越低：需拉開兩者距離（控場/位移）後爆發",
+     "threat": "特雷西斯，黑冠尊主（ISW-DF 朝謁）",
+     "needs": "與特蕾西婭越近傷害越高、受傷越低：需拉開兩者距離（控場/位移）後爆發",
      "url": "https://prts.wiki/w/%E7%89%B9%E9%9B%B7%E8%A5%BF%E6%96%AF%EF%BC%8C%E9%BB%91%E5%86%A0%E5%B0%8A%E4%B8%BB"
     },
     {
-     "threat": "博卓卡斯替，圣卫铳骑（ISW-DF 圣城/不容拒绝）",
-     "needs": "DEF 5000/RES 80，遠距離對其傷害大幅降低，手動撤退再部署延長，二階段掃射所有高台：需近身高爆發、少依賴高台",
+     "threat": "博卓卡斯替，聖衛銃騎（ISW-DF 聖城/不容拒絕）",
+     "needs": "DEF 5000/RES 80，遠距離對其傷害大幅降低，手動撤退再部署延長，二階段掃射所有高臺：需近身高爆發、少依賴高臺",
      "url": "https://prts.wiki/w/%E5%8D%9A%E5%8D%93%E5%8D%A1%E6%96%AF%E6%9B%BF%EF%BC%8C%E5%9C%A3%E5%8D%AB%E9%93%B3%E9%AA%91"
     },
     {
-     "threat": "“阿米娅”，炉芯终曲（ISW-DF 不容拒绝）",
+     "threat": "“阿米婭”，爐芯終曲（ISW-DF 不容拒絕）",
      "needs": "抵達終點即強制失敗；DEF 8000/RES 70、物法減傷50%，二階段周圍真傷：需真傷/穿防爆發與阻擋",
      "url": "https://prts.wiki/w/%E2%80%9C%E9%98%BF%E7%B1%B3%E5%A8%85%E2%80%9D%EF%BC%8C%E7%82%89%E8%8A%AF%E7%BB%88%E6%9B%B2"
     },
     {
-     "threat": "霜星，“冬痕”（ISW-DF 时光凯旋）",
+     "threat": "霜星，“冬痕”（ISW-DF 時光凱旋）",
      "needs": "法術攻擊附寒冷、對凍結目標加倍，重生後20秒無敵；場上源石冰晶持續寒冷：需法抗/治療與錯開無敵期",
      "url": "https://prts.wiki/w/%E9%9C%9C%E6%98%9F%EF%BC%8C%E2%80%9C%E5%86%AC%E7%97%95%E2%80%9D"
     },
@@ -2056,13 +2082,13 @@
      "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
     },
     {
-     "threat": "“门”",
-     "needs": "擊敗後帶走最後部署的干員：需注意部署順序",
+     "threat": "“門”",
+     "needs": "擊敗後帶走最後部署的幹員：需注意部署順序",
      "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
     },
     {
-     "threat": "宝箱：垂死羽兽",
-     "needs": "需治療回滿才給5源石錠：需醫療干員",
+     "threat": "寶箱：垂死羽獸",
+     "needs": "需治療回滿才給5源石錠：需醫療幹員",
      "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
     }
    ]
@@ -2152,7 +2178,7 @@
      {
       "source": "bahamut",
       "stance": "recommend",
-      "reason": "六星重裝首選，進洞作戰強、對空鎖血還能助渡劫",
+      "reason": "六星重灌首選，進洞作戰強、對空鎖血還能助渡劫",
       "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
       "date": "2026-01-18"
      }
@@ -2346,7 +2372,7 @@
      {
       "source": "bilibili",
       "stance": "avoid",
-      "reason": "界園適配差，招募優先級不高，其他干員做得更好",
+      "reason": "界園適配差，招募優先順序不高，其他幹員做得更好",
       "url": "https://www.bilibili.com/read/cv53745463",
       "date": "2026-11-03",
       "author": "天綾綾"
@@ -2393,37 +2419,37 @@
    },
    "counters": [
     {
-     "threat": "易（ISW-DF 破岁阵祀/天数将易）",
-     "needs": "晦/明屬性，同屬性攻擊倍率降至80%、優先打異屬性；周期換屬性並召喚「梁」：需利用晦明之印配置雙屬性干員",
+     "threat": "易（ISW-DF 破歲陣祀/天數將易）",
+     "needs": "晦/明屬性，同屬性攻擊倍率降至80%、優先打異屬性；週期換屬性並召喚「梁」：需利用晦明之印配置雙屬性幹員",
      "url": "https://prts.wiki/w/%E6%98%93"
     },
     {
-     "threat": "“岁”（ISW-DF 昔字如烟/止变）",
+     "threat": "“歲”（ISW-DF 昔字如煙/止變）",
      "needs": "56萬HP、無敵不死，週期【不寐】強制撤退目標周圍8格並【撼山河】全場三次高物傷：需分散部署、物理防禦與治療",
      "url": "https://prts.wiki/w/%E2%80%9C%E5%B2%81%E2%80%9D"
     },
     {
-     "threat": "“望”（ISW-DF 谋岁者）",
+     "threat": "“望”（ISW-DF 謀歲者）",
      "needs": "部署會生成「瑕」，瑕回血、暈眩並為其減傷，被瑕包圍格會刷怪：需優先清瑕、謹慎部署位置",
      "url": "https://prts.wiki/w/%E2%80%9C%E6%9C%9B%E2%80%9D"
     },
     {
-     "threat": "朔壳/妄躯/身形（ISW-DF 定乾坤/止变）",
-     "needs": "朔壳對非阻擋者50%閃避；妄躯每節身形減傷50%；身形登場強制撤退並反彈傷害：需清身形、阻擋朔壳近戰輸出",
+     "threat": "朔殼/妄軀/身形（ISW-DF 定乾坤/止變）",
+     "needs": "朔殼對非阻擋者50%閃避；妄軀每節身形減傷50%；身形登場強制撤退並反彈傷害：需清身形、阻擋朔殼近戰輸出",
      "url": "https://prts.wiki/w/%E6%9C%94%E5%A3%B3"
     },
     {
-     "threat": "后兽/矩兽（ISW-DF 末狩）",
-     "needs": "矩兽移動時減傷90%、異常時間大減，被阻擋時高物傷；倒下時全場高物傷並清場：需阻擋使其停步後輸出、預留治療",
+     "threat": "後獸/矩獸（ISW-DF 末狩）",
+     "needs": "矩獸移動時減傷90%、異常時間大減，被阻擋時高物傷；倒下時全場高物傷並清場：需阻擋使其停步後輸出、預留治療",
      "url": "https://prts.wiki/w/%E7%9F%A9%E5%85%BD"
     },
     {
-     "threat": "雕伥",
+     "threat": "雕倀",
      "needs": "持續吐敵並加速周圍敵人；四格外傷害大減：需近距離輸出或付費使其閉嘴",
      "url": "https://prts.wiki/w/%E5%B2%81%E7%9A%84%E7%95%8C%E5%9B%AD%E5%BF%97%E5%BC%82"
     },
     {
-     "threat": "岁时（永久負面效果）",
+     "threat": "歲時（永久負面效果）",
      "needs": "特定層級觸發並隨難度增強，可透過方法醒覺轉為有利",
      "url": "https://prts.wiki/w/%E5%B2%81%E7%9A%84%E7%95%8C%E5%9B%AD%E5%BF%97%E5%BC%82"
     }

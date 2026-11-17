@@ -9,6 +9,8 @@ import { operatorTexts } from './synergy.ts';
 /* 日常＝數值在同分支的排位、費用、技能觸發；基建＝技能解析；各模式＝明寫效果。 */
 /* ------------------------------------------------------------------ */
 export const IS_THEMES = ['傀影與猩紅孤鑽', '水月與深藍之樹', '探索者的銀淞止境', '薩卡茲的無終奇語', '歲的界園志異'];
+/** 與 IS_THEMES 同順序的主題 ID（roguelike_topic_table）。社群評價以 ID 對應，不必等關卡分析完成。 */
+export const IS_THEME_IDS = ['rogue_1', 'rogue_2', 'rogue_3', 'rogue_4', 'rogue_5'];
 const SKILL_TYPE: Record<string, string> = { PASSIVE: '被動', MANUAL: '手動', AUTO: '自動' };
 const SP_TYPE: Record<string, string> = { INCREASE_WITH_TIME: '自然回復', INCREASE_WHEN_ATTACK: '攻擊回復', INCREASE_WHEN_TAKEN_DAMAGE: '受擊回復', '8': '被動' };
 type Text = { kind: string; name: string; description: string };

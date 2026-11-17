@@ -4,7 +4,7 @@ import { analyzeSynergies, DEBUFF_PARTNER, type SynergyLink } from '../domain/sy
 import { useBaseCatalog } from './BasePage';
 import { useGrowthCatalog } from './GrowthPage';
 import { effectText } from './BasePage';
-import { IS_THEMES, operatorReview } from '../domain/review';
+import { IS_THEMES, IS_THEME_IDS, operatorReview } from '../domain/review';
 import type { RogueAnalysis } from '../catalog/rogue';
 import { fitLevel, themeFit, type ThemeFit } from '../domain/rogueFit';
 import { CommunityForOperator, CommunityThemePanel, useCommunity } from './Community';
@@ -240,7 +240,7 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
           else if (mode.key.startsWith('is')) {
             const theme = review.roguelike[Number(mode.key.slice(2)) - 1]; const items = [...theme.effects, ...review.roguelikeGeneral];
             const fit = rogue?.fits.get(theme.theme)?.get(definition.id), scores = rogue?.scores.get(theme.theme);
-            const themeId = rogue?.analyses.find(item => item.name === theme.theme)?.id;
+            const themeId = IS_THEME_IDS[Number(mode.key.slice(2)) - 1];
             body = <>{fit && scores ? <FitView fit={fit} level={fitLevel(fit.score, scores)}/> : <p className="fine-print">{rogue ? '此主題的關卡資料尚未分析。' : '分析主題關卡中…（首次需下載關卡檔）'}</p>}<CommunityForOperator data={community.data} themeId={themeId} operatorId={definition.id}/>{items.length > 0 && list(items)}</>;
           }
           else {

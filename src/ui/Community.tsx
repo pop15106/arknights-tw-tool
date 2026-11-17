@@ -29,7 +29,7 @@ export function useCommunity() {
 function PickLine({ pick }: { pick: CommunityPick }) {
   return <li className={`community-pick stance-${pick.stance}`}>
     <span className="community-tag">{COMMUNITY_SOURCE_LABEL[pick.source]}・{STANCE[pick.stance]}</span>{' '}
-    {pick.reason}{' '}
+    {pick.reason}{pick.inferred && <small className="fine-print" title="原文用暱稱或簡稱，幹員是整理時判讀的，請點出處核對。">（依暱稱判讀）</small>}{' '}
     <a href={pick.url} target="_blank" rel="noopener noreferrer">出處 ↗</a>
     {pick.date && <small className="fine-print"> {pick.date}{isStale(pick.date) ? '（發文超過兩年）' : ''}</small>}
   </li>;
