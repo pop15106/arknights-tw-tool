@@ -88,11 +88,15 @@ export async function repairUnknownFields(raw: unknown): Promise<{ state: AppSta
   const rawOk = isPlain(raw) ? [await checksumOk(raw.dataset), !isPlain(raw.undo) || await checksumOk(raw.undo.dataset)] : [false, false];
   const batches = isPlain(value) && Array.isArray(value.batches) ? value.batches : [];
   const touched = new WeakMap<object, Set<string>>();
-  // 每一輪都修好一個沒修過的位置（重複就停止），所以必定結束；不設固定次數上限。
+  // 只修「實際存在於資料中」的物件；驗證器有時檢查的是當場建立的暫時物件，修它不會有任何效果。
+  const stored = new WeakSet<object>();
+  const collect = (node: unknown): void => { if (node && typeof node === 'object' && !stored.has(node)) { stored.add(node); for (const child of Object.values(node)) collect(child); } };
+  collect(value);
+  // 每一輪都修好資料中一個沒修過的位置（重複或不在資料中就停止）；位置有限，所以必定結束，不設固定次數上限。
   for (;;) {
     try { validateAppState(value); break; }
     catch (error) {
-      if (!(error instanceof FieldError)) throw error;
+      if (!(error instanceof FieldError) || !stored.has(error.target)) throw error;
       // 同一位置修過還是錯（例如驗證器檢查的是暫時物件），表示無法安全修復。
       const seen = touched.get(error.target) ?? new Set<string>();
       if (seen.has(error.key)) throw error;

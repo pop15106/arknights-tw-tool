@@ -187,3 +187,17 @@ test('Codex 回饋：大量未決定衝突（600 筆匯入紀錄各一筆）也�
   assert.deepEqual(removed, ['pendingReviews']); assert.equal(undecided, 600);
   assert.ok(state.batches.every(item => item.conflicts.every(conflict => item.decisions[conflict.id])));
 });
+
+test('Codex 回饋：錯誤指向驗證器的暫時物件時直接停止，不會無限迴圈', async () => {
+  const date = '2026-11-13T00:00:00.000Z';
+  const dataset = await sealDataset({ metadata: { id: 'demo-set', version: '1', product: 'arknights', server: 'tw', namespace: 'demo', validFrom: date, acquiredAt: date, source: '自製', licenseStatus: 'self-authored' }, operators: [{ id: 'demo-1', displayName: '測試幹員', aliases: [], rarity: 6, profession: '先鋒', branch: '虛構分支', faction: '測試', skills: [{ id: 'demo-s1', name: '技能' }], modules: [], availability: 'unknown' }] });
+  const input: ImportDocument = { format: 'arknights-roster-import', schemaVersion: 1, product: 'arknights', server: 'tw', namespace: 'demo', dataset, candidates: [{ operatorId: 'demo-1', fields: { level: known(50, '測試', { importedAt: date, observedAt: date }) } }], completeness: 'partial', source: '測試', adapterVersion: '1', createdAt: date };
+  const empty = createEmptyState(dataset);
+  const first = applyImport(empty, await previewImport(empty, input), {});
+  const change = structuredClone(input); change.candidates[0].fields.level = known(70, '測試', { importedAt: date, observedAt: date });
+  const preview = await previewImport(first, change);
+  const second = applyImport(first, preview, { [preview.conflicts[0].id]: 'keep' });
+  const raw = structuredClone(second) as unknown as { batches: { conflicts: { field: string }[] }[] };
+  raw.batches[1].conflicts[0].field = 'futureField';
+  await assert.rejects(repairUnknownFields(raw), /未允許欄位：futureField/);
+});
