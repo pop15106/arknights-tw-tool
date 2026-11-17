@@ -88,7 +88,8 @@ export async function repairUnknownFields(raw: unknown): Promise<{ state: AppSta
   const rawOk = isPlain(raw) ? [await checksumOk(raw.dataset), !isPlain(raw.undo) || await checksumOk(raw.undo.dataset)] : [false, false];
   const batches = isPlain(value) && Array.isArray(value.batches) ? value.batches : [];
   const touched = new WeakMap<object, Set<string>>();
-  for (let attempt = 0; attempt < 500; attempt++) {
+  // 每一輪都修好一個沒修過的位置（重複就停止），所以必定結束；不設固定次數上限。
+  for (;;) {
     try { validateAppState(value); break; }
     catch (error) {
       if (!(error instanceof FieldError)) throw error;
@@ -98,7 +99,15 @@ export async function repairUnknownFields(raw: unknown): Promise<{ state: AppSta
       seen.add(error.key); touched.set(error.target, seen);
       if (error.kind === 'unknown') { delete error.target[error.key]; removed.push(error.key); continue; }
       const batch = batches.find(item => isPlain(item) && item.decisions === error.target);
-      if (isPlain(batch) && batch.kind === 'import' && Array.isArray(batch.conflicts) && batch.conflicts.some(conflict => isPlain(conflict) && conflict.id === error.key)) { error.target[error.key] = 'keep'; undecided++; continue; }
+      if (isPlain(batch) && batch.kind === 'import' && Array.isArray(batch.conflicts) && batch.conflicts.some(conflict => isPlain(conflict) && conflict.id === error.key)) {
+        // 驗證器確認是「匯入紀錄缺衝突決定」後，所有匯入紀錄的未決定衝突一次補齊，避免每補一筆就重驗整份資料。
+        for (const item of batches) {
+          if (!isPlain(item) || item.kind !== 'import' || !isPlain(item.decisions) || !Array.isArray(item.conflicts)) continue;
+          const decisions = item.decisions;
+          for (const conflict of item.conflicts) if (isPlain(conflict) && typeof conflict.id === 'string' && !Object.hasOwn(decisions, conflict.id)) { decisions[conflict.id] = 'keep'; undecided++; }
+        }
+        continue;
+      }
       throw error;
     }
   }

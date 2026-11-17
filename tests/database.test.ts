@@ -170,3 +170,20 @@ test('Codex 回饋：修復寫入前資料已被其他分頁改動時取消，�
   assert.equal((await loadState(db))?.revision, 5);
   db.close();
 });
+
+test('Codex 回饋：大量未決定衝突（600 筆匯入紀錄各一筆）也能一次修完', async () => {
+  const date = '2026-11-13T00:00:00.000Z';
+  const dataset = await sealDataset({ metadata: { id: 'demo-set', version: '1', product: 'arknights', server: 'tw', namespace: 'demo', validFrom: date, acquiredAt: date, source: '自製', licenseStatus: 'self-authored' }, operators: [{ id: 'demo-1', displayName: '測試幹員', aliases: [], rarity: 6, profession: '先鋒', branch: '虛構分支', faction: '測試', skills: [{ id: 'demo-s1', name: '技能' }], modules: [], availability: 'unknown' }] });
+  const input: ImportDocument = { format: 'arknights-roster-import', schemaVersion: 1, product: 'arknights', server: 'tw', namespace: 'demo', dataset, candidates: [{ operatorId: 'demo-1', fields: { level: known(50, '測試', { importedAt: date, observedAt: date }) } }], completeness: 'partial', source: '測試', adapterVersion: '1', createdAt: date };
+  const empty = createEmptyState(dataset);
+  const first = applyImport(empty, await previewImport(empty, input), {});
+  const change = structuredClone(input); change.candidates[0].fields.level = known(70, '測試', { importedAt: date, observedAt: date });
+  const preview = await previewImport(first, change);
+  const second = applyImport(first, preview, { [preview.conflicts[0].id]: 'keep' });
+  const template = second.batches[1];
+  const copies = Array.from({ length: 600 }, (_, index) => ({ ...structuredClone(template), id: `batch-copy-${index}`, decisions: {} }));
+  const raw = { ...structuredClone(second), pendingReviews: [], batches: [...structuredClone(second.batches), ...copies] };
+  const { state, removed, undecided } = await repairUnknownFields(raw);
+  assert.deepEqual(removed, ['pendingReviews']); assert.equal(undecided, 600);
+  assert.ok(state.batches.every(item => item.conflicts.every(conflict => item.decisions[conflict.id])));
+});
