@@ -75,6 +75,8 @@ function Bubble({ text, line, voiceOn, speaker }: { text: string; line?: GuideLi
   const audio = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   useEffect(() => () => { audio.current?.pause(); }, []);
+  // 關掉「開啟語音」時，正在播放的語音也要停下來。
+  useEffect(() => { if (!voiceOn) { audio.current?.pause(); audio.current = null; setPlaying(false); } }, [voiceOn]);
   const play = () => {
     if (!line?.file) return;
     audio.current?.pause();
