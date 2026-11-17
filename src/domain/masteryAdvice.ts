@@ -80,7 +80,7 @@ export function skillAdvice(definition: OperatorDefinition, row: OwnedOperator |
   });
 }
 
-/** 全帳號排行：已精二、技能還沒專精 3 的幹員，依選定模式排序。 */
+/** 全帳號排行：已精二、技能還沒專精 3 的幹員，依選定模式排序（不截斷）。 */
 export interface RankedSkill { operatorId: string; name: string; advice: SkillAdvice; modePoints: number }
 export function rankMastery(definitions: readonly OperatorDefinition[], roster: readonly OwnedOperator[], context: AdviceContext, mode: string): RankedSkill[] {
   const out: RankedSkill[] = [];
@@ -97,5 +97,6 @@ export function rankMastery(definitions: readonly OperatorDefinition[], roster: 
       out.push({ operatorId: definition.id, name: definition.displayName, advice, modePoints: Math.round((modePoints + (advice.gain?.score ?? 0) * 0.3 + community * 10) * 10) / 10 });
     }
   }
-  return out.sort((a, b) => b.modePoints - a.modePoints).slice(0, 60);
+  // 回傳全部候選，由畫面依使用者選的排序再截斷。
+  return out.sort((a, b) => b.modePoints - a.modePoints);
 }

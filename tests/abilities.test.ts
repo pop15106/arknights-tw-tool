@@ -15,6 +15,15 @@ test('能力解析：常見技能說明抽出正確標籤', () => {
   assert.ok(keys('攻擊間隔大幅度縮短').includes('aspdBuff'));
   assert.equal(parseAbilityText('攻擊間隔大幅度縮短', skill).find(item => item.key === 'aspdBuff')?.value, 50);
   assert.ok(keys('攻擊範圍內所有友方幹員攻擊力+10%', { kind: '天賦', name: '鼓舞' }).includes('allyBuff'));
+  assert.ok(!keys('攻擊範圍內所有友方幹員攻擊力+10%', { kind: '天賦', name: '鼓舞' }).includes('aoe'));
+  assert.ok(!keys('治療攻擊範圍內所有友方單位').includes('aoe'));
+  assert.ok(keys('對範圍內所有敵人造成傷害').includes('aoe'));
+});
+
+test('能力解析：自身暈眩、免疫暈眩不算控場', () => {
+  assert.ok(!keys('攻擊力+200%，技能結束後自身暈眩10秒').includes('stun'));
+  assert.ok(!keys('免疫暈眩與凍結').includes('stun'));
+  assert.ok(keys('攻擊力+200%，使目標暈眩2秒，技能結束後自身暈眩10秒').includes('stun'));
 });
 
 test('能力解析：隱匿要分清楚是「自己隱匿」還是「看穿隱匿」', () => {
@@ -58,4 +67,9 @@ test('專精排行：只列已精二、還沒專精 3 的技能', () => {
   const ranked = rankMastery([definition], [row(2, 3)], context, '全部');
   assert.deepEqual(ranked.map(item => item.advice.skillId), ['sk2']);
   assert.equal(rankMastery([definition], [row(1, 0)], context, '全部').length, 0);
+  // 不在領域層截斷，畫面依使用者選的排序再取前幾名。
+  const many = Array.from({ length: 70 }, (_, index) => ({ ...definition, id: `char_${index}` })) as OperatorDefinition[];
+  const manyGrowth = { items: {}, operators: Object.fromEntries(many.map(def => [def.id, { masteries: {}, skillMeta: {} }])) } as never;
+  const rows = many.map(def => ({ ...row(2, 0), operatorId: def.id }) as OwnedOperator);
+  assert.equal(rankMastery(many, rows, { growth: manyGrowth, analyses: [] }, '全部').length, 140);
 });
