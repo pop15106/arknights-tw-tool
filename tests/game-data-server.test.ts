@@ -138,3 +138,19 @@ test('同步失敗回固定 502 且仍能讀舊快取；讀取例外與 lastErro
   const stale = await fetch(`${h.origin}/api/game-data/status`);
   assert.equal(stale.status, 200); assert.equal((await stale.text()).includes(secret), false);
 });
+
+test('立繪同步：背景執行、可查進度，只接受本機頁面的同步請求', async t => {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const service = await startGameDataServer({ port: 0, load: async () => snapshot, sync: async () => snapshot, notifier: null, syncPortraits: async progress => { progress(1, 2); await gate; progress(2, 2); return { downloaded: 1, skipped: 0, missing: 1, failed: 0 }; } });
+  t.after(() => service.close());
+  const headers = { Origin: service.origin, 'X-Game-Data-Sync': '1', 'Sec-Fetch-Site': 'same-origin' };
+  assert.equal((await rawRequest(service.origin, '/api/game-data/portraits', { ...headers, Origin: 'https://evil.example' }, 'POST')).status, 403);
+  const started = await rawRequest(service.origin, '/api/game-data/portraits', headers, 'POST');
+  assert.equal(started.status, 202);
+  const running = JSON.parse((await rawRequest(service.origin, '/api/game-data/portraits-status', {})).body);
+  assert.equal(running.running, true); assert.equal(running.done, 1);
+  release(); await new Promise(resolve => setTimeout(resolve, 20));
+  const finished = JSON.parse((await rawRequest(service.origin, '/api/game-data/portraits-status', {})).body);
+  assert.equal(finished.running, false); assert.deepEqual(finished.result, { downloaded: 1, skipped: 0, missing: 1, failed: 0 });
+});

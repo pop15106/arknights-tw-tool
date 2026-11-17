@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { GameDataSnapshot } from './game-data-sync.ts';
 import type { TradingParams } from '../src/catalog/trading.ts';
+import { SKIN_ID } from '../src/catalog/skins.ts';
+import { createNotifier, NotifyError, type Notifier } from './notify.ts';
 
 const DEFAULT_PORT = 5188;
 // 只接受 127.0.0.1 的任意連接埠（例如 5173 被占用時改用 5174）；外部網域與 DNS 重新綁定仍會被擋下。
@@ -18,6 +20,13 @@ interface ServerOptions {
   rogueAnalysis?: (theme: string) => Promise<import('../src/catalog/rogue.ts').RogueAnalysis | null>;
   loadCnEvents?: () => Promise<{ fetchedAt: string; source: string; events: unknown[] } | null>;
   loadDrops?: () => Promise<import('../src/catalog/drops.ts').DropRates | null>;
+  /** 換班推播；測試時注入假的發送端，正式執行才讀本機設定。 */
+  notifier?: Notifier | null;
+  loadCommunity?: () => Promise<import('../src/catalog/community.ts').CommunityData>;
+  syncCommunity?: () => Promise<import('../src/catalog/community.ts').CommunityData>;
+  loadSkins?: () => Promise<import('../src/catalog/skins.ts').SkinCatalog>;
+  skinPortrait?: (skinId: string) => Promise<string>;
+  syncPortraits?: (onProgress: (done: number, total: number) => void) => Promise<{ downloaded: number; skipped: number; missing: number; failed: number }>;
 }
 class ApiError extends Error {
   status: number;
@@ -69,8 +78,17 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const rogueAnalysis = options.rogueAnalysis ?? (options.load ? async () => null : async (theme: string) => (await import('./game-data-sync.ts')).rogueAnalysisData(theme));
   const loadCnEvents = options.loadCnEvents ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadCnEventsData());
   const loadDrops = options.loadDrops ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadDropsData());
+  const loadCommunity = options.loadCommunity ?? (options.load ? async () => { throw new Error('測試未提供'); } : async () => (await import('./game-data-sync.ts')).loadCommunityData());
+  const syncCommunity = options.syncCommunity ?? (options.load ? async () => { throw new Error('測試未提供'); } : async () => (await import('./game-data-sync.ts')).syncCommunityData());
+  const loadSkins = options.loadSkins ?? (options.load ? async () => ({}) : async () => (await import('./game-data-sync.ts')).loadSkinsData());
+  const skinPortrait = options.skinPortrait ?? (options.load ? async () => { throw new Error('測試未提供'); } : async (skinId: string) => (await import('./game-data-sync.ts')).skinPortraitData(skinId));
+  const syncPortraits = options.syncPortraits ?? (options.load ? async () => { throw new Error('測試未提供'); } : async (progress: (done: number, total: number) => void) => (await import('./game-data-sync.ts')).syncPortraitsData(progress));
+  // 立繪同步要下載數百張圖，超過單次請求時限，所以在背景執行，頁面輪詢進度。
+  let portraitJob: { running: boolean; done: number; total: number; result?: Awaited<ReturnType<typeof syncPortraits>>; error?: string } = { running: false, done: 0, total: 0 };
+  const notifier = options.notifier !== undefined ? options.notifier : options.load ? null : createNotifier();
+  const stopNotifier = notifier?.start();
   let origin = '', host = '';
-  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'recruit', 'cn-events', 'rogue', 'rogue-analysis', 'sync'].map(name => `/api/game-data/${name}`));
+  const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'recruit', 'cn-events', 'rogue', 'rogue-analysis', 'sync', 'portraits', 'portraits-status', 'skins', 'skin-portrait', 'community', 'community-sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
     try {
       if (req.headers.host !== host && !isLoopbackHost(req.headers.host)) throw new ApiError(403, 'HOST', '只接受本機資料服務的網址。');
@@ -78,11 +96,18 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       const raw = req.url ?? '';
       if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') || raw.includes('#') || raw.length > 2048) throw new ApiError(400, 'PATH', '網址格式無效。');
       const url = new URL(raw, origin);
+      if (url.pathname.startsWith('/api/notify/')) {
+        if (!notifier) throw new ApiError(404, 'NOT_FOUND', '找不到此資料功能。');
+        if (url.search) throw new ApiError(400, 'QUERY', '查詢參數無效。');
+        try { await notifier.handle(req, res, url.pathname, value => value === origin || isLoopbackOrigin(value), json); }
+        catch (error) { if (error instanceof NotifyError) throw new ApiError(error.status, 'NOTIFY', error.message); throw error; }
+        return;
+      }
       if (!paths.has(url.pathname)) throw new ApiError(404, 'NOT_FOUND', '找不到此資料功能。');
-      const isSync = url.pathname === '/api/game-data/sync';
+      const isSync = url.pathname === '/api/game-data/sync' || url.pathname === '/api/game-data/portraits' || url.pathname === '/api/game-data/skin-portrait' || url.pathname === '/api/game-data/community-sync';
       if (req.method !== (isSync ? 'POST' : 'GET')) throw new ApiError(405, 'METHOD', '不支援此請求方法。');
       const isList = url.pathname === '/api/game-data/stages' || url.pathname === '/api/game-data/events';
-      const allowedQuery = isList ? ['limit', 'offset', 'q'] : url.pathname === '/api/game-data/stage-enemies' ? ['id'] : url.pathname === '/api/game-data/rogue-analysis' ? ['theme'] : [];
+      const allowedQuery = isList ? ['limit', 'offset', 'q'] : url.pathname === '/api/game-data/stage-enemies' ? ['id'] : url.pathname === '/api/game-data/rogue-analysis' ? ['theme'] : url.pathname === '/api/game-data/skin-portrait' ? ['id'] : [];
       for (const key of url.searchParams.keys()) {
         if (!allowedQuery.includes(key) || url.searchParams.getAll(key).length !== 1) throw new ApiError(400, 'QUERY', '查詢參數無效。');
       }
@@ -93,6 +118,24 @@ export async function startGameDataServer(options: ServerOptions = {}) {
         }
         if (req.headers['content-type'] !== undefined) throw new ApiError(415, 'CONTENT_TYPE', '同步請求不接受 Content-Type 或內容。');
         if (req.headers['transfer-encoding'] !== undefined || (req.headers['content-length'] !== undefined && req.headers['content-length'] !== '0')) throw new ApiError(400, 'BODY', '同步請求不接受內容。');
+        if (url.pathname === '/api/game-data/community-sync') {
+          try { json(res, 200, await syncCommunity()); } catch { throw new ApiError(502, 'COMMUNITY_FAILED', '社群評價同步失敗；目前的資料仍可使用。'); }
+          return;
+        }
+        if (url.pathname === '/api/game-data/skin-portrait') {
+          const skinId = url.searchParams.get('id') ?? '';
+          if (!SKIN_ID.test(skinId)) throw new ApiError(400, 'QUERY', '時裝 ID 無效。');
+          try { json(res, 200, { path: await skinPortrait(skinId) }); } catch { throw new ApiError(502, 'SKIN_FAILED', '這套服裝的立繪下載失敗，請稍後再試。'); }
+          return;
+        }
+        if (url.pathname === '/api/game-data/portraits') {
+          if (!portraitJob.running) {
+            portraitJob = { running: true, done: 0, total: 0 };
+            void syncPortraits((done, total) => { portraitJob.done = done; portraitJob.total = total; })
+              .then(result => { portraitJob = { ...portraitJob, running: false, result }; }, error => { portraitJob = { ...portraitJob, running: false, error: error instanceof Error && error.message === '請先更新遊戲資料。' ? error.message : '立繪同步失敗，請確認網路後再試。' }; });
+          }
+          json(res, 202, portraitJob); return;
+        }
         let updated: GameDataSnapshot;
         try { updated = await sync(); } catch { throw new ApiError(502, 'SYNC_FAILED', '公開資料同步失敗；先前快取仍可使用。'); }
         json(res, 200, publicStatus(updated)); return;
@@ -101,6 +144,15 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       const offset = isList ? queryNumber(url.searchParams, 'offset', 0, 0, Number.MAX_SAFE_INTEGER) : 0;
       const q = url.searchParams.get('q') ?? '';
       if (q.length > 100) throw new ApiError(400, 'QUERY', '查詢文字不可超過 100 字。');
+      if (url.pathname === '/api/game-data/portraits-status') { json(res, 200, portraitJob); return; }
+      if (url.pathname === '/api/game-data/community') {
+        try { json(res, 200, await loadCommunity()); } catch { throw new ApiError(503, 'COMMUNITY_UNAVAILABLE', '社群評價資料無法讀取。'); }
+        return;
+      }
+      if (url.pathname === '/api/game-data/skins') {
+        try { json(res, 200, await loadSkins()); } catch { throw new ApiError(502, 'SKINS_FAILED', '無法取得服裝清單，請確認網路後再試。'); }
+        return;
+      }
       const snapshot = await load();
       if (!snapshot) throw new ApiError(503, 'DATA_UNAVAILABLE', '尚未同步公開遊戲資料。');
       if (url.pathname === '/api/game-data/status') { json(res, 200, publicStatus(snapshot)); return; }
@@ -171,6 +223,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   });
   let closing: Promise<void> | undefined;
   return { server, origin, close: () => closing ??= new Promise<void>((resolveClose, reject) => {
+    stopNotifier?.();
     server.close(error => error ? reject(error) : resolveClose()); server.closeAllConnections();
   }) };
 }

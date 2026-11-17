@@ -4,9 +4,10 @@ import { analyzeSynergies, DEBUFF_PARTNER, type SynergyLink } from '../domain/sy
 import { useBaseCatalog } from './BasePage';
 import { useGrowthCatalog } from './GrowthPage';
 import { effectText } from './BasePage';
-import { IS_THEMES, operatorReview } from '../domain/review';
+import { IS_THEMES, IS_THEME_IDS, operatorReview } from '../domain/review';
 import type { RogueAnalysis } from '../catalog/rogue';
 import { fitLevel, themeFit, type ThemeFit } from '../domain/rogueFit';
+import { CommunityForOperator, CommunityThemePanel, useCommunity } from './Community';
 import { operatorTexts } from '../domain/synergy';
 import { buildSquad, operatorInfo, TEMPLATES } from '../domain/squad';
 import { useEffect } from 'preact/hooks';
@@ -203,6 +204,7 @@ function StageTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
 
 const MODES: { key: string; label: string }[] = [{ key: 'daily', label: '日常（主線／活動）' }, { key: 'base', label: '基建' }, ...IS_THEMES.map((theme, index) => ({ key: `is${index + 1}`, label: `集成戰略：${theme}` })), { key: 'reclamation', label: '生息演算' }, { key: 'security', label: '保全派駐' }];
 function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDemo: boolean; tabs: preact.JSX.Element; onSaveNotes?: (notes: NonNullable<AppState['settings']['reviewNotes']>) => void }) {
+  const community = useCommunity();
   const { catalog: growth } = useGrowthCatalog(isDemo);
   const { catalog: base } = useBaseCatalog(isDemo, 0);
   const [operatorId, setOperatorId] = useState('');
@@ -238,7 +240,8 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
           else if (mode.key.startsWith('is')) {
             const theme = review.roguelike[Number(mode.key.slice(2)) - 1]; const items = [...theme.effects, ...review.roguelikeGeneral];
             const fit = rogue?.fits.get(theme.theme)?.get(definition.id), scores = rogue?.scores.get(theme.theme);
-            body = <>{fit && scores ? <FitView fit={fit} level={fitLevel(fit.score, scores)}/> : <p className="fine-print">{rogue ? '此主題的關卡資料尚未分析。' : '分析主題關卡中…（首次需下載關卡檔）'}</p>}{items.length > 0 && list(items)}</>;
+            const themeId = IS_THEME_IDS[Number(mode.key.slice(2)) - 1];
+            body = <>{fit && scores ? <FitView fit={fit} level={fitLevel(fit.score, scores)}/> : <p className="fine-print">{rogue ? '此主題的關卡資料尚未分析。' : '分析主題關卡中…（首次需下載關卡檔）'}</p>}<CommunityForOperator data={community.data} themeId={themeId} operatorId={definition.id}/>{items.length > 0 && list(items)}</>;
           }
           else {
             const kind = mode.key === 'reclamation' ? 'reclamation' : 'security';
@@ -296,6 +299,7 @@ function RogueTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
   const rogue = useRogueFits(isDemo, state, growth, base);
   const [themeName, setThemeName] = useState('');
   const [mode, setMode] = useState<'roguelike' | 'security' | 'reclamation'>('roguelike');
+  const community = useCommunity();
   const head = <header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>模式分析：集成戰略／保全派駐／生息演算</h2></div>{tabs}</header>;
   if (!rogue || !rogue.analyses.length) return <section className="panel">{head}<p className="fine-print">分析各模式關卡中…（首次需下載所有關卡檔，約需數分鐘）</p></section>;
   const inMode = rogue.analyses.filter(item => (item.mode ?? 'roguelike') === mode);
@@ -332,6 +336,7 @@ function RogueTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
       </tbody></table></div>
       {special.length > 0 && <details className="plain-details"><summary>點名特定分支／陣營／機制的{mode === 'security' ? '戰術裝備卡' : '藏品'}（{special.length}）</summary><ul className="gap-list">{special.map(relic => <li key={relic.id}><strong>{relic.name}</strong>：{relic.usage}</li>)}</ul></details>}
     </section>
+    {mode === 'roguelike' && <CommunityThemePanel community={community} themeId={analysis.id} owned={owned} nameOf={name}/>}
     <section className="panel" aria-label="你的契合幹員">
       <h3>你持有的幹員中契合度最高</h3>
       <div className="synergy-grid">{top.map(([id, fit]) => <article key={id} className="synergy-card"><header><strong>{name(id)}</strong></header><FitView fit={fit} level={fitLevel(fit.score, scores)}/></article>)}</div>

@@ -1,0 +1,2462 @@
+{
+ "format": "arknights-community-picks",
+ "version": 1,
+ "updatedAt": "2026-11-17",
+ "sources": [
+  {
+   "id": "bahamut",
+   "name": "巴哈姆特",
+   "note": "台服視角；收錄的攻略多出自少數資深玩家（偏高難度），不代表多數共識。"
+  },
+  {
+   "id": "bilibili",
+   "name": "B 站",
+   "note": "陸服視角；部分只取自影片標題或簡介（理由會註明），舊攻略可能與現行版本不符。NGA 需登入，未收錄。"
+  },
+  {
+   "id": "prts",
+   "name": "PRTS",
+   "note": "PRTS 沒有推薦幹員的攻略；首領／機制應對是依頁面數值整理的摘要，不是 PRTS 的建議。"
+  }
+ ],
+ "themes": {
+  "rogue_1": {
+   "picks": {
+    "char_002_amiya": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "簡介「幹員推薦」五星",
+      "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
+      "date": "2024-09-21",
+      "author": "永世摇篮"
+     }
+    ],
+    "char_003_kalts": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "好用但佔兩個部署位，作者基本不拿",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "兼具阻擋位但費用偏高，毒霧圖要注意站位（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "module": true
+     }
+    ],
+    "char_017_huang": [
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "同上，低上限型近衛，後期乏力",
+      "url": "https://www.bilibili.com/read/cv15130002",
+      "date": "2022-02-05",
+      "author": "白猫猫A-A"
+     }
+    ],
+    "char_1012_skadi2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "可群奶與增傷，適合強化少數輸出核心",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     }
+    ],
+    "char_1013_chen2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "作者稱「唯一真神」，狙擊首選",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "列為劇作家門殺候選，前置關卡也實用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=7737",
+      "date": "2022-07-22"
+     }
+    ],
+    "char_1021_kroos2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "提豐單核攻略的核心幹員之一",
+      "url": "https://www.bilibili.com/video/BV1HN411n7D1",
+      "date": "2023-09-27",
+      "author": "白倦今天也好疲倦啊",
+      "inferred": true
+     }
+    ],
+    "char_1026_gvial2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "精一發力，可帶非職業分隊刷角標的新保姆",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=7737",
+      "date": "2022-07-22",
+      "inferred": true
+     }
+    ],
+    "char_1028_texas2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "新手開荒以異德開局，但傀影需另一個大C如水陳",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10399",
+      "date": "2024-08-04"
+     }
+    ],
+    "char_1035_wisdel": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "簡介「幹員推薦」物傷六星（EW）",
+      "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
+      "date": "2024-09-21",
+      "author": "永世摇篮"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "重返古堡N15狙醫核心，道中與結局守線都強；但高費、對空空窗使統治力不如其他期",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "inferred": true
+     }
+    ],
+    "char_1041_angel2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "低費精一發力、套盾保生存，可偷傀影攻速，被視為特種首抓",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "inferred": true
+     }
+    ],
+    "char_1042_phatm2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "開局、道中、結局皆有幫助，全圖貓增加容錯並協助永控",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13"
+     }
+    ],
+    "char_123_fang": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "低難新手向：費用低能快速回費，作者每局首抓先鋒",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10588",
+      "date": "2024-10-13"
+     }
+    ],
+    "char_124_kroos": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "便宜好用，能扛起大部分狙擊需求",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     }
+    ],
+    "char_128_plosis": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "群奶回技力，每把必拿的五星",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "提豐單核攻略的核心幹員之一",
+      "url": "https://www.bilibili.com/video/BV1HN411n7D1",
+      "date": "2023-09-27",
+      "author": "白倦今天也好疲倦啊",
+      "inferred": true
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "低難：有群補應付毒霧圖與王關回血",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10588",
+      "date": "2024-10-13"
+     }
+    ],
+    "char_129_bluep": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "開局助戰借用即可擺完掛機，吃強力擊與攻速藏品",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG"
+     }
+    ],
+    "char_148_nearl": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "又肉又能奶，天馬光環增加全場治療量",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG",
+      "inferred": true
+     }
+    ],
+    "char_151_myrtle": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "2希望便宜，滿足爆費鋪場需求",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     }
+    ],
+    "char_172_svrash": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "強力擊/雪境法則等藏品都能用上，減再部署好用",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "大鎖關需高傷大範圍拔插清報幕助手的候選",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=7737",
+      "date": "2022-07-22"
+     }
+    ],
+    "char_179_cgbird": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "大鎖與劇作家的老牌對策，與奶羊二選一看缺什麼",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13"
+     }
+    ],
+    "char_180_amgoat": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "常態輸出加高爆發，傀影與喉舌關底優秀",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     }
+    ],
+    "char_2012_typhon": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "正式調查單核可行，大多數圖表現優秀",
+      "url": "https://www.bilibili.com/video/BV1HN411n7D1",
+      "date": "2023-09-27",
+      "author": "白倦今天也好疲倦啊"
+     }
+    ],
+    "char_2023_ling": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "輔助隊開局，三技能極肉，基本保送4-5層",
+      "url": "https://www.bilibili.com/read/cv15130002",
+      "date": "2022-02-05",
+      "author": "白猫猫A-A"
+     }
+    ],
+    "char_2025_shu": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "純補生存，補充阻擋與奶量",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13"
+     }
+    ],
+    "char_202_demkni": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "臨光精二後抓，配鈣質化法蒸傀影很強",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG"
+     }
+    ],
+    "char_222_bpipe": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "有輸出能前期承壓，打喉舌可切報幕助手",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     }
+    ],
+    "char_250_phatom": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "由新能偷攻速後疊攻，術特線打大鎖的優選（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "module": true
+     }
+    ],
+    "char_264_f12yin": [
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "低上限高下限，後期誰都打不過，最好不拿",
+      "url": "https://www.bilibili.com/read/cv15130002",
+      "date": "2022-02-05",
+      "author": "白猫猫A-A"
+     }
+    ],
+    "char_272_strong": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "空降切人、常態奶人單守，僅2希望很便宜",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     },
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "扣費型，部分圖好用但很多時候沒法用",
+      "url": "https://www.bilibili.com/read/cv15130002",
+      "date": "2022-02-05",
+      "author": "白猫猫A-A"
+     }
+    ],
+    "char_284_spot": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "前期奶盾兼阻擋，物理閃避，可用到傀影關底",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     }
+    ],
+    "char_291_aglina": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "配空弦作為一、四結局對策，可直接永控Boss（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "module": true
+     }
+    ],
+    "char_293_thorns": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "災厄難度舒適開局，精二可保送3層以上",
+      "url": "https://www.bilibili.com/read/cv15130002",
+      "date": "2022-02-05",
+      "author": "白猫猫A-A",
+      "inferred": true
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "2022年統計中最多人用的六星開局，近鋒第一保姆",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=7737",
+      "date": "2022-07-22"
+     }
+    ],
+    "char_322_lmlee": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "扣費型，部分圖好用但很多時候沒法用",
+      "url": "https://www.bilibili.com/read/cv15130002",
+      "date": "2022-02-05",
+      "author": "白猫猫A-A"
+     }
+    ],
+    "char_332_archet": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "表現極佳，攻回狙擊（蘭登隊）核心",
+      "url": "https://www.bilibili.com/read/cv15130002",
+      "date": "2022-02-05",
+      "author": "白猫猫A-A"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "N15帶蘭登體系，配合安潔通緝精英、M3真傷，地位穩固（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "module": true
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "低難：速狙清歌姬與飛機，王關需她處理右側",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10588",
+      "date": "2024-10-13"
+     }
+    ],
+    "char_350_surtr": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "近衛推薦抓42，配塞雷婭可法蒸傀影",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG",
+      "inferred": true
+     }
+    ],
+    "char_358_lisa": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "輔助推薦，與鴻雪搭配可秒傀影",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG"
+     }
+    ],
+    "char_377_gdglow": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "簡介「幹員推薦」法傷六星",
+      "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
+      "date": "2024-09-21",
+      "author": "永世摇篮"
+     }
+    ],
+    "char_4009_irene": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "近鋒第二保姆，可單帶多數關卡但缺對空",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=7737",
+      "date": "2022-07-22"
+     }
+    ],
+    "char_4025_aprot2": [
+     {
+      "source": "prts",
+      "stance": "situational",
+      "reason": "本主題的主題幹員（古堡筆記Lv25獎勵）；頁面未給出強度評價",
+      "url": "https://prts.wiki/w/%E5%82%80%E5%BD%B1%E4%B8%8E%E7%8C%A9%E7%BA%A2%E5%AD%A4%E9%92%BB"
+     }
+    ],
+    "char_4039_horn": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "劇作家中路守線推薦之一（法傷壓力大）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=7737",
+      "date": "2022-07-22"
+     }
+    ],
+    "char_4055_bgsnow": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "無視閃避，可爆殺傀影；配鈴蘭可秒傀影",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（據標題）普通結局全程鴻雪單核可通關",
+      "url": "https://www.bilibili.com/video/BV1D6421u7fi",
+      "date": "2024-02-11",
+      "author": "纯凉今天鸽了吗"
+     }
+    ],
+    "char_4064_mlynar": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "近鋒對非本家多是希望小偷，僅嘲諷等少數例外可考慮",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13"
+     }
+    ],
+    "char_4072_ironmn": [
+     {
+      "source": "bahamut",
+      "stance": "avoid",
+      "reason": "作者認為本體與技能佔位高費、效果來不及發揮",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10588",
+      "date": "2024-10-13"
+     }
+    ],
+    "char_4087_ines": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "簡介「幹員推薦」輔助類六星",
+      "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
+      "date": "2024-09-21",
+      "author": "永世摇篮",
+      "inferred": true
+     }
+    ],
+    "char_4179_monstr": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "奶與真傷兼具，劇作家可正面守冬靈血巫，大鎖線也可用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13"
+     }
+    ],
+    "char_4193_lemuen": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "簡介「幹員推薦」物傷六星",
+      "url": "https://www.bilibili.com/video/BV1crt6eLExQ",
+      "date": "2024-09-21",
+      "author": "永世摇篮"
+     }
+    ],
+    "char_437_mizuki": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "生存強可單守大鎖左路，傀影結局能持續打斷巨象（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "module": true
+     }
+    ],
+    "char_449_glider": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "醫療首選之一，防傀影/歌姬神經損傷眩暈",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG"
+     }
+    ],
+    "char_450_necras": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "術特開局保姆，召喚大兵阻擋輸出且不佔部署與費用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13"
+     }
+    ],
+    "char_472_pasngr": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "滿練索敵可處理多路，專屬藏品超模",
+      "url": "https://www.bilibili.com/read/cv14849482",
+      "date": "2022-01-15",
+      "author": "夏侯一吨"
+     }
+    ],
+    "char_473_mberry": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "醫療首選之一，防神經損傷眩暈",
+      "url": "https://www.bilibili.com/read/cv21665972",
+      "date": "2023-02-06",
+      "author": "焕彩GG"
+     }
+    ],
+    "char_492_quercu": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "缺醫療券時用來撐毒霧圖的替代治療",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10588",
+      "date": "2024-10-13"
+     }
+    ]
+   },
+   "counters": [
+    {
+     "threat": "盧西恩，“猩紅血鑽”（ISW-DF 覆水難收/別無所求等終局）",
+     "needs": "被阻擋時瞬移穿過並留幻影、未阻擋時40%閃避、無視40%防禦附神經損傷：需高阻擋/多段阻擋與法術或真傷爆發、治療",
+     "url": "https://prts.wiki/w/%E5%8D%A2%E8%A5%BF%E6%81%A9%EF%BC%8C%E2%80%9C%E7%8C%A9%E7%BA%A2%E8%A1%80%E9%92%BB%E2%80%9D"
+    },
+    {
+     "threat": "“劇團喉舌”（ISW-DF 諸事不順）",
+     "needs": "本體永久無敵、減緩部署費用回復；擊殺「報幕助手」才使其掉血：需清召喚物的群攻/爆發，助手周圍持續真傷需治療",
+     "url": "https://prts.wiki/w/%E2%80%9C%E5%89%A7%E5%9B%A2%E5%96%89%E8%88%8C%E2%80%9D"
+    },
+    {
+     "threat": "傷心的大鎖（ISW-DF 別無所求）",
+     "needs": "30萬HP、自癒、全場攻擊2目標並週期法傷全場、持續刷怪：需高持續輸出與全隊治療；持有【空白遺書】可停其自癒",
+     "url": "https://prts.wiki/w/%E4%BC%A4%E5%BF%83%E7%9A%84%E5%A4%A7%E9%94%81"
+    },
+    {
+     "threat": "漂泊頌偶（ISW-DF 悅耳殺機等）",
+     "needs": "未被阻擋時每秒對全場我方造成法術傷害：需及早阻擋",
+     "url": "https://prts.wiki/w/%E6%BC%82%E6%B3%8A%E9%A2%82%E5%81%B6"
+    },
+    {
+     "threat": "“雪牝”/“霜牡”（ISW-DF 寒淵惜別）",
+     "needs": "一方倒下另一方繼承能力並大幅強化，攻擊附寒冷、對凍結目標增傷：需同步擊殺（雙線爆發）、避免被凍結",
+     "url": "https://prts.wiki/w/ISW-DF_%E5%AF%92%E6%B8%8A%E6%83%9C%E5%88%AB"
+    },
+    {
+     "threat": "迷路的巨像",
+     "needs": "投擲超長暈眩石頭：需注意站位/抗控",
+     "url": "https://prts.wiki/w/%E8%BF%B7%E8%B7%AF%E7%9A%84%E5%B7%A8%E5%83%8F"
+    },
+    {
+     "threat": "無主的財富（寶箱）",
+     "needs": "敵人經過會奪走寶箱，留存可多得源石錠：需攔截/控場",
+     "url": "https://prts.wiki/w/%E5%82%80%E5%BD%B1%E4%B8%8E%E7%8C%A9%E7%BA%A2%E5%AD%A4%E9%92%BB"
+    },
+    {
+     "threat": "幻覺（區域負面效果）",
+     "needs": "進入區域機率觸發、深入後機率增加，高難可雙重/融合：需隊伍泛用性",
+     "url": "https://prts.wiki/w/%E5%82%80%E5%BD%B1%E4%B8%8E%E7%8C%A9%E7%BA%A2%E5%AD%A4%E9%92%BB"
+    }
+   ]
+  },
+  "rogue_2": {
+   "picks": {
+    "char_002_amiya": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "術士/劍衛雙職業，功能性強",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     }
+    ],
+    "char_003_kalts": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "強勢，M3可快速換站位，建議拿",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "前期陣容差時一次補足醫療與阻擋，M3可對空",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_1012_skadi2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "打騎士結局推薦拿粉毛",
+      "url": "https://www.bilibili.com/read/cv18866711",
+      "date": "2022-09-30",
+      "author": "千爱要乐奈",
+      "inferred": true
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "三個技能皆有用的多功能對策輔助",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25",
+      "inferred": true
+     }
+    ],
+    "char_1013_chen2": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "其他結局不錯，但被騎士機制剋制",
+      "url": "https://www.bilibili.com/read/cv18866711",
+      "date": "2022-09-30",
+      "author": "千爱要乐奈",
+      "inferred": true
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "高臺版叔叔負責清雜，四結局前不算必抓",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_1021_kroos2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "水月價效比最高五星，暈眩與對空、精一即可開局",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25",
+      "inferred": true
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "N18數值跟不上，但精一就能暈眩仍划算",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "inferred": true
+     }
+    ],
+    "char_1026_gvial2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "對小怪群、精英與boss都極優，極推薦",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel",
+      "inferred": true
+     }
+    ],
+    "char_1028_texas2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "仙術杯DLC統計被抓16次",
+      "url": "https://www.bilibili.com/read/cv21002023",
+      "date": "2023-01-05",
+      "author": "是铜镜不是憧憬"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "低難新手：藏品好時異德單核可通一結局",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10399",
+      "date": "2024-08-04"
+     }
+    ],
+    "char_102_texas": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "擊暈能力可控浮空怪",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     }
+    ],
+    "char_1035_wisdel": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "後續追加：無專三單人可通所有水月結局，tag最多",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_103_angel": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "需整隊配華法琳等重構，一般玩家不太推薦",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_1041_angel2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "N18非職業隊主流開局之一，道中低費展開也實用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "inferred": true
+     }
+    ],
+    "char_1042_phatm2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "N18全圖支援控制，精一發力，結局可拖時間或永控",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13"
+     }
+    ],
+    "char_128_plosis": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "仙術杯DLC統計被抓10次",
+      "url": "https://www.bilibili.com/read/cv21002023",
+      "date": "2023-01-05",
+      "author": "是铜镜不是憧憬"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "五星自帶技力光環，騎士永控與大蒂都有用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25",
+      "inferred": true
+     }
+    ],
+    "char_179_cgbird": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "希望貴，後期作對策卡（如六層水火）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_2012_typhon": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "N15開局一層很多緊急打不了，不太適合首抓",
+      "url": "https://www.bilibili.com/video/BV1vk4y1K7M9",
+      "date": "2023-07-07",
+      "author": "丶明久"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "對單Boss與精英強，但難開局也難應付怪海",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_2023_ling": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "令開局在分奴打法中穩定性與抗壓性佳",
+      "url": "https://www.bilibili.com/video/BV1kG4y1x7Uk",
+      "date": "2022-11-17",
+      "author": "月白夜黑"
+     }
+    ],
+    "char_242_otter": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "異德登場前的飛魚對策，有異德後屬過渡謹慎投資",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_254_vodfox": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "娃娃在N15高數值怪環境中很好用，靈活支援",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_291_aglina": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "N18以安潔加溫蒂推坑，四個結局可公式化解決（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "module": true
+     }
+    ],
+    "char_293_thorns": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "表現穩定，但除近衛隊外不建議開局選",
+      "url": "https://www.bilibili.com/read/cv18866711",
+      "date": "2022-09-30",
+      "author": "千爱要乐奈"
+     },
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "水月近衛券稀缺，不推薦功能性低的基石",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     }
+    ],
+    "char_300_phenxi": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "列為其它好用幹員",
+      "url": "https://www.bilibili.com/read/cv18866711",
+      "date": "2022-09-30",
+      "author": "千爱要乐奈"
+     }
+    ],
+    "char_332_archet": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "追蹤箭與超遠射程處理小怪，但對浮空魚有限",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     }
+    ],
+    "char_350_surtr": [
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "被很多懸浮機制怪物剋制",
+      "url": "https://www.bilibili.com/read/cv18866711",
+      "date": "2022-09-30",
+      "author": "千爱要乐奈",
+      "inferred": true
+     }
+    ],
+    "char_377_gdglow": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "作者稱肉鴿之神",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     }
+    ],
+    "char_391_rosmon": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "N18保生存選擇，但要先確保對空（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11685",
+      "date": "2025-10-13",
+      "module": true
+     }
+    ],
+    "char_4009_irene": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "清爆破大錘與聚群怪，第一boss核心，優先度極高",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel",
+      "inferred": true
+     }
+    ],
+    "char_401_elysm": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "投鋒必備，大量費用需求下不論結局都要有一個",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_4039_horn": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "唯一推薦六星重灌，遠端清罰站怪、第二boss主C",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "仙術杯DLC統計被抓10次",
+      "url": "https://www.bilibili.com/read/cv21002023",
+      "date": "2023-01-05",
+      "author": "是铜镜不是憧憬"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "重灌少數推薦，可開局",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_4046_ebnhlz": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "二技能統治波次怪群，精一即可",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     }
+    ],
+    "char_4055_bgsnow": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "去質器、打字機清轟炸機，boss輸出強",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "仙術杯DLC統計被抓16次（8人中多數）",
+      "url": "https://www.bilibili.com/read/cv21002023",
+      "date": "2023-01-05",
+      "author": "是铜镜不是憧憬"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "優秀開局，打字機靈活，水月以外結局也能打",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_4064_mlynar": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "高壓波次最優解之一，但暖機拖累",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel",
+      "inferred": true
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "仙術杯DLC統計被抓14次",
+      "url": "https://www.bilibili.com/read/cv21002023",
+      "date": "2023-01-05",
+      "author": "是铜镜不是憧憬"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "水月N15近衛第一抓，吃藏品，騎士與大蒂等多結局可用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     },
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "開局即巔峰，但常態不阻擋是問題",
+      "url": "https://www.bilibili.com/read/cv18866711",
+      "date": "2022-09-30",
+      "author": "千爱要乐奈",
+      "inferred": true
+     }
+    ],
+    "char_4066_highmo": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "天賦減元素損傷、加阻擋，五星開局不錯",
+      "url": "https://www.bilibili.com/read/cv18866711",
+      "date": "2022-09-30",
+      "author": "千爱要乐奈"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "因侵蝕損傷，五星中比羽毛筆更推薦",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（簡介）精一滿級海沫開局可穩過前三層",
+      "url": "https://www.bilibili.com/video/BV1Ae4y1z7Ht",
+      "date": "2022-10-02",
+      "author": "凌雨情"
+     },
+     {
+      "source": "prts",
+      "stance": "situational",
+      "reason": "本主題的主題幹員（里程碑獎勵）；頁面未給出強度評價",
+      "url": "https://prts.wiki/w/%E6%B0%B4%E6%9C%88%E4%B8%8E%E6%B7%B1%E8%93%9D%E4%B9%8B%E6%A0%91"
+     }
+    ],
+    "char_4116_blkkgt": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "爆發輸出強、迴轉快對空，可強殺N15騎士",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9037",
+      "date": "2023-05-25"
+     }
+    ],
+    "char_440_pinecn": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "擊暈控制近地浮空怪，可擊落兩側浮空魚",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel",
+      "inferred": true
+     }
+    ],
+    "char_472_pasngr": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "作者稱「客門」，強烈推薦",
+      "url": "https://www.bilibili.com/read/cv18850364",
+      "date": "2022-09-29",
+      "author": "inmNebel"
+     }
+    ]
+   },
+   "counters": [
+    {
+     "threat": "伊莎瑪拉，腐化之心（ISW-DF 大群所向）",
+     "needs": "初始形態治療3名敵人並召喚「伊莎瑪拉之淚」充能變身，變身後攻擊3目標造成真傷：需在初始形態爆發擊破、優先處理之淚，並準備治療",
+     "url": "https://prts.wiki/w/%E4%BC%8A%E8%8E%8E%E7%8E%9B%E6%8B%89%EF%BC%8C%E8%85%90%E5%8C%96%E4%B9%8B%E5%BF%83"
+    },
+    {
+     "threat": "伊祖米克，生態泉源（ISW-DF 人之光輝）",
+     "needs": "學習階段無敵並吸收子代成長、對全場法傷；闡釋形態週期全場暈眩+每秒法傷：需速清子代、全隊治療與抗暈眩手段",
+     "url": "https://prts.wiki/w/%E4%BC%8A%E7%A5%96%E7%B1%B3%E5%85%8B%EF%BC%8C%E7%94%9F%E6%80%81%E6%B3%89%E6%BA%90"
+    },
+    {
+     "threat": "“偏執泡影”（ISW-DF 認知即重擔）",
+     "needs": "攻擊範圍內我方攻速大幅降低、同時打3~5目標附侵蝕損傷；近地懸浮可被暈眩/凍結等破除：需控場破懸浮與遠距離輸出",
+     "url": "https://prts.wiki/w/%E2%80%9C%E5%81%8F%E6%89%A7%E6%B3%A1%E5%BD%B1%E2%80%9D"
+    },
+    {
+     "threat": "最後的騎士（ISW-DF “命運的寵兒”）",
+     "needs": "DEF 4000/RES 70、受擊對來源施寒冷、首次倒下進入不可阻擋衝鋒：需高爆發穿防，持【騎士骨血】防禦降80%",
+     "url": "https://prts.wiki/w/%E6%9C%80%E5%90%8E%E7%9A%84%E9%AA%91%E5%A3%AB"
+    },
+    {
+     "threat": "“墓碑”（ISW-DF 險路勿近）",
+     "needs": "全場我方攻防減半、費用回復減半、再部署加倍，週期護盾：需低費高效幹員與穩定輸出",
+     "url": "https://prts.wiki/w/%E2%80%9C%E5%A2%93%E7%A2%91%E2%80%9D"
+    },
+    {
+     "threat": "燈火/排異反應",
+     "needs": "目標生命受損會降燈火，低燈火易得排異反應減益：需零漏怪的穩定防線",
+     "url": "https://prts.wiki/w/%E6%B0%B4%E6%9C%88%E4%B8%8E%E6%B7%B1%E8%93%9D%E4%B9%8B%E6%A0%91"
+    }
+   ]
+  },
+  "rogue_3": {
+   "picks": {
+    "char_1012_skadi2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "作者個人抓位（輔助）",
+      "url": "https://www.bilibili.com/video/BV1aE421j7gy",
+      "date": "2024-05-02",
+      "author": "墨妍wjh"
+     }
+    ],
+    "char_1016_agoat2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "一至四結局皆列入，功能輔助型治療",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "奶羊為兩大真神之一，適合124結局",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒",
+      "inferred": true
+     }
+    ],
+    "char_1020_reed2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "精一開局不弱，三技能清怪，奶量不穩",
+      "url": "https://www.bilibili.com/read/cv29920924",
+      "date": "2024-01-22",
+      "author": "半只蜜饼"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "六虎之一，可開局且四個結局都有tag",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "低難新手：最穩的開局，王關也有對策用處",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10399",
+      "date": "2024-08-04"
+     }
+    ],
+    "char_1026_gvial2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "開局很穩，中後期仍有一戰之力",
+      "url": "https://www.bilibili.com/read/cv29920924",
+      "date": "2024-01-22",
+      "author": "半只蜜饼",
+      "inferred": true
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "DLC後仍是不錯開局，但後期與Boss戰無力",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_1028_texas2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "六虎之一，開局與多結局皆可用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     },
+     {
+      "source": "bahamut",
+      "stance": "avoid",
+      "reason": "低難新手：異德等快活類不適合在薩米開局",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=10399",
+      "date": "2024-08-04"
+     }
+    ],
+    "char_1029_yato2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "六虎之一，開局與一、三、四結局可用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_1034_jesca2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "解決重灌無人開局問題，能扛傷又能對空",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_1035_wisdel": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "N15開局，精一可過一二層，精二後戰力爆升",
+      "url": "https://www.bilibili.com/video/BV1aE421j7gy",
+      "date": "2024-05-02",
+      "author": "墨妍wjh"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "精一可開局，一、四結局與扛傷皆有用（後期登場）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     },
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "作者不常用：前四層無腦過但索敵亂，五層後易翻車",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒",
+      "inferred": true
+     }
+    ],
+    "char_1046_sbell2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（簡介）N15開局打四結局，新幹員對薩米降維打擊",
+      "url": "https://www.bilibili.com/video/BV1481EByEst",
+      "date": "2025-11-05",
+      "author": "赭青Hozonri"
+     }
+    ],
+    "char_136_hsguma": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "最硬的盾，對策二結局，希望用不完可出",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "防盾在二結局換坦流有需求，注意2技反傷問題",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_179_cgbird": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "兩大真神之一，對策三結局",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_2012_typhon": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "狙擊二抓，三層後出，深寒造像守右線唯一人選",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_2014_nian": [
+     {
+      "source": "bahamut",
+      "stance": "avoid",
+      "reason": "作者移出推薦：星熊或DJ所需奶量少很多",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_2025_shu": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "地面奶，奶券畸形時對策，非剛需",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "傳送機制處理二三結局與愛跑小怪，提升安全感",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_206_gnosis": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "有延長控制或減CD藏品時才考慮",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_213_mostma": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "二結局用，三級Y模必開否則不要用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_245_cello": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "輔助隊精一開局，凋亡致虛弱可降冰鎖、小埃奶壓",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     },
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "前三層強但三層後元損太少、乏力",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_249_mlyss": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "回費普通依賴隊友，走林阿體系時再優先",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_261_sddrag": [
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "非法傷流不建議，三層後難以發力",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_350_surtr": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "法抗降低後可用於三四結局，但優先度不高",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_4048_doroth": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "開局前期極強，但boss戰作用小、後期乏力",
+      "url": "https://www.bilibili.com/read/cv29920924",
+      "date": "2024-01-22",
+      "author": "半只蜜饼"
+     }
+    ],
+    "char_4064_mlynar": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "嘲諷與真金斬群傷，一四結局不可替代",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "天賦嘲諷吸引冰鎖與皮蛋火力，輸出強，六虎之一",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_4080_lin": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "精一開局，林阿繆多體系核心兼扛傷",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_4082_qiubai": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "DLC後開發浴血加攻速永控單邊Boss",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_4087_ines": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "先鋒一抓，強控小怪、對策衝家與反隱",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "先鋒一抓：反隱、束縛、對空並可偷攻，六虎之一",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_4102_threye": [
+     {
+      "source": "prts",
+      "stance": "situational",
+      "reason": "本主題的主題幹員（里程碑獎勵）；頁面未給出強度評價",
+      "url": "https://prts.wiki/w/%E6%8E%A2%E7%B4%A2%E8%80%85%E7%9A%84%E9%93%B6%E5%87%87%E6%AD%A2%E5%A2%83"
+     }
+    ],
+    "char_4116_blkkgt": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "前三層保姆，適配三結局，身板脆需謹慎",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     },
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "精一開局也能鯊穿第一層，一三結局可當C",
+      "url": "https://www.bilibili.com/read/cv29920924",
+      "date": "2024-01-22",
+      "author": "半只蜜饼"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "精一開局強，爆發對空，三結局對口，可用到最後",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=9946",
+      "date": "2024-03-04"
+     }
+    ],
+    "char_4117_ray": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "單體爆發與控制，四結局控紅王",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     },
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "攻擊範圍大前中後期可用，但未精二易重開",
+      "url": "https://www.bilibili.com/read/cv29920924",
+      "date": "2024-01-22",
+      "author": "半只蜜饼"
+     }
+    ],
+    "char_4123_ela": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "雷清雜，費用低可開局，配空羽獸",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_4132_ascln": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "特種一抓，配伊內絲提供範圍控制，前三層強勢",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_4133_logos": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "大範圍殲滅，精二前疲軟，養得起再抓",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒",
+      "inferred": true
+     }
+    ],
+    "char_4138_narant": [
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "前三層爽但三層後輸出不足",
+      "url": "https://www.bilibili.com/read/cv37689124",
+      "date": "2024-08-26",
+      "author": "淡金葡萄酒"
+     }
+    ],
+    "char_4247_oxi": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "精一開局不錯，但整體是「望」的下位選擇",
+      "url": "https://www.bilibili.com/read/cv53745463",
+      "date": "2026-11-03",
+      "author": "天綾綾"
+     }
+    ],
+    "char_436_whispr": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "作者個人抓位（醫療）",
+      "url": "https://www.bilibili.com/video/BV1aE421j7gy",
+      "date": "2024-05-02",
+      "author": "墨妍wjh"
+     }
+    ],
+    "char_502_nblade": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "作者個人抓位，雙快活中夜刀優先",
+      "url": "https://www.bilibili.com/video/BV1aE421j7gy",
+      "date": "2024-05-02",
+      "author": "墨妍wjh"
+     }
+    ]
+   },
+   "counters": [
+    {
+     "threat": "“薩米的意志”（ISW-DF 巍峨銀凇/深寒造像）",
+     "needs": "無法阻擋，冰凌打整列物傷、自然湧動暈眩並持續法傷；半血後減傷60%；需打積雪銀凇、分散站位與治療",
+     "url": "https://prts.wiki/w/%E2%80%9C%E8%90%A8%E7%B1%B3%E7%9A%84%E6%84%8F%E5%BF%97%E2%80%9D"
+    },
+    {
+     "threat": "“木裂”埃克提爾尼爾（ISW-DF 薩米之熵/虛無之偶）",
+     "needs": "DEF 3000，攻擊與週期施寒冷，失血後短暫不可阻擋並大幅減傷：需法術傷害、避開自我泯滅期間爆發",
+     "url": "https://prts.wiki/w/%E2%80%9C%E6%9C%A8%E8%A3%82%E2%80%9D%E5%9F%83%E5%85%8B%E6%8F%90%E5%B0%94%E5%B0%BC%E5%B0%94"
+    },
+    {
+     "threat": "哈蘭杜汗/路加薩爾古斯（ISW-DF 時光之沙/邁入永恆）",
+     "needs": "雙王互相蓄力打對方周圍；一方倒下另一方大幅強化並轉打我方；哈蘭DEF5000、路加RES90：需物法混合輸出並同步擊殺",
+     "url": "https://prts.wiki/w/%E5%93%88%E5%85%B0%E6%9D%9C%E6%B1%97%EF%BC%8C%E5%A4%A7%E5%9C%B0%E4%B9%8B%E9%9E%AD"
+    },
+    {
+     "threat": "坍縮值/坍縮正規化",
+     "needs": "戰鬥中目標生命受損+1坍縮值，累積觸發負面正規化：需不漏怪的穩定防線",
+     "url": "https://prts.wiki/w/%E6%8E%A2%E7%B4%A2%E8%80%85%E7%9A%84%E9%93%B6%E5%87%87%E6%AD%A2%E5%A2%83"
+    }
+   ]
+  },
+  "rogue_4": {
+   "picks": {
+    "char_002_amiya": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "阿米婭開局較虧資源，其最優解是抓酒神",
+      "url": "https://www.bilibili.com/video/BV1FbLr6bEdR",
+      "date": "2026-05-19",
+      "author": "AstBerry"
+     }
+    ],
+    "char_003_kalts": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（據標題）N18藍圖測繪凱爾希開局245連打通關",
+      "url": "https://www.bilibili.com/video/BV1pY476ZEoN",
+      "date": "2026-11-07",
+      "author": "丶明久"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "扛傷兼真傷，二、五結局表現佳（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01",
+      "module": true
+     }
+    ],
+    "char_1016_agoat2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "奎隆結局奶尼盧火首推全圖治療",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11187",
+      "date": "2025-04-23",
+      "inferred": true
+     }
+    ],
+    "char_1035_wisdel": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "作者稱為唯一真神，模組必開",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "新手借維神配藍圖分隊與美願國王套，可平推一結局",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=12153",
+      "date": "2026-03-19"
+     }
+    ],
+    "char_1042_phatm2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "目前精一開局最優解，適合死仇/無相遇打法",
+      "url": "https://www.bilibili.com/video/BV1FbLr6bEdR",
+      "date": "2026-05-19",
+      "author": "AstBerry"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "幾乎所有結局tag，貓可永控奎隆或扛大特",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_108_silent": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "奎隆奶火全場支援的替代治療",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11187",
+      "date": "2025-04-23"
+     }
+    ],
+    "char_110_deepcl": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "吃理解的召喚師，可臨時補阻擋",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_181_flower": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "天賦緩回，可奶絕食",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_196_sunbr": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "推薦開局組合（後勤/藍圖測繪-穩紮穩打）成員",
+      "url": "https://www.bilibili.com/video/BV1UT42167rN",
+      "date": "2024-07-18",
+      "author": "自在道爷"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "高臺隊常用的開局重灌，精一可用到底",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_2025_shu": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "大特結局盾奶坦住最便宜的盾位選擇之一",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11187",
+      "date": "2025-04-23"
+     }
+    ],
+    "char_236_rope": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "拉人，二結局特攻，普通關用處不大",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_237_gravel": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "作者稱四星真神，阻擋拖時間一流",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_249_mlyss": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "美願佔手與書是問題，作者認為多屬為用而用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01",
+      "inferred": true
+     }
+    ],
+    "char_254_vodfox": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "降攻扛傷，多個Boss結局有用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_258_podego": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "能控能奶",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_272_strong": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "打源石蟲特攻，可充當快活引城防炮",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_277_sqrrel": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "多券可抓、希望便宜的二結局大特推拉解",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_298_susuro": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "四星醫療，奶量充足",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_311_mudrok": [
+     {
+      "source": "bahamut",
+      "stance": "avoid",
+      "reason": "可無藏永控大特，但對結局連打沒用不推薦",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11187",
+      "date": "2025-04-23"
+     }
+    ],
+    "char_328_cammou": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "值得練的四星術士",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_355_ethan": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "控制不俗，生存力較強",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "四星吃美願攻速觸發束縛，比多數五六星好用又便宜",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_385_finlpp": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "四結局奎隆奶火範圍大，需開模組",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_4004_pudd": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "有神之手時可抓",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_4039_horn": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "（簡介）N15重輔號角核思路，可替代維羅",
+      "url": "https://www.bilibili.com/video/BV1w7eYegEGz",
+      "date": "2024-07-25",
+      "author": "憧憬成为大德鲁伊"
+     }
+    ],
+    "char_4041_chnut": [
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "作元素奶不好用，不如抓蜜莓",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_4046_ebnhlz": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（據標題）N15黑鍵開局攻略",
+      "url": "https://www.bilibili.com/video/BV1EZ421K78M",
+      "date": "2024-07-24",
+      "author": "子龙浑身都是肾"
+     }
+    ],
+    "char_4062_totter": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "推薦開局組合（後勤/藍圖測繪-穩紮穩打）成員",
+      "url": "https://www.bilibili.com/video/BV1UT42167rN",
+      "date": "2024-07-18",
+      "author": "自在道爷"
+     }
+    ],
+    "char_4082_qiubai": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "吃美願攻速，可永控大特，二三四結局可用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_4088_hodrer": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "與M3合稱貓雷，被視為薩卡茲通解公式，多結局可用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_4116_blkkgt": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "手短怕年代印痕，DLC2鐧瑪雷組合才回到視野",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_4134_cetsyr": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "扛傷與組合用，三、四結局可用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_4145_ulpia": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "近鋒大範圍主C，需重劍手配合組隊",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_4151_tinman": [
+     {
+      "source": "prts",
+      "stance": "recommend",
+      "reason": "主題幹員；PRTS註明其天賦可提供更多思維負荷",
+      "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
+     }
+    ],
+    "char_4179_monstr": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "組合核心，二、四、五結局可用，但窮局下限不如凱",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_4182_oblvns": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "（據標題）N18近鋒美願祥子開局245連打",
+      "url": "https://www.bilibili.com/video/BV1BXveBmEAR",
+      "date": "2025-12-31",
+      "author": "赭青Hozonri"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "吃攻速與藏品極強，但身板脆需補生存控制位",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11245",
+      "date": "2025-05-01"
+     }
+    ],
+    "char_469_indigo": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "秘術師模板不太行，不優先抓",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ],
+    "char_484_robrta": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "加盾加防，輔助抗傷不錯",
+      "url": "https://www.bilibili.com/read/cv36216556",
+      "date": "2024-07-20",
+      "author": "小八你为何爱卡莲"
+     }
+    ]
+   },
+   "counters": [
+    {
+     "threat": "弗萊蒙特，諸思之解答（ISW-DF 緊急授課/思維矯正）",
+     "needs": "RES 80，儲能時減傷；倒下/撤退幹員被封入「放逐的黑棺」，二階段隨機重部署我方、附凋亡損傷：需物理爆發、擊破黑棺",
+     "url": "https://prts.wiki/w/%E5%BC%97%E8%8E%B1%E8%92%99%E7%89%B9%EF%BC%8C%E8%AF%B8%E6%80%9D%E4%B9%8B%E8%A7%A3%E7%AD%94"
+    },
+    {
+     "threat": "特雷西斯，黑冠尊主（ISW-DF 朝謁）",
+     "needs": "與特蕾西婭越近傷害越高、受傷越低：需拉開兩者距離（控場/位移）後爆發",
+     "url": "https://prts.wiki/w/%E7%89%B9%E9%9B%B7%E8%A5%BF%E6%96%AF%EF%BC%8C%E9%BB%91%E5%86%A0%E5%B0%8A%E4%B8%BB"
+    },
+    {
+     "threat": "博卓卡斯替，聖衛銃騎（ISW-DF 聖城/不容拒絕）",
+     "needs": "DEF 5000/RES 80，遠距離對其傷害大幅降低，手動撤退再部署延長，二階段掃射所有高臺：需近身高爆發、少依賴高臺",
+     "url": "https://prts.wiki/w/%E5%8D%9A%E5%8D%93%E5%8D%A1%E6%96%AF%E6%9B%BF%EF%BC%8C%E5%9C%A3%E5%8D%AB%E9%93%B3%E9%AA%91"
+    },
+    {
+     "threat": "“阿米婭”，爐芯終曲（ISW-DF 不容拒絕）",
+     "needs": "抵達終點即強制失敗；DEF 8000/RES 70、物法減傷50%，二階段周圍真傷：需真傷/穿防爆發與阻擋",
+     "url": "https://prts.wiki/w/%E2%80%9C%E9%98%BF%E7%B1%B3%E5%A8%85%E2%80%9D%EF%BC%8C%E7%82%89%E8%8A%AF%E7%BB%88%E6%9B%B2"
+    },
+    {
+     "threat": "霜星，“冬痕”（ISW-DF 時光凱旋）",
+     "needs": "法術攻擊附寒冷、對凍結目標加倍，重生後20秒無敵；場上源石冰晶持續寒冷：需法抗/治療與錯開無敵期",
+     "url": "https://prts.wiki/w/%E9%9C%9C%E6%98%9F%EF%BC%8C%E2%80%9C%E5%86%AC%E7%97%95%E2%80%9D"
+    },
+    {
+     "threat": "年代之刺/年代印痕",
+     "needs": "高防禦高法抗裝置，印痕內每秒凋亡損傷：需高輸出拆除",
+     "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
+    },
+    {
+     "threat": "“門”",
+     "needs": "擊敗後帶走最後部署的幹員：需注意部署順序",
+     "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
+    },
+    {
+     "threat": "寶箱：垂死羽獸",
+     "needs": "需治療回滿才給5源石錠：需醫療幹員",
+     "url": "https://prts.wiki/w/%E8%90%A8%E5%8D%A1%E5%85%B9%E7%9A%84%E6%97%A0%E7%BB%88%E5%A5%87%E8%AF%AD"
+    }
+   ]
+  },
+  "rogue_5": {
+   "picks": {
+    "char_002_amiya": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "醫療阿米婭前期治療加減速扛高壓（推廣文）",
+      "url": "https://www.bilibili.com/read/cv42383273",
+      "date": "2025-07-19",
+      "author": "吃寿司的游戏喵"
+     },
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "三職業通吃，用來消化用不到的券，前期進洞有戰力",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_003_kalts": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "N15五層搶商店守右路炮手首推",
+      "url": "https://www.bilibili.com/video/BV1j7gpziEJ1",
+      "date": "2025-07-22",
+      "author": "金乌___"
+     }
+    ],
+    "char_1027_greyy2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "投擲手配高速藏品控制，狙擊二抓（推廣文）",
+      "url": "https://www.bilibili.com/read/cv42383273",
+      "date": "2025-07-19",
+      "author": "吃寿司的游戏喵"
+     }
+    ],
+    "char_1035_wisdel": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "鎖血戰神，各分隊各結局都關鍵（模擬器推廣文）",
+      "url": "https://www.bilibili.com/read/cv42383273",
+      "date": "2025-07-19",
+      "author": "吃寿司的游戏喵"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "仍是狙擊一抓，但壓制力不如薩卡茲，費用高展開慢",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_1041_angel2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "精一發力、低費對空、炎國戶口，與電弧並列強勢",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_1042_phatm2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "電弧之前的開荒開局擔當，2技容錯高可處理次數怪",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "零練度N0~N2：借酒神開局可穩定通一結局",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=12578",
+      "date": "2026-07-17"
+     }
+    ],
+    "char_1044_hsgma2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "六星重灌首選，進洞作戰強、對空鎖血還能助渡劫",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_1045_svash2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "精一可用，配特限靈知的喀蘭隊全場冰凍很強",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_1046_sbell2": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（據標題）界園二結局「最嚴厲的母親」",
+      "url": "https://www.bilibili.com/video/BV1KJ1yB7EUy",
+      "date": "2025-11-04",
+      "author": "风青泠"
+     }
+    ],
+    "char_1050_chen3": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "炎國戶口，作者稱現已一面倒優於祥子",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_1052_kalts2": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "精一可開局，渡劫與多結局皆有tag",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_136_hsguma": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（據標題）界園GOAT，被ban就打不了",
+      "url": "https://www.bilibili.com/video/BV1zcEE6cETZ",
+      "date": "2026-06-09",
+      "author": "斯卡蒂迪抵地"
+     }
+    ],
+    "char_151_myrtle": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "0希望產費，先鋒券必抓（推廣文）",
+      "url": "https://www.bilibili.com/read/cv42383273",
+      "date": "2025-07-19",
+      "author": "吃寿司的游戏喵"
+     }
+    ],
+    "char_2027_wang": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "原期待作五結局對策，因吃反傷風評受損",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_206_gnosis": [
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "配凜御銀灰，四、五結局與次數怪對策（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18",
+      "module": true
+     }
+    ],
+    "char_298_susuro": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "二層渡劫流的渡劫用治療",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=12479",
+      "date": "2026-06-21"
+     }
+    ],
+    "char_4010_etlchi": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "精一發力，配驚蟄可對空，清次數怪好用",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_4056_titi": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "精一發力兼輸出控制，較適合當外援",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_4067_lolxh": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "二層渡劫流開局近衛，用來湊炎國幹員",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=12479",
+      "date": "2026-06-21"
+     }
+    ],
+    "char_4087_ines": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "對策隱匿與高速敵，四結局左路（推廣文）",
+      "url": "https://www.bilibili.com/read/cv42383273",
+      "date": "2025-07-19",
+      "author": "吃寿司的游戏喵"
+     }
+    ],
+    "char_4146_nymph": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "副C，四結局強殺核心輸出（推廣文）",
+      "url": "https://www.bilibili.com/read/cv42383273",
+      "date": "2025-07-19",
+      "author": "吃寿司的游戏喵"
+     }
+    ],
+    "char_4182_oblvns": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "純輸出藏品放大器，但生存差需保護",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_4195_radian": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "不抓電弧進不了洞，作者認為設計過強",
+      "url": "https://www.bilibili.com/read/cv42518643",
+      "date": "2025-07-31",
+      "author": "终裕"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "界園底層邏輯，前期與二層進洞超常發揮，常被列為ban位第一",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18"
+     }
+    ],
+    "char_421_crow": [
+     {
+      "source": "bahamut",
+      "stance": "situational",
+      "reason": "零練度打法中搭配酒神守門的開局幹員",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=12578",
+      "date": "2026-07-17"
+     }
+    ],
+    "char_4231_clemnt": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "精一成型快，收隱藏與道中優於塔露拉",
+      "url": "https://www.bilibili.com/read/cv53745463",
+      "date": "2026-11-03",
+      "author": "天綾綾"
+     }
+    ],
+    "char_4247_oxi": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "2結局可守線，但對歲輸出不足",
+      "url": "https://www.bilibili.com/video/BV1Ma4c6sEQY",
+      "date": "2026-11-02",
+      "author": "某中二的鸽子"
+     },
+     {
+      "source": "bilibili",
+      "stance": "avoid",
+      "reason": "界園適配差，招募優先順序不高，其他幹員做得更好",
+      "url": "https://www.bilibili.com/read/cv53745463",
+      "date": "2026-11-03",
+      "author": "天綾綾"
+     }
+    ],
+    "char_437_mizuki": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "（據標題）特種二抓，抓到就保送boss面前",
+      "url": "https://www.bilibili.com/video/BV14PtizeEtA",
+      "date": "2025-08-07",
+      "author": "痒酱_kayui"
+     },
+     {
+      "source": "bahamut",
+      "stance": "recommend",
+      "reason": "生存強可單走，拉人強控化解多路與入坑（含模組）",
+      "url": "https://forum.gamer.com.tw/C.php?bsn=33651&snA=11969",
+      "date": "2026-01-18",
+      "module": true
+     }
+    ],
+    "char_502_nblade": [
+     {
+      "source": "bilibili",
+      "stance": "situational",
+      "reason": "守右路次選，明顯不太穩",
+      "url": "https://www.bilibili.com/video/BV1j7gpziEJ1",
+      "date": "2025-07-22",
+      "author": "金乌___"
+     }
+    ],
+    "char_614_acsupo": [
+     {
+      "source": "bilibili",
+      "stance": "recommend",
+      "reason": "與凱爾希同為首推，可守右路（原文raidian）",
+      "url": "https://www.bilibili.com/video/BV1j7gpziEJ1",
+      "date": "2025-07-22",
+      "author": "金乌___"
+     }
+    ]
+   },
+   "counters": [
+    {
+     "threat": "易（ISW-DF 破歲陣祀/天數將易）",
+     "needs": "晦/明屬性，同屬性攻擊倍率降至80%、優先打異屬性；週期換屬性並召喚「梁」：需利用晦明之印配置雙屬性幹員",
+     "url": "https://prts.wiki/w/%E6%98%93"
+    },
+    {
+     "threat": "“歲”（ISW-DF 昔字如煙/止變）",
+     "needs": "56萬HP、無敵不死，週期【不寐】強制撤退目標周圍8格並【撼山河】全場三次高物傷：需分散部署、物理防禦與治療",
+     "url": "https://prts.wiki/w/%E2%80%9C%E5%B2%81%E2%80%9D"
+    },
+    {
+     "threat": "“望”（ISW-DF 謀歲者）",
+     "needs": "部署會生成「瑕」，瑕回血、暈眩並為其減傷，被瑕包圍格會刷怪：需優先清瑕、謹慎部署位置",
+     "url": "https://prts.wiki/w/%E2%80%9C%E6%9C%9B%E2%80%9D"
+    },
+    {
+     "threat": "朔殼/妄軀/身形（ISW-DF 定乾坤/止變）",
+     "needs": "朔殼對非阻擋者50%閃避；妄軀每節身形減傷50%；身形登場強制撤退並反彈傷害：需清身形、阻擋朔殼近戰輸出",
+     "url": "https://prts.wiki/w/%E6%9C%94%E5%A3%B3"
+    },
+    {
+     "threat": "後獸/矩獸（ISW-DF 末狩）",
+     "needs": "矩獸移動時減傷90%、異常時間大減，被阻擋時高物傷；倒下時全場高物傷並清場：需阻擋使其停步後輸出、預留治療",
+     "url": "https://prts.wiki/w/%E7%9F%A9%E5%85%BD"
+    },
+    {
+     "threat": "雕倀",
+     "needs": "持續吐敵並加速周圍敵人；四格外傷害大減：需近距離輸出或付費使其閉嘴",
+     "url": "https://prts.wiki/w/%E5%B2%81%E7%9A%84%E7%95%8C%E5%9B%AD%E5%BF%97%E5%BC%82"
+    },
+    {
+     "threat": "歲時（永久負面效果）",
+     "needs": "特定層級觸發並隨難度增強，可透過方法醒覺轉為有利",
+     "url": "https://prts.wiki/w/%E5%B2%81%E7%9A%84%E7%95%8C%E5%9B%AD%E5%BF%97%E5%BC%82"
+    }
+   ],
+   "notes": [
+    "部分事件會檢查隊伍裡是否有炎國陣營幹員（PRTS）。"
+   ]
+  }
+ }
+}

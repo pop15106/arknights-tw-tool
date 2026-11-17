@@ -116,6 +116,8 @@ export interface Settings {
   };
   /** 幹員簡評的個人筆記：幹員 ID → 模式 → 文字（只存在本機）。 */
   reviewNotes?: Record<string, Record<string, string>>;
+  /** 幹員目前穿的時裝（使用者手動選擇；沒有就依精英階段顯示預設立繪）。 */
+  skins?: Record<string, string>;
   /** 養成計畫：各幹員的目標，以及材料庫存（本機手動輸入）。 */
   growth?: { plans: { operatorId: string; target: { elite: number; level: number; skillLevel: number; masteries: Record<string, number>; modules: Record<string, number> } }[]; expand?: boolean; inventory?: Record<string, number> };
   analysis: { mode: 'story' | 'integrated-strategies' | 'reclamation' | 'stationary-security' | 'defense'; goal: string; budget: number };
@@ -352,7 +354,8 @@ export function parseJson(textValue: string, maxBytes: number): unknown {
 export function parseImportText(textValue: string): ImportDocument { return validateImportDocument(parseJson(textValue, MAX_IMPORT_BYTES)); }
 
 function validateSettings(value: unknown): void {
-  const settings = object(value, ['base', 'analysis', 'lastBackupAt', 'growth', 'reviewNotes'], ['base', 'analysis']);
+  const settings = object(value, ['base', 'analysis', 'lastBackupAt', 'growth', 'reviewNotes', 'skins'], ['base', 'analysis']);
+  if (settings.skins !== undefined) for (const [key, skin] of Object.entries(object(settings.skins, Object.keys(settings.skins as object), []))) { id(key, '幹員 ID'); if (typeof skin !== 'string' || !/^char_[A-Za-z0-9_]+@[A-Za-z0-9_]+#\d+\+?$/u.test(skin) || !skin.startsWith(`${key}@`)) throw new Error('服裝設定格式不正確。'); }
   if (settings.reviewNotes !== undefined) for (const [key, notes] of Object.entries(object(settings.reviewNotes, Object.keys(settings.reviewNotes as object), []))) { id(key); for (const [mode, note] of Object.entries(object(notes, Object.keys(notes as object), []))) { if (!/^[a-z0-9_-]{1,40}$/u.test(mode) || typeof note !== 'string' || note.length > 1000) throw new Error('簡評筆記格式不正確（每則最多 1000 字）。'); } }
   if (settings.growth !== undefined) {
     const growth = object(settings.growth, ['plans', 'expand', 'inventory'], ['plans']); list(growth.plans, 200, '養成計畫');

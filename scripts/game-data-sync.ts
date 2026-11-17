@@ -2,6 +2,8 @@ import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/pro
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { parseCommunity, type CommunityData } from '../src/catalog/community.ts';
+import { buildSkinCatalog, SKIN_ID, skinFileName, skinPortraitId, type SkinCatalog } from '../src/catalog/skins.ts';
 import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DATA_COMMIT, type GameDataSnapshot, type GameDataTables } from '../src/catalog/build.ts';
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
 import { parseTradingWikitext, PRTS_TRADING_API, validateTradingParams, type TradingParams } from '../src/catalog/trading.ts';
@@ -13,6 +15,8 @@ export type { GameDataSnapshot } from '../src/catalog/build.ts';
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TABLES = { characters: 'character_table.json', patches: 'char_patch_table.json', skills: 'skill_table.json', modules: 'uniequip_table.json', stages: 'stage_table.json', activities: 'activity_table.json', items: 'item_table.json', building: 'building_data.json', constants: 'gamedata_const.json', gacha: 'gacha_table.json' } as const;
 const PNG = Buffer.from([137,80,78,71,13,10,26,10]);
+const COMMUNITY_SOURCE = 'https://raw.githubusercontent.com/pop15106/arknights-tw-tool/main/data/community/rogue.json';
+const PORTRAIT_SOURCE = 'https://raw.githubusercontent.com/ArknightsAssets/ArknightsAssets2/cn/assets/dyn/arts/charportraits';
 const validVersion = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/u.test(value);
 type Source = { commit: string; sourceUpdatedAt: string; syncedAt: string };
 
@@ -225,7 +229,79 @@ export function createGameDataStore(options: {
     if (!active) active = update().finally(() => { active = undefined; });
     return active;
   }
-  return { load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
+  /**
+   * 依精英階段的立繪：{id}_1.png（精英 0／1）與 {id}_2.png（精英 2，部分低星幹員沒有）。
+   * 來源是公開的 ArknightsAssets2（陸服資源，台服幹員都包含在內）；已下載的檔案略過，404 視為「沒有這張」。
+   */
+  async function syncPortraits(onProgress?: (done: number, total: number) => void): Promise<{ downloaded: number; skipped: number; missing: number; failed: number }> {
+    const snapshot = await load();
+    if (!snapshot) throw new Error('請先更新遊戲資料。');
+    await mkdir(assets, { recursive: true });
+    const names = snapshot.dataset.operators.filter(op => /^char_[A-Za-z0-9_.-]+$/u.test(op.id) && !op.id.includes('..')).flatMap(op => [`${op.id}_1`, `${op.id}_2`]);
+    const result = { downloaded: 0, skipped: 0, missing: 0, failed: 0 };
+    let done = 0;
+    const queue = [...names];
+    await Promise.all(Array.from({ length: 6 }, async () => {
+      while (queue.length) {
+        const name = queue.shift()!;
+        const target = path.join(assets, `${name}.png`);
+        try {
+          if (await fileExists(target)) { result.skipped++; continue; }
+          const response = await fetcher(`${PORTRAIT_SOURCE}/${encodeURIComponent(name)}.png`, { method: 'HEAD', redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(20_000) });
+          if (response.status === 404) { result.missing++; continue; }
+          const image = await bytes(`${PORTRAIT_SOURCE}/${encodeURIComponent(name)}.png`, 2 * 1024 * 1024);
+          if (!image.subarray(0, 8).equals(PNG)) throw new Error('not png');
+          const temporary = `${target}.${crypto.randomUUID()}.tmp`;
+          await writeFile(temporary, image, { flag: 'wx' }); await rename(temporary, target);
+          result.downloaded++;
+        } catch { result.failed++; }
+        finally { done++; onProgress?.(done, names.length); }
+      }
+    }));
+    return result;
+  }
+  /** 台服時裝清單：第一次讀取時下載 skin_table，整理成精簡清單快取在本機。 */
+  async function loadSkins(): Promise<SkinCatalog> {
+    const file = path.join(cache, `skins-${MODULE_DATA_COMMIT}.json`);
+    try { return JSON.parse(await readFile(file, 'utf8')) as SkinCatalog; } catch { /* 沒有快取 */ }
+    const table = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/skin_table.json`, 24 * 1024 * 1024)).toString('utf8'));
+    const catalog = buildSkinCatalog(table);
+    await mkdir(cache, { recursive: true });
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(catalog), { flag: 'wx' }); await rename(temporary, file);
+    return catalog;
+  }
+  /** 下載單一時裝立繪（選擇服裝時才抓，不一次下載全部 484 套）。 */
+  async function skinPortrait(skinId: string): Promise<string> {
+    if (!SKIN_ID.test(skinId)) throw new Error('時裝 ID 無效。');
+    const target = path.join(assets, skinFileName(skinId));
+    if (!(await fileExists(target))) {
+      const image = await bytes(`${PORTRAIT_SOURCE}/${encodeURIComponent(skinPortraitId(skinId))}.png`, 2 * 1024 * 1024);
+      if (!image.subarray(0, 8).equals(PNG)) throw new Error('立繪來源未回傳 PNG。');
+      await mkdir(assets, { recursive: true });
+      const temporary = `${target}.${crypto.randomUUID()}.tmp`;
+      await writeFile(temporary, image, { flag: 'wx' }); await rename(temporary, target);
+    }
+    return `/assets/operators/${skinFileName(skinId)}`;
+  }
+  /** 社群評價：已同步的本機版本優先，否則用 repo 內附的版本。兩者都經過格式驗證。 */
+  async function loadCommunity(): Promise<CommunityData> {
+    const bundled = parseCommunity(JSON.parse(await readFile(path.join(project, 'data/community/rogue.json'), 'utf8')));
+    try {
+      const synced = parseCommunity(JSON.parse(await readFile(path.join(cache, 'community.json'), 'utf8')));
+      return synced.updatedAt >= bundled.updatedAt ? synced : bundled;
+    } catch { return bundled; }
+  }
+  /** 下載 GitHub 上的最新社群評價；格式不符就不覆蓋，保留現有資料。 */
+  async function syncCommunity(): Promise<CommunityData> {
+    const latest = parseCommunity(JSON.parse((await bytes(COMMUNITY_SOURCE, 4 * 1024 * 1024)).toString('utf8')));
+    await mkdir(cache, { recursive: true });
+    const file = path.join(cache, 'community.json');
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(latest), { flag: 'wx' }); await rename(temporary, file);
+    return loadCommunity();
+  }
+  return { loadCommunity, syncCommunity, loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
 }
 
 const defaultStore = createGameDataStore();
@@ -237,3 +313,8 @@ export const loadDropsData = defaultStore.loadDrops;
 export const stageEnemiesData = defaultStore.stageEnemies;
 export const loadCnEventsData = defaultStore.loadCnEvents;
 export const rogueAnalysisData = defaultStore.rogueAnalysis;
+export const syncPortraitsData = defaultStore.syncPortraits;
+export const loadSkinsData = defaultStore.loadSkins;
+export const skinPortraitData = defaultStore.skinPortrait;
+export const loadCommunityData = defaultStore.loadCommunity;
+export const syncCommunityData = defaultStore.syncCommunity;
