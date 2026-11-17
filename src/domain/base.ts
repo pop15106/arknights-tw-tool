@@ -1351,7 +1351,10 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
     }, 0));
     const moodPicks = owned.filter(row => !used.has(row.operatorId)).map(row => ({ row, value: moodValue(row) })).filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value || nameOf(a.row.operatorId).localeCompare(nameOf(b.row.operatorId), 'zh-Hant'));
-    for (const { row, value } of moodPicks.slice(0, seats - assignments[facility.id].length)) {
+    for (const { row, value } of moodPicks) {
+      // 同一角色的不同形態只能排一位：每次加入前重新檢查。
+      if (assignments[facility.id].length >= seats) break;
+      if (used.has(row.operatorId)) continue;
       assignments[facility.id].push(row.operatorId); used.add(row.operatorId); mood++;
       picks.set(facility.id, [...(picks.get(facility.id) ?? []), { facilityId: facility.id, operatorId: row.operatorId, name: nameOf(row.operatorId), score: value, summary: `心情技能（中樞心情 ${value}／小時）` }]);
     }
@@ -1670,7 +1673,11 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
       return sum + parseSkill(active).effects.reduce((inner, effect) => inner + (effect.kind === 'moodRoom' ? -effect.value * capacity(facility) : effect.kind === 'moodCost' ? -effect.value : 0), 0);
     }, 0);
     const picks = owned.filter(row => !used.has(characterOf(row.operatorId))).map(row => ({ id: row.operatorId, value: benefit(row) })).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
-    for (const pick of picks.slice(0, free)) { current[facility.id].push(pick.id); moodFilled.push(pick.id); }
+    for (const pick of picks) {
+      if (current[facility.id].length >= capacity(facility)) break;
+      if (used.has(characterOf(pick.id))) continue;
+      current[facility.id].push(pick.id); moodFilled.push(pick.id); used.add(characterOf(pick.id));
+    }
   }
   return { assignments: current, products, moodFilled, objective: best, start: startObjective, moves, evaluations, timedOut };
 }

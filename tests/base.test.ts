@@ -269,6 +269,20 @@ test('推薦配置：控制中樞依跨設施加成挑人，與下方配置一�
   assert.deepEqual(card.picks.map(pick => pick.operatorId), rec.assignments.c, '上方卡片與下方配置一致');
 });
 
+test('控制中樞心情補位：同一角色的不同形態只排一位（推薦與整體最佳化）', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.meta = { 'demo-8': { groups: [], character: 'demo-1' }, 'demo-1': { groups: [] } };
+  catalog.skills['mood'] = { id: 'mood', name: '示範・下午茶', roomType: 'CONTROL', description: '進駐控制中樞時，控制中樞內所有幹員的心情每小時恢復+0.05' };
+  catalog.operators['demo-1'] = [[{ buffId: 'mood', elite: 0, level: 1 }]];
+  catalog.operators['demo-8'] = [[{ buffId: 'mood', elite: 0, level: 1 }]];
+  const base = { facilities: [{ id: 'c', type: 'control', level: 5 }] as Facility[], onlineSlots: [] };
+  const rec = recommendBase(base, catalog, state.roster, definitions);
+  assert.equal(rec.assignments.c.filter(id => id === 'demo-1' || id === 'demo-8').length, 1);
+  const opt = optimizeBase(base, catalog, state.roster, definitions, { timeBudgetMs: 500 });
+  assert.equal(opt.assignments.c.filter(id => id === 'demo-1' || id === 'demo-8').length, 1);
+});
+
 test('同一角色的不同形態不能同時進駐，推薦也只排一處', async () => {
   const state = await demoState(), catalog = createDemoBaseCatalog();
   const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
