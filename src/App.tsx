@@ -18,9 +18,9 @@ import { GrowthPage } from './ui/GrowthPage';
 import { StagePage } from './ui/StagePage';
 import { TeamPage } from './ui/TeamPage';
 import { ToolsPage } from './ui/ToolsPage';
-import { GuidePage, guideSeen } from './ui/GuidePage';
+import { GuidePage, guideSeen, markSettingsVisited, settingsVisited, SettingsHint } from './ui/GuidePage';
 import { PlannedPage, SettingsPage, type PlannedName } from './ui/pages';
-import { DetailPanel, ImportPanel, PreviewPanel, RestorePanel, SwitchPanel, type Decisions } from './ui/panels';
+import { DetailPanel, ImportPanel, PreviewPanel, RestorePanel, type Decisions } from './ui/panels';
 import './styles.css';
 
 type Page = '導覽' | '幹員庫' | '批次修正' | PlannedName | '關卡' | '工具' | '設定';
@@ -38,10 +38,14 @@ const SUBTITLE: Record<Page, string> = {
 };
 
 export default function App() {
-  const [namespace, setNamespace] = useState<Namespace>(window.location.hash === '#personal' ? 'personal' : 'demo');
+  // 測試階段的「示範工作區」已移除：固定使用個人庫（示範資料只留給自動測試）。
+  const namespace = 'personal' as Namespace;
   const [state, setState] = useState<AppState | null>(null);
   const [initError, setInitError] = useState('');
   const [page, setPage] = useState<Page>(() => guideSeen() ? '幹員庫' : '導覽');
+  const [settingsHint, setSettingsHint] = useState(() => !settingsVisited());
+  // 第一次打開「設定」後，側欄的指路小人就收起來。
+  useEffect(() => { if (page === '設定' && settingsHint) { markSettingsVisited(); setSettingsHint(false); } }, [page, settingsHint]);
   const [panel, setPanel] = useState<Panel>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
@@ -214,11 +218,9 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark" aria-hidden="true">檔</div><div><div className="brand-name">幹員檔案室</div><div className="brand-sub">繁中服 · 本機工具</div></div></div>
       {nav(false)}
+      {settingsHint && page !== '設定' && <SettingsHint onGo={() => goto('設定')} onDismiss={() => { markSettingsVisited(); setSettingsHint(false); }}/>}
       <div className="sidebar-footer">
-        <button type="button" className={`workspace-switch ${isDemo ? 'demo' : 'personal'}`} disabled={busy} onClick={() => openPanel('switch')}>
-          <span className="workspace-dot"/><span><strong>{isDemo ? '示範工作區' : '個人工作區'}</strong><small>點此切換</small></span>
-        </button>
-        <p>本機優先 · 無帳號連線<br/>版本 1.4.1</p>
+        <p>本機優先 · 無帳號連線<br/>版本 1.4.2</p>
       </div>
     </aside>
     <div className="main">
@@ -239,7 +241,7 @@ export default function App() {
         {page === '導覽' && <GuidePage onNavigate={next => goto(next as Page)}/>}
         {page === '幹員庫' && <RosterPage key={namespace} state={state} isDemo={isDemo} busy={busy} onImport={() => openPanel('import')} onPreviewDemo={previewDemo} onOpen={id => { setSelectedId(id); openPanel('detail'); }}/>}
         <div hidden={page !== '批次修正'}><BatchEditor key={namespace} state={state} initialId={batchInitialId} onInitialHandled={() => setBatchInitialId(null)} onSave={saveBatch}/></div>
-        {page === '設定' && <SettingsPage state={state} isDemo={isDemo} busy={busy} persistence={persistence} onSwitch={() => openPanel('switch')} onPreviewDemo={previewDemo} onBackup={downloadBackup} onRestoreFile={readBackupFile}
+        {page === '設定' && <SettingsPage state={state} isDemo={isDemo} busy={busy} persistence={persistence} onPreviewDemo={previewDemo} onBackup={downloadBackup} onRestoreFile={readBackupFile}
           onRequestPersistence={() => void run(async () => { const granted = await requestPersistence(); setPersistence(await queryPersistence()); setNotice({ text: granted ? '瀏覽器已授予持久儲存；這不代表永不丟失，仍須備份。' : '瀏覽器尚未授予持久儲存。你仍可使用本機庫，請定期備份。', error: false }); })}
           onUndo={() => void run(async () => { await persist(undoLastImport(state), state.revision); setNotice({ text: '最後匯入批次已撤銷，復原結果已保存。撤銷紀錄已保留。', error: false }); })}/>}
         {page === '基建' && <BasePage key={namespace} state={state} isDemo={isDemo} busy={busy} onSave={base => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, base } }, state.revision); setNotice({ text: '基建配置已保存至本機。', error: false }); })}/>}
@@ -259,7 +261,5 @@ export default function App() {
       onBatch={() => { setBatchInitialId(selectedRow.operatorId); setPanel(null); setPage('批次修正'); window.scrollTo({ top: 0 }); }}/>}
     {panel === 'restore' && restored && <RestorePanel state={state} restored={restored.state} isDemo={isDemo} busy={busy} notice={panelNotice} onClose={closePanel} onBackup={downloadBackup}
       onConfirm={() => void run(async () => { if (state.revision !== restored.baseRevision) throw new Error('復原預覽已過期，請重新選取備份。'); await persist({ ...restored.state, profileId: state.profileId, revision: state.revision + 1 }, restored.baseRevision); setPanel(null); setRestored(null); setNotice({ text: '備份已通過驗證並以交易取代目前工作區，修訂版本已遞增。', error: false }); })}/>}
-    {panel === 'switch' && <SwitchPanel isDemo={isDemo} rosterSize={state.roster.length} busy={busy} notice={panelNotice} onClose={closePanel} onBackup={downloadBackup}
-      onConfirm={() => { const next = isDemo ? 'personal' : 'demo'; window.history.replaceState(null, '', `#${next}`); setNamespace(next); setPage('幹員庫'); }}/>}
   </div>;
 }

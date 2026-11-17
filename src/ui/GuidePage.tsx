@@ -9,6 +9,36 @@ const write = (key: string, value: string) => { try { localStorage.setItem(key, 
 /** 第一次開啟（還沒看過導覽）時，首頁改為導覽頁。 */
 export const guideSeen = () => read(SEEN_KEY) === '1';
 export const markGuideSeen = () => write(SEEN_KEY, '1');
+const SETTINGS_KEY = 'arknights-tw-settings-visited';
+/** 還沒去過「設定」時，側欄會有小人指路；去過一次就不再出現。 */
+export const settingsVisited = () => read(SETTINGS_KEY) === '1';
+export const markSettingsVisited = () => write(SETTINGS_KEY, '1');
+
+/** 只讀一次導覽素材清單（側欄指路小人用，不輪詢）。 */
+function useGuideManifest() {
+  const [manifest, setManifest] = useState<GuideManifest | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetch('/api/game-data/guide', { credentials: 'omit', redirect: 'error', cache: 'no-store' })
+      .then(response => response.ok ? response.json() as Promise<{ data: GuideManifest | null }> : null)
+      .then(result => { if (active && result?.data) setManifest(result.data); }, () => { /* 沒有素材就用原創小角色 */ });
+    return () => { active = false; };
+  }, []);
+  return manifest;
+}
+
+/** 側欄指路：凱爾希小人指向「設定」，說明第一次要先去更新遊戲資料。 */
+export function SettingsHint({ onGo, onDismiss }: { onGo: () => void; onDismiss: () => void }) {
+  const manifest = useGuideManifest();
+  return <div className="settings-hint" role="note" aria-label="設定頁指引">
+    <span className="settings-hint-arrow" aria-hidden="true"/>
+    <Chibi charId="char_003_kalts" manifest={manifest} size={84}/>
+    <div className="settings-hint-body">
+      <p><strong>凱爾希</strong>第一次使用，先到上面的「設定」按「更新遊戲資料」與「同步幹員立繪」，數值和圖片才會是最新的。</p>
+      <div className="inline-actions"><button type="button" className="button primary small" onClick={onGo}>帶我去</button><button type="button" className="button ghost small" onClick={onDismiss}>知道了</button></div>
+    </div>
+  </div>;
+}
 
 /** 導覽素材（Q 版小人、語音）的下載狀態；下載在本機資料服務背景執行，這裡輪詢到完成。 */
 function useGuideAssets() {

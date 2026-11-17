@@ -1054,3 +1054,13 @@ h2 { font-weight: 800; }
 .mastery-rank-row { display: grid; gap: 2px; width: 100%; text-align: left; background: none; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; color: inherit; }
 .mastery-advice-detail { padding: 8px 10px 4px; display: grid; gap: 6px; }
 .mastery-compare { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; margin-top: 10px; }
+
+/* 側欄指路小人：指向上方的「設定」 */
+.settings-hint { position: relative; margin: 10px 4px 0; padding: 8px 10px 10px; border: 2px solid var(--accent, #e8590c); border-radius: 14px; background: var(--surface); display: grid; justify-items: center; gap: 4px; }
+.settings-hint-arrow { position: absolute; top: -11px; left: 28px; width: 18px; height: 18px; background: var(--surface); border-left: 2px solid var(--accent, #e8590c); border-top: 2px solid var(--accent, #e8590c); transform: rotate(45deg); }
+.settings-hint .guide-chibi { margin: -4px 0 -6px; animation: hint-bob 2.4s ease-in-out infinite; }
+.settings-hint-body p { margin: 0 0 6px; font-size: 12.5px; line-height: 1.5; }
+.settings-hint-body strong { display: block; color: var(--accent, #e8590c); font-size: 12px; }
+.settings-hint-body .inline-actions { gap: 6px; }
+@keyframes hint-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .settings-hint .guide-chibi { animation: none; } }

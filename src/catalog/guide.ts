@@ -39,9 +39,9 @@ export const GUIDE_CAST: GuideCast[] = [
 
 /** 導覽步驟（主持人阿米婭依序介紹）。 */
 export const GUIDE_STEPS: { title: string; text: string; charId: string; page?: string }[] = [
-  { title: '歡迎來到幹員檔案室', text: '這是給繁中服博士用的本機工具。我會帶你看一遍主要功能，隨時可以按「跳過」。', charId: 'char_002_amiya' },
-  { title: '第一步：匯入幹員', text: '到「幹員庫」按右上角「匯入」，放入 SKPORT 研究資料或 MAA 辨識結果。合併前都會先讓你預覽。', charId: 'char_002_amiya', page: '幹員庫' },
-  { title: '第二步：更新遊戲資料', text: '到「設定」按「更新遊戲資料」，再按「同步幹員立繪」，幹員卡就會顯示精二立繪。', charId: 'char_003_kalts', page: '設定' },
+  { title: '歡迎來到幹員檔案室', text: '這是給繁中服博士用的本機工具。我會帶你看一遍主要功能，隨時可以按「跳過」。開始前，凱爾希醫生會先告訴你「設定」頁在做什麼——那是第一個要去的地方。', charId: 'char_002_amiya' },
+  { title: '第一步：先到「設定」更新資料', text: '「設定」是整個工具的資料中心：遊戲改版後按「更新遊戲資料」，幹員、技能、基建數值才會是最新的；「同步幹員立繪」會依精英化與服裝顯示立繪；資料也在這裡備份與復原。第一次使用請先來這裡按一次更新！', charId: 'char_003_kalts', page: '設定' },
+  { title: '第二步：匯入幹員', text: '到「幹員庫」按右上角「匯入」，放入 SKPORT 研究資料或 MAA 辨識結果。合併前都會先讓你預覽。', charId: 'char_002_amiya', page: '幹員庫' },
   { title: '第三步：排基建', text: '「基建」選好布局後按「產生推薦」或「整體最佳化」，權重可以依你重視的產出調整。', charId: 'char_311_mudrok', page: '基建' },
   { title: '第四步：規劃養成', text: '「養成」加入想練的幹員，就會算出材料缺口，還能幫你排刷圖計畫。', charId: 'char_4179_monstr', page: '養成' },
   { title: '第五步：看搭配與集成戰略', text: '「搭配 → 模式分析」可以看每個主題的敵人組成、社群推薦和最新討論。', charId: 'char_1035_wisdel', page: '搭配' },
