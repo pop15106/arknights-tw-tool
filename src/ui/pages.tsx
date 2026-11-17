@@ -8,16 +8,16 @@ import { formatDate, mb } from './format';
 
 type Persistence = Awaited<ReturnType<typeof queryPersistence>> | null;
 
-export function SettingsPage({ state, isDemo, busy, persistence, onSwitch, onPreviewDemo, onBackup, onRequestPersistence, onRestoreFile, onUndo }: {
+export function SettingsPage({ state, isDemo, busy, persistence, onPreviewDemo, onBackup, onRequestPersistence, onRestoreFile, onUndo }: {
   state: AppState; isDemo: boolean; busy: boolean; persistence: Persistence;
-  onSwitch: () => void; onPreviewDemo: () => void; onBackup: () => void; onRequestPersistence: () => void; onRestoreFile: (file: File) => void; onUndo: () => void;
+  onPreviewDemo: () => void; onBackup: () => void; onRequestPersistence: () => void; onRestoreFile: (file: File) => void; onUndo: () => void;
 }) {
   const meta = state.dataset.metadata;
   const capacity = measureCapacity(state);
   const license = meta.licenseStatus === 'self-authored' ? '自製資料' : meta.licenseStatus === 'permitted' ? '來源自述已獲允許，仍需核對' : '未知，待查核';
   return <div className="settings-grid">
     <section className="panel">
-      <header className="panel-header"><Icon name="database"/><h2>工作區與資料版本</h2></header>
+      <header className="panel-header"><Icon name="database"/><h2>資料版本</h2></header>
       <dl className="meta-list">
         <div><dt>目前工作區</dt><dd>{isDemo ? '示範庫（虛構）' : '個人庫（局部）'}</dd></div>
         <div><dt>格式 / 修訂</dt><dd>v{state.schemaVersion} / {state.revision}</dd></div>
@@ -28,10 +28,6 @@ export function SettingsPage({ state, isDemo, busy, persistence, onSwitch, onPre
         <div><dt>取得日期</dt><dd>{formatDate(meta.acquiredAt)}</dd></div>
       </dl>
       <details className="plain-details"><summary>查看資料校驗值</summary><code className="wrap-text">{meta.checksum}</code></details>
-      <div className="inline-actions">
-        <button type="button" className="button secondary" disabled={busy} onClick={onSwitch}>切換至{isDemo ? '個人' : '示範'}庫</button>
-        {isDemo && <button type="button" className="button ghost" disabled={busy} onClick={onPreviewDemo}>再次預覽示範批次</button>}
-      </div>
     </section>
     <section className="panel">
       <header className="panel-header"><Icon name="shield"/><h2>本機保存與備份</h2></header>
