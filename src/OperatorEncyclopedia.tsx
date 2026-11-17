@@ -196,20 +196,24 @@ function PortraitSync() {
   const [job, setJob] = useState<PortraitJob | null>(null);
   const [error, setError] = useState('');
   const poll = useRef<number | null>(null);
+  // 只要伺服器回報同步進行中就輪詢（包含離開設定頁後回來、或重新整理頁面的情況）。
+  const follow = (next: PortraitJob) => {
+    setJob(next);
+    if (next.running && poll.current === null) poll.current = window.setInterval(() => { void read().catch(err => setError(err instanceof Error ? err.message : '讀取進度失敗。')); }, 1000);
+    if (!next.running && poll.current !== null) { window.clearInterval(poll.current); poll.current = null; }
+  };
   const read = async () => {
     const response = await fetch('/api/game-data/portraits-status', { credentials: 'omit', redirect: 'error', cache: 'no-store' });
     if (!response.ok) throw new Error('本機資料服務沒有回應，請用 start.cmd 啟動。');
-    const next = await response.json() as PortraitJob; setJob(next);
-    if (!next.running && poll.current !== null) { window.clearInterval(poll.current); poll.current = null; }
+    follow(await response.json() as PortraitJob);
   };
-  useEffect(() => { void read().catch(() => {}); return () => { if (poll.current !== null) window.clearInterval(poll.current); }; }, []);
+  useEffect(() => { void read().catch(() => {}); return () => { if (poll.current !== null) { window.clearInterval(poll.current); poll.current = null; } }; }, []);
   const start = async () => {
     setError('');
     try {
       const response = await fetch('/api/game-data/portraits', { method: 'POST', headers: { 'X-Game-Data-Sync': '1' }, credentials: 'omit', redirect: 'error', cache: 'no-store' });
       if (!response.ok) throw new Error('無法開始同步，請確認本機資料服務已啟動。');
-      setJob(await response.json() as PortraitJob);
-      if (poll.current === null) poll.current = window.setInterval(() => { void read().catch(err => setError(err instanceof Error ? err.message : '讀取進度失敗。')); }, 1000);
+      follow(await response.json() as PortraitJob);
     } catch (err) { setError(err instanceof Error ? err.message : '無法開始同步。'); }
   };
   const result = job?.result;
