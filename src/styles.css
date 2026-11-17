@@ -1064,3 +1064,9 @@ h2 { font-weight: 800; }
 .settings-hint-body .inline-actions { gap: 6px; }
 @keyframes hint-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .settings-hint .guide-chibi { animation: none; } }
+
+/* 宿舍恢復拆解 */
+.dorm-breakdown { display: grid; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.dorm-breakdown > strong { font-size: 12.5px; }
+.dorm-breakdown .fine-print { margin: 0; }
+.slot-head .dorm-rate { margin-left: auto; margin-right: 8px; font-size: 12px; font-weight: 700; color: var(--accent, #e8590c); white-space: nowrap; }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBaseCatalog, plainGameText } from '../src/catalog/base.ts';
-import { candidatesFor, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, optimizeBase, baseObjective, compareLayout, layoutFacilities, LAYOUTS, simulateShift, unlockState, type Facility } from '../src/domain/base.ts';
+import { candidatesFor, dormBreakdown, evaluateBase, parseSkill, recommendBase, slotResult, trainingAdvice, baseStatistics, optimizeBase, baseObjective, compareLayout, layoutFacilities, LAYOUTS, simulateShift, unlockState, type Facility } from '../src/domain/base.ts';
 import { createDemoBaseCatalog, createDemoDataset, createDemoImport } from '../src/demo.ts';
 import { createEmptyState, known, unknown, validateAppState, type OwnedOperator } from '../src/domain/model.ts';
 import { applyImport, previewImport } from '../src/domain/import.ts';
@@ -281,6 +281,28 @@ test('控制中樞心情補位：同一角色的不同形態只排一位（推�
   assert.equal(rec.assignments.c.filter(id => id === 'demo-1' || id === 'demo-8').length, 1);
   const opt = optimizeBase(base, catalog, state.roster, definitions, { timeBudgetMs: 500 });
   assert.equal(opt.assignments.c.filter(id => id === 'demo-1' || id === 'demo-8').length, 1);
+});
+
+test('宿舍恢復拆解：基礎＋氛圍＋全宿舍（取最高）＋自身；單人恢復另列；不吃其他來源者只算自身', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  catalog.mood = { ...(catalog.mood ?? { max: 24, costPerHour: {} }), dormRecover: [1.6, 1.7, 1.8, 1.9, 2] };
+  catalog.skills['d-all'] = { id: 'd-all', name: '示範・解脫', roomType: 'DORMITORY', description: '進駐宿舍時，自身心情每小時恢復+0.55，該宿舍內所有幹員的心情每小時恢復+0.1（同種效果取最高）' };
+  catalog.skills['d-one'] = { id: 'd-one', name: '示範・嘉蘭', roomType: 'DORMITORY', description: '進駐宿舍時，使該宿舍內心情未滿的某個幹員每小時恢復+0.5（同種效果取最高）' };
+  catalog.skills['d-solo'] = { id: 'd-solo', name: '示範・獨處', roomType: 'DORMITORY', description: '進駐宿舍時，自身心情每小時恢復+0.7，同時無法獲得其他來源提供的心情恢復效果' };
+  catalog.operators['demo-1'] = [[{ buffId: 'd-all', elite: 0, level: 1 }]];
+  catalog.operators['demo-2'] = [[{ buffId: 'd-one', elite: 0, level: 1 }]];
+  catalog.operators['demo-3'] = [[{ buffId: 'd-solo', elite: 0, level: 1 }]];
+  const make = (atmosphere?: number) => evaluateBase({ facilities: [{ id: 'd', type: 'dormitory', level: 5, ...(atmosphere === undefined ? {} : { atmosphere }) }], onlineSlots: [], assignments: { d: ['demo-1', 'demo-2', 'demo-3'] } }, catalog, state.roster, definitions);
+  const full = dormBreakdown(make(), 'd', catalog)!;
+  assert.equal(full.base, 2); assert.equal(full.atmosphereBonus, 2, '未設定氛圍時視為滿 5000');
+  assert.equal(full.all, 0.1); assert.equal(full.single, 0.5);
+  const rate = (id: string) => full.operators.find(op => op.operatorId === id)!;
+  assert.equal(rate('demo-1').total, 4.65, '2＋2＋0.1＋自身 0.55');
+  assert.equal(rate('demo-2').total, 4.1, '單人恢復不加進每個人');
+  assert.equal(rate('demo-3').total, 4.7, '不吃其他來源：2＋2＋自身 0.7');
+  assert.ok(rate('demo-3').exclusive);
+  assert.equal(dormBreakdown(make(2500), 'd', catalog)!.atmosphereBonus, 1);
 });
 
 test('同一角色的不同形態不能同時進駐，推薦也只排一處', async () => {

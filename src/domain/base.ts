@@ -1854,3 +1854,44 @@ export function droneOptions(evaluation: BaseEvaluation, catalog: BaseCatalog, s
     : bestTrading ? `無人機給「${bestTrading.label}」（每架約 ${bestTrading.perDrone.lmd} 龍門幣）。` : '';
   return { perDay, chargePercent, options, recommendation };
 }
+
+/* ------------------------------------------------------------------ */
+/* 宿舍恢復拆解：每位幹員的心情恢復／時＝                                   */
+/*   宿舍基礎（資料表）＋0.0004×氛圍（PRTS）＋全宿舍（同種取最高）           */
+/*   ＋控制中樞「所有宿舍」（同種取最高）＋陣營額外＋自身恢復。                 */
+/* 單人恢復（給心情未滿的某一位，同種取最高）另外列出，不加進每個人。          */
+/* ------------------------------------------------------------------ */
+export interface DormBreakdown {
+  base: number; atmosphere: number; atmosphereMax: number; atmosphereBonus: number;
+  all: number; single: number; global: number;
+  below: { threshold: number; value: number }[];
+  operators: { operatorId: string; name: string; self: number; global: number; group: number; total: number; exclusive: boolean }[];
+}
+export function dormBreakdown(evaluation: BaseEvaluation, facilityId: string, catalog: BaseCatalog): DormBreakdown | null {
+  const result = evaluation.facilities.find(item => item.facility.id === facilityId);
+  if (!result || result.facility.type !== 'dormitory') return null;
+  const { facility } = result;
+  const base = catalog.mood?.dormRecover?.[facility.level - 1] ?? 0;
+  const atmosphereMax = facility.level * 1000;
+  const atmosphere = Math.min(facility.atmosphere ?? atmosphereMax, atmosphereMax);
+  const atmosphereBonus = round(0.0004 * atmosphere);
+  const effectsOf = (op: OperatorInRoom) => op.skills.flatMap(skill => skill.applied ?? []);
+  const globals = evaluation.facilities.filter(item => item.facility.type === 'control').flatMap(item => item.operators.flatMap(effectsOf))
+    .filter((effect): effect is Extract<SkillEffect, { kind: 'globalDorm' }> => effect.kind === 'globalDorm');
+  const roomEffects = result.operators.flatMap(effectsOf);
+  const below = roomEffects.filter((effect): effect is Extract<SkillEffect, { kind: 'dormBelow' }> => effect.kind === 'dormBelow').map(effect => ({ threshold: effect.threshold, value: effect.value }));
+  const all = result.totals.moodRecoverAll, single = result.totals.dormSingle;
+  const groupsOf = (id: string) => catalog.meta?.[id]?.groups ?? [];
+  const operators = result.operators.map(op => {
+    const own = effectsOf(op);
+    const self = round(own.filter(effect => effect.kind === 'moodRecoverSelf').reduce((sum, effect) => sum + (effect as { value: number }).value, 0));
+    // 「同時無法獲得其他來源提供的心情恢復效果」：只算宿舍基礎＋氛圍＋自身。
+    const exclusive = op.skills.some(skill => skill.applies && skill.active?.description.includes('無法獲得其他來源'));
+    const global = Math.max(0, ...globals.filter(effect => !effect.group || groupsOf(op.operatorId).includes(effect.group)).map(effect => effect.value));
+    const group = Math.max(0, ...roomEffects.filter((effect): effect is Extract<SkillEffect, { kind: 'dormGroupBonus' }> => effect.kind === 'dormGroupBonus'
+      && groupsOf(op.operatorId).includes(effect.group) && result.operators.some(other => other.name === effect.name)).map(effect => effect.value));
+    const total = round(base + atmosphereBonus + self + (exclusive ? 0 : all + global + group));
+    return { operatorId: op.operatorId, name: op.name, self, global: exclusive ? 0 : global, group: exclusive ? 0 : group, total, exclusive };
+  });
+  return { base, atmosphere, atmosphereMax, atmosphereBonus, all, single, global: Math.max(0, ...globals.filter(effect => !effect.group).map(effect => effect.value)), below, operators };
+}
