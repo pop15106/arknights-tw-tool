@@ -8,6 +8,9 @@ import { IS_THEMES, IS_THEME_IDS, operatorReview } from '../domain/review';
 import type { RogueAnalysis } from '../catalog/rogue';
 import { fitLevel, themeFit, type ThemeFit } from '../domain/rogueFit';
 import { CommunityForOperator, CommunityThemePanel, useCommunity } from './Community';
+import { useModeAnalyses } from './modeAnalyses';
+import { abilitySummary, operatorAbilities } from '../domain/abilities';
+import { skillAdvice } from '../domain/masteryAdvice';
 import { operatorTexts } from '../domain/synergy';
 import { buildSquad, operatorInfo, TEMPLATES } from '../domain/squad';
 import { useEffect } from 'preact/hooks';
@@ -211,12 +214,16 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<Record<string, string>>({});
   const definitions = state.dataset.operators;
+  // hook 要在提前 return 之前呼叫，順序才固定。
+  const rogue = useRogueFits(isDemo, state, growth, base);
   const head = <header className="recommend-head"><div><p className="eyebrow">搭配</p><h2>幹員簡評</h2></div>{tabs}</header>;
   if (!growth) return <section className="panel">{head}<p className="fine-print">讀取遊戲資料中…</p></section>;
   const definition = definitions.find(def => def.id === operatorId);
   const matches = query.trim() ? definitions.filter(def => def.displayName.includes(query.trim()) && growth.operators[def.id]).slice(0, 10) : [];
   const review = definition ? operatorReview(definition, definitions, growth, base, effectText) : null;
-  const rogue = useRogueFits(isDemo, state, growth, base);
+  const abilities = definition ? abilitySummary(operatorAbilities(definition)) : [];
+  const advice = definition ? skillAdvice(definition, state.roster.find(row => row.operatorId === definition.id), { growth, analyses: rogue?.analyses ?? [], community: community.data }) : [];
+  const bestDaily = [...advice].sort((a, b) => b.daily.points - a.daily.points)[0];
   const saved = (definition && state.settings.reviewNotes?.[definition.id]) ?? {};
   const note = (key: string) => notes[key] ?? saved[key] ?? '';
   const dirty = definition && Object.keys(notes).some(key => (notes[key] ?? '') !== (saved[key] ?? ''));
@@ -235,13 +242,14 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
       <div className="review-grid">
         {MODES.map(mode => {
           let body: preact.JSX.Element;
-          if (mode.key === 'daily') body = <><ul className="gap-list">{review.daily.facts.map(fact => <li key={fact}>{fact}</li>)}</ul><ul className="gap-list">{review.daily.skills.map(skill => <li key={skill}>{skill}</li>)}</ul></>;
+          if (mode.key === 'daily') body = <><ul className="gap-list">{review.daily.facts.map(fact => <li key={fact}>{fact}</li>)}</ul><ul className="gap-list">{review.daily.skills.map(skill => <li key={skill}>{skill}</li>)}</ul>{abilities.length > 0 && <><strong className="fine-print">技能／天賦／模組能力（解析自說明文字）</strong><ul className="gap-list">{abilities.map(item => <li key={item.key}>{item.label}：{item.sources.join('、')}</li>)}</ul></>}{bestDaily && <p className="fine-print">日常建議專精：技能 {bestDaily.skillIndex + 1}「{bestDaily.name}」（{bestDaily.daily.reasons.slice(0, 3).join('、')}）</p>}</>;
           else if (mode.key === 'base') body = review.base.length ? <ul className="gap-list">{review.base.map(item => <li key={item.skill}><strong>{item.room}</strong>「{item.skill}」：{item.effects}{item.note ? `（${item.note}）` : ''}</li>)}</ul> : <p className="fine-print">沒有基建技能。</p>;
           else if (mode.key.startsWith('is')) {
             const theme = review.roguelike[Number(mode.key.slice(2)) - 1]; const items = [...theme.effects, ...review.roguelikeGeneral];
             const fit = rogue?.fits.get(theme.theme)?.get(definition.id), scores = rogue?.scores.get(theme.theme);
             const themeId = IS_THEME_IDS[Number(mode.key.slice(2)) - 1];
-            body = <>{fit && scores ? <FitView fit={fit} level={fitLevel(fit.score, scores)}/> : <p className="fine-print">{rogue ? '此主題的關卡資料尚未分析。' : '分析主題關卡中…（首次需下載關卡檔）'}</p>}<CommunityForOperator data={community.data} themeId={themeId} operatorId={definition.id}/>{items.length > 0 && list(items)}</>;
+            const best = advice.map(item => ({ item, mode: item.modes.find(m => m.mode === theme.theme) })).filter(entry => entry.mode && entry.mode.points > 0).sort((a, b) => b.mode!.points - a.mode!.points)[0];
+            body = <>{fit && scores ? <FitView fit={fit} level={fitLevel(fit.score, scores)}/> : <p className="fine-print">{rogue ? '此主題的關卡資料尚未分析。' : '分析主題關卡中…（首次需下載關卡檔）'}</p>}{best && <p className="fine-print">此主題建議專精：技能 {best.item.skillIndex + 1}「{best.item.name}」（{best.mode!.reasons.slice(0, 2).join('；')}）</p>}<CommunityForOperator data={community.data} themeId={themeId} operatorId={definition.id}/>{items.length > 0 && list(items)}</>;
           }
           else {
             const kind = mode.key === 'reclamation' ? 'reclamation' : 'security';
@@ -258,21 +266,7 @@ function ReviewTab({ state, isDemo, tabs, onSaveNotes }: { state: AppState; isDe
 
 /** 各主題的分析與全部幹員的契合度（主題關卡分析由資料服務快取）。 */
 function useRogueFits(isDemo: boolean, state: AppState, growth: ReturnType<typeof useGrowthCatalog>['catalog'], base: ReturnType<typeof useBaseCatalog>['catalog']) {
-  const [analyses, setAnalyses] = useState<(RogueAnalysis & { mode?: string })[] | null>(null);
-  useEffect(() => {
-    if (isDemo) return;
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const list = await fetch('/api/game-data/rogue', { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }).then(response => response.ok ? response.json() : []) as { id: string; mode: string }[];
-        // 平行讀取（分析結果由資料服務快取；首次會下載關卡檔），全部完成後一次計算契合度。
-        const queue = [...list]; const results: (RogueAnalysis & { mode?: string })[] = [];
-        await Promise.all(Array.from({ length: 4 }, async () => { while (queue.length) { const theme = queue.shift()!; const response = await fetch(`/api/game-data/rogue-analysis?theme=${encodeURIComponent(theme.id)}`, { credentials: 'omit', redirect: 'error', signal: controller.signal, cache: 'no-store' }); if (response.ok) results.push({ ...(await response.json()), mode: theme.mode }); } }));
-        if (!controller.signal.aborted) setAnalyses(list.map(theme => results.find(item => item.id === theme.id)).filter((item): item is RogueAnalysis & { mode?: string } => !!item));
-      } catch { /* 資料服務沒有集成戰略資料時不顯示 */ }
-    })();
-    return () => controller.abort();
-  }, [isDemo]);
+  const analyses = useModeAnalyses(isDemo);
   return useMemo(() => {
     if (!analyses || !growth) return null;
     const definitions = state.dataset.operators.filter(def => growth.operators[def.id]?.stats);

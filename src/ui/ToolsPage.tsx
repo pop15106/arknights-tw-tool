@@ -7,6 +7,7 @@ import { accountCheckup } from '../domain/checkup';
 import { currentState } from '../domain/growth';
 import { useBaseCatalog } from './BasePage';
 import { useGrowthCatalog } from './GrowthPage';
+import { MasteryAdviceTab } from './MasteryAdvice';
 
 function useRecruitCatalog(isDemo: boolean) {
   const [catalog, setCatalog] = useState<RecruitCatalog | null>(null);
@@ -21,13 +22,14 @@ function useRecruitCatalog(isDemo: boolean) {
   return { catalog, error };
 }
 
-export type ToolTab = 'recruit' | 'mastery' | 'checkup';
+export type ToolTab = 'recruit' | 'mastery' | 'advice' | 'checkup';
 export function ToolsPage({ state, isDemo, extra }: { state: AppState; isDemo: boolean; extra?: Partial<Record<ToolTab, (tabs: preact.JSX.Element) => preact.JSX.Element>> }) {
   const [tab, setTab] = useState<ToolTab>('recruit');
-  const tabs = <div className="segmented" role="tablist">{([['recruit', '公招計算'], ['mastery', '專精規劃'], ['checkup', '帳號體檢']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
+  const tabs = <div className="segmented" role="tablist">{([['recruit', '公招計算'], ['advice', '專精建議'], ['mastery', '專精時間'], ['checkup', '帳號體檢']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
   return <div className="team-page">
     {tab === 'recruit' && <RecruitTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'mastery' && <MasteryTab state={state} isDemo={isDemo} tabs={tabs}/>}
+    {tab === 'advice' && <MasteryAdviceTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'checkup' && <CheckupTab state={state} isDemo={isDemo} tabs={tabs}/>}
   </div>;
 }
