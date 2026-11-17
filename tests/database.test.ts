@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
-import { createEmptyState, sealDataset } from '../src/domain/model.ts';
+import { createEmptyState, known, sealDataset, type ImportDocument } from '../src/domain/model.ts';
+import { applyImport, previewImport } from '../src/domain/import.ts';
 import { loadState, openDatabase, overwriteRepaired, readRawState, repairUnknownFields, saveState } from '../src/storage/database.ts';
 import { createBackup, parseBackup } from '../src/storage/backup.ts';
 
@@ -107,7 +108,7 @@ test('其他版本留下的未知欄位：可備份原樣、移除後通過驗�
   const { state: repaired, removed } = await repairUnknownFields(raw);
   assert.deepEqual(removed, ['pendingReviews']);
   assert.equal(repaired.settings.analysis.goal, '保留這段');
-  await overwriteRepaired(db, repaired);
+  await overwriteRepaired(db, repaired, raw);
   const loaded = await loadState(db);
   assert.equal(loaded?.settings.analysis.goal, '保留這段');
   assert.ok(!('pendingReviews' in (loaded as object)));
@@ -119,4 +120,53 @@ test('修復只處理未知欄位；缺少必要欄位時不猜測、直接拒�
   const broken = structuredClone(state) as unknown as Record<string, unknown>;
   delete broken.roster;
   await assert.rejects(repairUnknownFields(broken), /缺少必要欄位：roster/);
+});
+
+test('其他版本留下「稍後審閱」的衝突：補記為保留現有值，幹員庫不變', async () => {
+  const date = '2026-11-13T00:00:00.000Z';
+  const dataset = await sealDataset({ metadata: { id: 'demo-set', version: '1', product: 'arknights', server: 'tw', namespace: 'demo', validFrom: date, acquiredAt: date, source: '自製', licenseStatus: 'self-authored' }, operators: [{ id: 'demo-1', displayName: '測試幹員', aliases: [], rarity: 6, profession: '先鋒', branch: '虛構分支', faction: '測試', skills: [{ id: 'demo-s1', name: '技能' }], modules: [], availability: 'unknown' }] });
+  const input: ImportDocument = { format: 'arknights-roster-import', schemaVersion: 1, product: 'arknights', server: 'tw', namespace: 'demo', dataset, candidates: [{ operatorId: 'demo-1', fields: { level: known(50, '測試', { importedAt: date, observedAt: date }) } }], completeness: 'partial', source: '測試', adapterVersion: '1', createdAt: date };
+  const empty = createEmptyState(dataset);
+  const first = applyImport(empty, await previewImport(empty, input), {});
+  const change = structuredClone(input); change.candidates[0].fields.level = known(70, '測試', { importedAt: date, observedAt: date });
+  const preview = await previewImport(first, change);
+  assert.equal(preview.conflicts.length, 1);
+  const second = applyImport(first, preview, { [preview.conflicts[0].id]: 'keep' });
+  // 模擬其他版本：衝突沒做決定、改放在 pendingReviews。
+  const raw = structuredClone(second) as unknown as Record<string, unknown> & { batches: { decisions: Record<string, string> }[] };
+  raw.batches[1].decisions = {}; raw.pendingReviews = [preview.conflicts[0].id];
+  const { state, removed, undecided } = await repairUnknownFields(raw);
+  assert.deepEqual(removed, ['pendingReviews']); assert.equal(undecided, 1);
+  assert.equal(state.batches[1].decisions[preview.conflicts[0].id], 'keep');
+  assert.deepEqual(state.roster, second.roster);
+});
+
+test('Codex 回饋：同名欄位只刪驗證器指出的位置，正常設定不受影響', async () => {
+  const { state } = await setup();
+  const raw = structuredClone(state) as unknown as { settings: { base: Record<string, unknown>; analysis: Record<string, unknown> } };
+  raw.settings.analysis.onlineSlots = ['09:00'];
+  raw.settings.base.onlineSlots = ['08:00'];
+  const { state: repaired, removed } = await repairUnknownFields(raw);
+  assert.deepEqual(removed, ['onlineSlots']);
+  assert.deepEqual(repaired.settings.base.onlineSlots, ['08:00']);
+});
+
+test('Codex 回饋：原本就壞掉的校驗值不會因為順便移除欄位而被蓋過', async () => {
+  const { state } = await setup();
+  const raw = { ...structuredClone(state), pendingReviews: [] } as unknown as { dataset: { metadata: { checksum: string } } };
+  raw.dataset.metadata.checksum = `sha256:${'1'.repeat(64)}`;
+  await assert.rejects(repairUnknownFields(raw), /校驗值不符/);
+});
+
+test('Codex 回饋：修復寫入前資料已被其他分頁改動時取消，不蓋掉新資料', async () => {
+  const { db, state } = await setup();
+  const put = (value: unknown) => new Promise<void>((resolve, reject) => { const tx = db.transaction('state', 'readwrite'); tx.objectStore('state').put(value, 'active'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+  const raw = { ...structuredClone(state), pendingReviews: [] };
+  await put(raw);
+  const { state: repaired } = await repairUnknownFields(raw);
+  const newer = { ...structuredClone(state), revision: 5 };
+  await put(newer);
+  await assert.rejects(overwriteRepaired(db, repaired, raw), /其他分頁/);
+  assert.equal((await loadState(db))?.revision, 5);
+  db.close();
 });
