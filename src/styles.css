@@ -1028,3 +1028,7 @@ h2 { font-weight: 800; }
 .guide-card .eyebrow { margin: 0; }
 .guide-faq-list { display: grid; gap: 6px; }
 @media (max-width: 640px) { .guide-hero, .guide-card { grid-template-columns: 1fr; justify-items: center; } .guide-bubble::before { display: none; } }
+.mastery-rank { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.mastery-rank-row { display: grid; gap: 2px; width: 100%; text-align: left; background: none; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; color: inherit; }
+.mastery-advice-detail { padding: 8px 10px 4px; display: grid; gap: 6px; }
+.mastery-compare { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; margin-top: 10px; }
