@@ -1322,9 +1322,54 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
     assignments[facility.id].push(option.operatorId); used.add(option.operatorId);
     picks.set(facility.id, [...(picks.get(facility.id) ?? []), option]);
   }
+  // 控制中樞：技能多為跨設施加成，逐位以「加入後整體效益增加多少」挑人（與整體最佳化同一套計分）；
+  // 沒有可計算增益的空位，再以心情技能（中樞全員恢復×人數＋自身消耗減少）補滿。
+  const controlNotes = new Map<string, { alternatives: RecommendationPick[]; mood: number }>();
+  for (const facility of base.facilities.filter(item => item.type === 'control')) {
+    const seats = capacity(facility);
+    if (!seats) continue;
+    const objective = (map: Record<string, string[]>) => baseObjective(evaluateBase({ ...base, assignments: map }, catalog, owned, definitions), catalog, weights).total;
+    const pool = candidatesFor(facility, catalog, owned, definitions, new Set()).filter(item => item.state === 'ready');
+    let baseline = objective(assignments);
+    let lastRound: RecommendationPick[] = [];
+    while (assignments[facility.id].length < seats) {
+      const scored = pool.filter(item => !used.has(item.operatorId)).map(item => {
+        const gain = round(objective({ ...assignments, [facility.id]: [...assignments[facility.id], item.operatorId] }) - baseline);
+        return { facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: gain, summary: `${item.summary}（整體效益 +${gain}）` };
+      }).filter(item => item.score > 0.001).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'zh-Hant'));
+      lastRound = scored.slice(1, 4);
+      const best = scored[0];
+      if (!best) break;
+      assignments[facility.id].push(best.operatorId); used.add(best.operatorId); baseline += best.score;
+      picks.set(facility.id, [...(picks.get(facility.id) ?? []), best]);
+    }
+    let mood = 0;
+    const moodValue = (row: OwnedOperator) => round((catalog.operators[row.operatorId] ?? []).reduce((sum, slot) => {
+      const active = slotResult(slot, row, catalog).active;
+      if (!active || active.roomType !== 'CONTROL') return sum;
+      return sum + parseSkill(active).effects.reduce((inner, effect) => inner + (effect.kind === 'moodRoom' ? -effect.value * seats : effect.kind === 'moodCost' ? -effect.value : 0), 0);
+    }, 0));
+    const moodPicks = owned.filter(row => !used.has(row.operatorId)).map(row => ({ row, value: moodValue(row) })).filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value || nameOf(a.row.operatorId).localeCompare(nameOf(b.row.operatorId), 'zh-Hant'));
+    for (const { row, value } of moodPicks) {
+      // 同一角色的不同形態只能排一位：每次加入前重新檢查。
+      if (assignments[facility.id].length >= seats) break;
+      if (used.has(row.operatorId)) continue;
+      assignments[facility.id].push(row.operatorId); used.add(row.operatorId); mood++;
+      picks.set(facility.id, [...(picks.get(facility.id) ?? []), { facilityId: facility.id, operatorId: row.operatorId, name: nameOf(row.operatorId), score: value, summary: `心情技能（中樞心情 ${value}／小時）` }]);
+    }
+    controlNotes.set(facility.id, { alternatives: lastRound, mood });
+  }
   const labels = evaluateBase(base, catalog, [], definitions).facilities;
   const facilities = base.facilities.map((facility, index): FacilityRecommendation => {
     const label = labels[index].label;
+    const control = controlNotes.get(facility.id);
+    if (control) {
+      const chosen = picks.get(facility.id) ?? [];
+      const open = capacity(facility) - chosen.length;
+      const note = ['控制中樞的技能多為跨設施加成：依「加入後整體效益增加多少」逐位挑選，與整體最佳化同一套計分。', control.mood ? `其中 ${control.mood} 位以心情技能補位（不影響產出）。` : '', open > 0 ? `還有 ${open} 個空位沒有可計算效果的人選。` : ''].join('');
+      return { facilityId: facility.id, label, picks: chosen, alternatives: control.alternatives, maybe: [], note };
+    }
     if (!RECOMMENDABLE.has(ROOM_OF[facility.type])) return { facilityId: facility.id, label, picks: [], alternatives: [], maybe: [], note: `${FACILITY_LABEL[facility.type]}的技能多為跨設施或條件效果，無法用可追溯數值比較，因此不推薦人選。` };
     if (roomWeight(facility, weights) <= 0) return { facilityId: facility.id, label, picks: [], alternatives: [], maybe: [], note: `${FACILITY_LABEL[facility.type]}的權重設為「不考慮」，因此不推薦人選。` };
     const list = candidateLists.get(facility.id) ?? [];
@@ -1628,7 +1673,11 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
       return sum + parseSkill(active).effects.reduce((inner, effect) => inner + (effect.kind === 'moodRoom' ? -effect.value * capacity(facility) : effect.kind === 'moodCost' ? -effect.value : 0), 0);
     }, 0);
     const picks = owned.filter(row => !used.has(characterOf(row.operatorId))).map(row => ({ id: row.operatorId, value: benefit(row) })).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
-    for (const pick of picks.slice(0, free)) { current[facility.id].push(pick.id); moodFilled.push(pick.id); }
+    for (const pick of picks) {
+      if (current[facility.id].length >= capacity(facility)) break;
+      if (used.has(characterOf(pick.id))) continue;
+      current[facility.id].push(pick.id); moodFilled.push(pick.id); used.add(characterOf(pick.id));
+    }
   }
   return { assignments: current, products, moodFilled, objective: best, start: startObjective, moves, evaluations, timedOut };
 }
