@@ -196,8 +196,11 @@ function PortraitSync() {
   const [job, setJob] = useState<PortraitJob | null>(null);
   const [error, setError] = useState('');
   const poll = useRef<number | null>(null);
+  const mounted = useRef(true);
   // 只要伺服器回報同步進行中就輪詢（包含離開設定頁後回來、或重新整理頁面的情況）。
   const follow = (next: PortraitJob) => {
+    // 離開設定頁後才回來的回應一律忽略，避免留下沒人清除的輪詢。
+    if (!mounted.current) return;
     setJob(next);
     if (next.running && poll.current === null) poll.current = window.setInterval(() => { void read().catch(err => setError(err instanceof Error ? err.message : '讀取進度失敗。')); }, 1000);
     if (!next.running && poll.current !== null) { window.clearInterval(poll.current); poll.current = null; }
@@ -207,7 +210,7 @@ function PortraitSync() {
     if (!response.ok) throw new Error('本機資料服務沒有回應，請用 start.cmd 啟動。');
     follow(await response.json() as PortraitJob);
   };
-  useEffect(() => { void read().catch(() => {}); return () => { if (poll.current !== null) { window.clearInterval(poll.current); poll.current = null; } }; }, []);
+  useEffect(() => { mounted.current = true; void read().catch(() => {}); return () => { mounted.current = false; if (poll.current !== null) { window.clearInterval(poll.current); poll.current = null; } }; }, []);
   const start = async () => {
     setError('');
     try {
