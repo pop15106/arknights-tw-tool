@@ -1271,6 +1271,14 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
     candidateLists.set(facility.id, list);
     const weight = roomWeight(facility, weights);
     if (weight <= 0) return;
+    // 已選訓練職業／加工配方時，用實際評估的加成排序（職業或配方不符的技能算 0）；未選時才用技能數值粗略參考。
+    const selected = facility.type === 'training' ? !!base.training?.profession : facility.type === 'workshop' ? !!(base.workshop || base.workshopFormula) : false;
+    const actual = (operatorId: string) => {
+      const result = evaluateBase({ ...base, facilities: [facility], assignments: { [facility.id]: [operatorId] } }, catalog, owned, definitions).facilities[0];
+      return facility.type === 'training' ? result.totals.training : result.workshop ? result.workshop.efficiency : result.totals.byproduct;
+    };
+    if (selected) for (const item of list) if (item.state === 'ready') item.score = round(actual(item.operatorId));
+    if (selected) list.sort((a, b) => b.score - a.score);
     for (const item of list) if (item.state === 'ready' && item.score > 0) options.push({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, perSeat: item.score * weight, summary: item.summary, order });
     // 搭檔組合：兩人同房的總分換算成每個位置的分數，與單人候選一起排序。
     for (const row of owned) {

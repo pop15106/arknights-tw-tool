@@ -630,3 +630,18 @@ test('功能設施：單人推薦也涵蓋會客室／辦公室／訓練室／�
   const [, , tr] = evaluateBase({ ...base, training: { profession: '重裝' }, assignments: { tr: ['demo-4', 'demo-6'] } } as never, catalog, state.roster, definitions).facilities;
   assert.equal(tr.totals.training, 30);
 });
+
+test('Codex 回饋：已選訓練職業／加工類別時，推薦依實際加成排序（不符的技能不推薦）', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const add = (id: string, roomType: string, description: string, operator: string) => { catalog.skills[id] = { id, name: id, roomType, description }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('t-def', 'TRAINING', '進駐訓練室協助位時，重裝幹員的專精技能訓練速度+60%', 'demo-4');
+  add('t-snp', 'TRAINING', '進駐訓練室協助位時，狙擊幹員的專精技能訓練速度+30%', 'demo-6');
+  add('w-elite', 'WORKSHOP', '進駐加工站加工精英材料時，副產品的產出機率提升80%', 'demo-5');
+  add('w-skill', 'WORKSHOP', '進駐加工站加工技巧概要時，副產品的產出機率提升70%', 'demo-7');
+  const facilities: Facility[] = [{ id: 'tr', type: 'training', level: 3 }, { id: 'ws', type: 'workshop', level: 3 }];
+  const pick = (extra: object, id: string) => recommendBase({ facilities, onlineSlots: [], ...extra } as never, catalog, state.roster, definitions).facilities.find(item => item.facilityId === id)!.picks.map(item => item.operatorId);
+  assert.deepEqual(pick({ training: { profession: '狙擊' } }, 'tr'), ['demo-6'], '選狙擊時不推薦只加重裝的協助者');
+  assert.deepEqual(pick({ workshop: 'skill' }, 'ws'), ['demo-7'], '加工技巧概要時不推薦只加精英材料的人');
+  assert.deepEqual(pick({}, 'tr'), ['demo-4'], '未選職業時以技能數值粗略參考');
+});
