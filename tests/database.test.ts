@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { createEmptyState, sealDataset } from '../src/domain/model.ts';
-import { loadState, openDatabase, saveState } from '../src/storage/database.ts';
+import { loadState, openDatabase, overwriteRepaired, readRawState, repairUnknownFields, saveState } from '../src/storage/database.ts';
 import { createBackup, parseBackup } from '../src/storage/backup.ts';
 
 async function setup() {
@@ -95,4 +95,28 @@ test('較新的 IndexedDB schema 不降級、不重建', async () => {
   assert.equal(preserved.version, 2);
   assert.ok(preserved.objectStoreNames.contains('future'));
   preserved.close();
+});
+
+test('其他版本留下的未知欄位：可備份原樣、移除後通過驗證，其餘內容保留', async () => {
+  const { db, state } = await setup();
+  const foreign = { ...structuredClone(state), pendingReviews: [{ id: 'x' }], settings: { ...structuredClone(state.settings), analysis: { ...state.settings.analysis, goal: '保留這段' }, pendingReviews: {} } };
+  await new Promise<void>((resolve, reject) => { const tx = db.transaction('state', 'readwrite'); tx.objectStore('state').put(foreign, 'active'); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+  await assert.rejects(loadState(db), /未允許欄位：pendingReviews/);
+  const raw = await readRawState(db);
+  assert.ok(raw && typeof raw === 'object' && 'pendingReviews' in raw);
+  const { state: repaired, removed } = await repairUnknownFields(raw);
+  assert.deepEqual(removed, ['pendingReviews']);
+  assert.equal(repaired.settings.analysis.goal, '保留這段');
+  await overwriteRepaired(db, repaired);
+  const loaded = await loadState(db);
+  assert.equal(loaded?.settings.analysis.goal, '保留這段');
+  assert.ok(!('pendingReviews' in (loaded as object)));
+  db.close();
+});
+
+test('修復只處理未知欄位；缺少必要欄位時不猜測、直接拒絕', async () => {
+  const { state } = await setup();
+  const broken = structuredClone(state) as unknown as Record<string, unknown>;
+  delete broken.roster;
+  await assert.rejects(repairUnknownFields(broken), /缺少必要欄位：roster/);
 });
