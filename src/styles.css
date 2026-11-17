@@ -986,3 +986,6 @@ h2 { font-weight: 800; }
 .fit-badge.fit-high { background: var(--card-yellow); color: var(--card-ink); } .fit-badge.fit-mid { background: var(--surface); } .fit-badge.fit-low { background: transparent; color: var(--muted); border-style: dashed; }
 .stats-table td.hot { color: var(--danger); font-weight: 800; }
 .segmented.theme-list { display: flex; flex-wrap: wrap; border-radius: 16px; } .segmented.theme-list button { white-space: nowrap; }
+.telegram-setup { margin-top: 6px; } .telegram-setup summary { cursor: pointer; font-weight: 600; }
+.telegram-setup .telegram-steps { margin: 8px 0; padding-left: 20px; line-height: 1.7; }
+.shift-reminder .telegram-setup .text-input { width: min(320px, 100%); } .shift-reminder .telegram-setup .text-input[inputmode="numeric"] { width: 150px; }

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { GameDataSnapshot } from './game-data-sync.ts';
 import type { TradingParams } from '../src/catalog/trading.ts';
+import { createNotifier, NotifyError, type Notifier } from './notify.ts';
 
 const DEFAULT_PORT = 5188;
 // 只接受 127.0.0.1 的任意連接埠（例如 5173 被占用時改用 5174）；外部網域與 DNS 重新綁定仍會被擋下。
@@ -18,6 +19,8 @@ interface ServerOptions {
   rogueAnalysis?: (theme: string) => Promise<import('../src/catalog/rogue.ts').RogueAnalysis | null>;
   loadCnEvents?: () => Promise<{ fetchedAt: string; source: string; events: unknown[] } | null>;
   loadDrops?: () => Promise<import('../src/catalog/drops.ts').DropRates | null>;
+  /** 換班推播；測試時注入假的發送端，正式執行才讀本機設定。 */
+  notifier?: Notifier | null;
 }
 class ApiError extends Error {
   status: number;
@@ -69,6 +72,8 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   const rogueAnalysis = options.rogueAnalysis ?? (options.load ? async () => null : async (theme: string) => (await import('./game-data-sync.ts')).rogueAnalysisData(theme));
   const loadCnEvents = options.loadCnEvents ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadCnEventsData());
   const loadDrops = options.loadDrops ?? (options.load ? async () => null : async () => (await import('./game-data-sync.ts')).loadDropsData());
+  const notifier = options.notifier !== undefined ? options.notifier : options.load ? null : createNotifier();
+  const stopNotifier = notifier?.start();
   let origin = '', host = '';
   const paths = new Set(['status', 'operators', 'stages', 'events', 'base', 'growth', 'drops', 'stage-enemies', 'enemies', 'recruit', 'cn-events', 'rogue', 'rogue-analysis', 'sync'].map(name => `/api/game-data/${name}`));
   const server = createServer({ requestTimeout: 15_000, headersTimeout: 10_000, maxHeaderSize: 8192 }, async (req, res) => {
@@ -78,6 +83,13 @@ export async function startGameDataServer(options: ServerOptions = {}) {
       const raw = req.url ?? '';
       if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') || raw.includes('#') || raw.length > 2048) throw new ApiError(400, 'PATH', '網址格式無效。');
       const url = new URL(raw, origin);
+      if (url.pathname.startsWith('/api/notify/')) {
+        if (!notifier) throw new ApiError(404, 'NOT_FOUND', '找不到此資料功能。');
+        if (url.search) throw new ApiError(400, 'QUERY', '查詢參數無效。');
+        try { await notifier.handle(req, res, url.pathname, value => value === origin || isLoopbackOrigin(value), json); }
+        catch (error) { if (error instanceof NotifyError) throw new ApiError(error.status, 'NOTIFY', error.message); throw error; }
+        return;
+      }
       if (!paths.has(url.pathname)) throw new ApiError(404, 'NOT_FOUND', '找不到此資料功能。');
       const isSync = url.pathname === '/api/game-data/sync';
       if (req.method !== (isSync ? 'POST' : 'GET')) throw new ApiError(405, 'METHOD', '不支援此請求方法。');
@@ -171,6 +183,7 @@ export async function startGameDataServer(options: ServerOptions = {}) {
   });
   let closing: Promise<void> | undefined;
   return { server, origin, close: () => closing ??= new Promise<void>((resolveClose, reject) => {
+    stopNotifier?.();
     server.close(error => error ? reject(error) : resolveClose()); server.closeAllConnections();
   }) };
 }
