@@ -205,7 +205,7 @@ function OptimizedView({ result, base, catalog, state, weights }: { result: Opti
       <strong>警語：這是近似最佳，不是保證最佳</strong>
       <ul>
         <li>從單人推薦出發，逐格替換或交換幹員，只要整體效益變高就採用，直到無法再提升（局部搜尋）；不同起點可能得到不同結果。</li>
-        <li>整體效益＝赤金站生產力％×{weights.gold}＋記錄站生產力％×{weights.record}＋貿易站龍門幣提升％×{weights.trading}（赤金不足時按供應比例打折）＋發電站無人機％×{weights.power}；權重可在上方調整。</li>
+        <li>整體效益＝赤金站生產力％×{weights.gold}＋記錄站生產力％×{weights.record}＋貿易站龍門幣提升％×{weights.trading}（赤金不足時按供應比例打折）＋發電站無人機％×{weights.power}＋會客室線索％×{weights.clue}＋辦公室聯絡％×{weights.contact}＋訓練室速度％×{weights.training}＋加工站副產品％×{weights.byproduct}；權重可在上方調整，設為「不考慮」的項目不計分、單人推薦也會略過該設施。</li>
         <li>不模擬心情與換班；訂單品質技能以累積工作達峰值計；PRTS 為陸服資料；說明文字無法解析的技能不計入。</li>
         <li>宿舍沿用單人推薦，不參與最佳化。</li>
       </ul>
@@ -283,7 +283,7 @@ function RecommendPanel({ state, isDemo, busy, catalog, base, onApply, onApplyLa
   const [optimizedWeights, setOptimizedWeights] = useState<ObjectiveWeights | null>(null);
   const generate = () => {
     setOptimizedWeights(weights);
-    const recommendation = recommendBase(base, catalog, state.roster, definitions);
+    const recommendation = recommendBase(base, catalog, state.roster, definitions, weights);
     setResult(recommendation); setOptimized(null); setRunning(true);
     // 讓畫面先顯示「計算中」，再進行整體最佳化（約數秒）。
     window.setTimeout(() => { try { setOptimized(optimizeBase(base, catalog, state.roster, definitions, { start: recommendation.assignments, timeBudgetMs: 6000, weights })); } finally { setRunning(false); } }, 30);

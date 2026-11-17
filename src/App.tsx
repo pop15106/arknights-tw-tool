@@ -215,7 +215,7 @@ export default function App() {
         <button type="button" className={`workspace-switch ${isDemo ? 'demo' : 'personal'}`} disabled={busy} onClick={() => openPanel('switch')}>
           <span className="workspace-dot"/><span><strong>{isDemo ? '示範工作區' : '個人工作區'}</strong><small>點此切換</small></span>
         </button>
-        <p>本機優先 · 無帳號連線<br/>版本 1.1.0</p>
+        <p>本機優先 · 無帳號連線<br/>版本 1.1.1</p>
       </div>
     </aside>
     <div className="main">

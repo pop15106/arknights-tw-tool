@@ -607,3 +607,26 @@ test('無人機用途：每架＝設施 3 分鐘產出，依赤金收支建議',
   assert.equal(result.options[1].perDrone.lmd, 100);
   assert.match(result.recommendation, /貿易站 1/, '赤金有剩 → 給貿易站');
 });
+
+test('功能設施：單人推薦也涵蓋會客室／辦公室／訓練室／加工站，權重為 0 時略過；訓練室只算協助位最高者', async () => {
+  const state = await demoState(), catalog = createDemoBaseCatalog();
+  const definitions = new Map(state.dataset.operators.map(op => [op.id, op]));
+  const add = (id: string, roomType: string, description: string, operator: string) => { catalog.skills[id] = { id, name: id, roomType, description }; catalog.operators[operator] = [[{ buffId: id, elite: 0, level: 1 }]]; };
+  add('m1', 'MEETING', '進駐會客室時，線索蒐集速度提升20%', 'demo-1');
+  add('h1', 'HIRE', '進駐人力辦公室時，人脈資源的聯絡速度+20%', 'demo-3');
+  add('t1', 'TRAINING', '進駐訓練室協助位時，重裝幹員的專精技能訓練速度+30%', 'demo-4');
+  add('t2', 'TRAINING', '進駐訓練室協助位時，重裝幹員的專精技能訓練速度+25%', 'demo-6');
+  add('w1', 'WORKSHOP', '進駐加工站加工精英材料時，副產品的產出機率提升70%', 'demo-5');
+  const facilities: Facility[] = [{ id: 'me', type: 'meeting', level: 3 }, { id: 'of', type: 'office', level: 3 }, { id: 'tr', type: 'training', level: 3 }, { id: 'ws', type: 'workshop', level: 3 }];
+  const base = { facilities, onlineSlots: [] };
+  const rec = recommendBase(base, catalog, state.roster, definitions);
+  const picks = (id: string) => rec.facilities.find(item => item.facilityId === id)!.picks.map(pick => pick.operatorId);
+  assert.deepEqual(picks('me'), ['demo-1']); assert.deepEqual(picks('of'), ['demo-3']); assert.deepEqual(picks('ws'), ['demo-5']);
+  assert.deepEqual(picks('tr'), ['demo-4'], '訓練室只推薦一位協助者');
+  const noClue = recommendBase(base, catalog, state.roster, definitions, { clue: 0 });
+  assert.deepEqual(noClue.facilities.find(item => item.facilityId === 'me')!.picks, []);
+  assert.match(noClue.facilities.find(item => item.facilityId === 'me')!.note ?? '', /不考慮/);
+  // 兩位協助技能同時在訓練室：只取最高者（30），不相加成 55。
+  const [, , tr] = evaluateBase({ ...base, training: { profession: '重裝' }, assignments: { tr: ['demo-4', 'demo-6'] } } as never, catalog, state.roster, definitions).facilities;
+  assert.equal(tr.totals.training, 30);
+});
