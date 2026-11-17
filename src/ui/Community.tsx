@@ -80,16 +80,23 @@ function useBuzz(enabled: boolean) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!enabled) return;
-    let active = true, timer: number | undefined;
+    let active = true, timer: number | undefined, failures = 0;
     const read = async () => {
       try {
         const response = await fetch('/api/game-data/buzz', { credentials: 'omit', redirect: 'error', cache: 'no-store' });
         if (!response.ok) throw new Error('最新討論暫時無法讀取，請確認本機資料服務已啟動。');
         const next = await response.json() as { running: boolean; error?: string; data: BuzzData | null };
         if (!active) return;
-        setState(next);
+        failures = 0; setError(''); setState(next);
         if (next.running) timer = window.setTimeout(() => void read(), 2000);
-      } catch (err) { if (active) setError(err instanceof Error ? err.message : '讀取失敗。'); }
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : '讀取失敗。');
+        // 抓取進行中時，一次讀取失敗不代表結束：稍後重試；連續失敗 5 次就放開按鈕，讓使用者自行重試。
+        failures++;
+        if (failures < 5) timer = window.setTimeout(() => void read(), 3000);
+        else setState(current => current ? { ...current, running: false } : current);
+      }
     };
     void read();
     return () => { active = false; window.clearTimeout(timer); };
