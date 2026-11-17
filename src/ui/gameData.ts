@@ -8,16 +8,27 @@ import type { GameEvent, Stage } from '../domain/stages';
 /* ------------------------------------------------------------------ */
 const cache = new Map<string, unknown>();
 const pending = new Map<string, Promise<unknown>>();
+// 每次清除快取就換一個世代：清除前就開始的讀取，完成時不能再寫回快取（避免舊資料蓋掉更新後的資料）。
+const generation = new Map<string, number>();
+let globalGeneration = 0;
+const currentGeneration = (key: string) => `${globalGeneration}:${generation.get(key) ?? 0}`;
 export function cachedLoad<T>(key: string, loader: () => Promise<T>): Promise<T> {
   if (cache.has(key)) return Promise.resolve(cache.get(key) as T);
   const running = pending.get(key) as Promise<T> | undefined;
   if (running) return running;
-  const next = loader().then(value => { cache.set(key, value); pending.delete(key); return value; }, err => { pending.delete(key); throw err; });
+  const started = currentGeneration(key);
+  const next = loader().then(value => {
+    if (currentGeneration(key) === started) { cache.set(key, value); pending.delete(key); }
+    return value;
+  }, err => { if (currentGeneration(key) === started) pending.delete(key); throw err; });
   pending.set(key, next);
   return next;
 }
 export const peekCache = <T,>(key: string): T | undefined => cache.get(key) as T | undefined;
-export function clearGameDataCache(key?: string) { if (key) { cache.delete(key); pending.delete(key); } else { cache.clear(); pending.clear(); } }
+export function clearGameDataCache(key?: string) {
+  if (key) { cache.delete(key); pending.delete(key); generation.set(key, (generation.get(key) ?? 0) + 1); }
+  else { cache.clear(); pending.clear(); globalGeneration++; }
+}
 
 /** 讀取分頁清單（關卡、活動），每頁最多 1000 筆。 */
 async function readList<T>(name: 'stages' | 'events', signal: AbortSignal): Promise<T[]> {
