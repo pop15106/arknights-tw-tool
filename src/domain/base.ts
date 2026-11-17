@@ -748,6 +748,8 @@ export function productMatches(effect: SkillEffect, facility: Pick<Facility, 'pr
 /** moods：各幹員目前心情（模擬用）。省略時視為班次開始、心情全滿；心情 0 者視為停工。 */
 /** elapsed：班次已經過的小時數（模擬用，影響隨時間爬升的技能）；省略時以 12 小時班的平均值計。 */
 export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, moods?: Readonly<Record<string, number>>, elapsed?: number, orderCounts?: Readonly<Record<string, number>>): BaseEvaluation {
+  /** 訓練室每位幹員的訓練加成（只取最高者，見 totals.training）。 */
+  const trainingByOp = new Map<string, number>();
   const rampValue = (effect: Extract<SkillEffect, { kind: 'ramp' }>, hours: number) => Math.min(effect.max, effect.first + effect.perHour * Math.max(0, Math.floor(hours)));
   const rampAverage = (effect: Extract<SkillEffect, { kind: 'ramp' }>) => { let sum = 0; for (let h = 0; h < 12; h++) sum += rampValue(effect, h); return round(sum / 12); };
   const nameOf = (id: string) => definitions.get(id)?.displayName ?? id;
@@ -911,7 +913,7 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
           else if (effect.kind === 'moodCost') result.totals.moodCost.push(effect.value);
           else if (effect.kind === 'clue') { if (!effect.alone || assigned.length === 1) result.totals.clue += effect.value; }
           else if (effect.kind === 'contact') result.totals.contact += effect.perDormLevel ? effect.value * dormLevels : effect.value;
-          else if (effect.kind === 'training') { if ((!effect.professions || (!!base.training?.profession && effect.professions.includes(base.training.profession))) && (!effect.atMastery || base.training?.mastery === effect.atMastery)) result.totals.training += effect.value; }
+          else if (effect.kind === 'training') { if ((!effect.professions || (!!base.training?.profession && effect.professions.includes(base.training.profession))) && (!effect.atMastery || base.training?.mastery === effect.atMastery)) { const key = `${result.facility.id}|${operatorId}`; trainingByOp.set(key, round((trainingByOp.get(key) ?? 0) + effect.value)); result.totals.training = Math.max(result.totals.training, trainingByOp.get(key)!); } }
           else if (effect.kind === 'byproduct') { if (formula ? (effect.target ? workshopMatches(effect.target, formula) : effect.category === 'any' || CATEGORY_TYPE[effect.category] === formula.type) : (effect.category === 'any' || effect.category === base.workshop)) result.totals.byproduct += effect.value; }
         }
         if (!applied && !(partner && !comboActive)) result.notApplicable.push({ operatorId, skill: skill.active });
@@ -1071,7 +1073,8 @@ export function evaluateBase(base: Settings['base'], catalog: BaseCatalog, roste
     else if (effect.kind === 'order') result.totals.order = round(result.totals.order + effect.value);
     else if (effect.kind === 'clue') result.totals.clue = round(result.totals.clue + effect.value);
     else if (effect.kind === 'contact') result.totals.contact = round(result.totals.contact + effect.value);
-    else if (effect.kind === 'training') result.totals.training = round(result.totals.training + effect.value);
+    // 訓練室只有協助位的技能生效：取最高者，不把兩人相加。
+    else if (effect.kind === 'training') { const key = `${result.facility.id}|${operatorId ?? ''}`; trainingByOp.set(key, round((trainingByOp.get(key) ?? 0) + effect.value)); result.totals.training = Math.max(result.totals.training, trainingByOp.get(key)!); }
     else if (effect.kind === 'byproduct') result.totals.byproduct = round(result.totals.byproduct + effect.value);
   };
   for (const result of facilities) for (const op of result.operators) for (const skill of op.skills) {
@@ -1228,11 +1231,18 @@ export interface FacilityRecommendation {
 }
 export interface BaseRecommendation { assignments: Record<string, string[]>; facilities: FacilityRecommendation[]; pool: number; picked: number }
 
-const RECOMMENDABLE: ReadonlySet<BaseRoomType> = new Set(['MANUFACTURE', 'TRADING', 'POWER', 'DORMITORY']);
+const RECOMMENDABLE: ReadonlySet<BaseRoomType> = new Set(['MANUFACTURE', 'TRADING', 'POWER', 'DORMITORY', 'MEETING', 'HIRE', 'TRAINING', 'WORKSHOP']);
+/** 單人推薦依權重調整各設施的排序；宿舍（心情恢復）不受權重影響。 */
+const roomWeight = (facility: Facility, weights: ObjectiveWeights) => facility.type === 'manufacturing' ? (facility.product === 'record' ? weights.record : weights.gold)
+  : facility.type === 'trading' ? weights.trading : facility.type === 'power' ? weights.power : facility.type === 'meeting' ? weights.clue
+  : facility.type === 'office' ? weights.contact : facility.type === 'training' ? weights.training : facility.type === 'workshop' ? weights.byproduct : 1;
 
-export function recommendBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>): BaseRecommendation {
+export function recommendBase(base: Settings['base'], catalog: BaseCatalog, roster: readonly OwnedOperator[], definitions: ReadonlyMap<string, OperatorDefinition>, weightsInput: Partial<ObjectiveWeights> = DEFAULT_WEIGHTS): BaseRecommendation {
+  const weights = { ...DEFAULT_WEIGHTS, ...weightsInput };
   const rooms = new Map(catalog.rooms.map(room => [room.id, room]));
-  const capacity = (facility: Facility) => rooms.get(ROOM_OF[facility.type])?.phases[facility.level - 1]?.maxStationedNum ?? 0;
+  const roomCapacity = (facility: Facility) => rooms.get(ROOM_OF[facility.type])?.phases[facility.level - 1]?.maxStationedNum ?? 0;
+  // 訓練室兩格是「協助位＋受訓幹員」，只有協助位的技能生效，所以只推薦一位協助者。
+  const capacity = (facility: Facility) => facility.type === 'training' ? Math.min(1, roomCapacity(facility)) : roomCapacity(facility);
   const owned = roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false));
   // 每座可推薦設施的完整候選（含分數），之後全域依分數由高到低分配，避免先處理的設施搶走更適合別處的人。
   type Option = RecommendationPick & { order: number; perSeat: number; partner?: RecommendationPick };
@@ -1259,7 +1269,17 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
     if (!RECOMMENDABLE.has(ROOM_OF[facility.type])) return;
     const list = candidatesFor(facility, catalog, owned, definitions, new Set());
     candidateLists.set(facility.id, list);
-    for (const item of list) if (item.state === 'ready' && item.score > 0) options.push({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, perSeat: item.score, summary: item.summary, order });
+    const weight = roomWeight(facility, weights);
+    if (weight <= 0) return;
+    // 已選訓練職業／加工配方時，用實際評估的加成排序（職業或配方不符的技能算 0）；未選時才用技能數值粗略參考。
+    const selected = facility.type === 'training' ? !!base.training?.profession : facility.type === 'workshop' ? !!(base.workshop || base.workshopFormula) : false;
+    const actual = (operatorId: string) => {
+      const result = evaluateBase({ ...base, facilities: [facility], assignments: { [facility.id]: [operatorId] } }, catalog, owned, definitions).facilities[0];
+      return facility.type === 'training' ? result.totals.training : result.workshop ? result.workshop.efficiency : result.totals.byproduct;
+    };
+    if (selected) for (const item of list) if (item.state === 'ready') item.score = round(actual(item.operatorId));
+    if (selected) list.sort((a, b) => b.score - a.score);
+    for (const item of list) if (item.state === 'ready' && item.score > 0) options.push({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, perSeat: item.score * weight, summary: item.summary, order });
     // 搭檔組合：兩人同房的總分換算成每個位置的分數，與單人候選一起排序。
     for (const row of owned) {
       for (const slot of catalog.operators[row.operatorId] ?? []) {
@@ -1271,7 +1291,7 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
         const self = value(row, facility, partnerName), mate = value(partnerRow, facility, nameOf(row.operatorId));
         const total = round(self + mate);
         if (total <= Math.max(value(row, facility), value(partnerRow, facility))) continue;
-        options.push({ facilityId: facility.id, operatorId: row.operatorId, name: nameOf(row.operatorId), score: self, perSeat: total / 2, summary: `${active!.name}（與${partnerName}同房）`, order,
+        options.push({ facilityId: facility.id, operatorId: row.operatorId, name: nameOf(row.operatorId), score: self, perSeat: total / 2 * weight, summary: `${active!.name}（與${partnerName}同房）`, order,
           partner: { facilityId: facility.id, operatorId: partnerId, name: partnerName!, score: mate, summary: `搭配${nameOf(row.operatorId)}` } });
       }
     }
@@ -1306,13 +1326,15 @@ export function recommendBase(base: Settings['base'], catalog: BaseCatalog, rost
   const facilities = base.facilities.map((facility, index): FacilityRecommendation => {
     const label = labels[index].label;
     if (!RECOMMENDABLE.has(ROOM_OF[facility.type])) return { facilityId: facility.id, label, picks: [], alternatives: [], maybe: [], note: `${FACILITY_LABEL[facility.type]}的技能多為跨設施或條件效果，無法用可追溯數值比較，因此不推薦人選。` };
+    if (roomWeight(facility, weights) <= 0) return { facilityId: facility.id, label, picks: [], alternatives: [], maybe: [], note: `${FACILITY_LABEL[facility.type]}的權重設為「不考慮」，因此不推薦人選。` };
     const list = candidateLists.get(facility.id) ?? [];
     const alternatives = list.filter(item => item.state === 'ready' && item.score > 0 && !assignments[facility.id].includes(item.operatorId)).slice(0, 3)
       .map(item => ({ facilityId: facility.id, operatorId: item.operatorId, name: item.name, score: item.score, summary: used.has(item.operatorId) ? `${item.summary}（已排在其他設施）` : item.summary }));
     const maybe = list.filter(item => item.state === 'unknown').slice(0, 3).map(item => ({ operatorId: item.operatorId, name: item.name, summary: item.summary }));
     const chosen = picks.get(facility.id) ?? [];
     const open = capacity(facility) - chosen.length;
-    const note = open > 0 ? `還有 ${open} 個空位沒有可計算技能的人選${ROOM_OF[facility.type] === 'MANUFACTURE' || ROOM_OF[facility.type] === 'TRADING' ? '；放任何幹員都有基礎加成' : ''}。` : undefined;
+    const extra = facility.type === 'training' ? '只推薦協助位；另一格是要專精的受訓幹員，請自行安排。加成依「訓練職業」設定，未設定職業時只能參考。' : '';
+    const note = open > 0 ? `還有 ${open} 個空位沒有可計算技能的人選${ROOM_OF[facility.type] === 'MANUFACTURE' || ROOM_OF[facility.type] === 'TRADING' ? '；放任何幹員都有基礎加成' : ''}。${extra}` : extra || undefined;
     return { facilityId: facility.id, label, picks: chosen, alternatives, maybe, note };
   });
   return { assignments, facilities, pool: owned.length, picked: used.size };
@@ -1538,11 +1560,12 @@ export function optimizeBase(base: Settings['base'], catalog: BaseCatalog, roste
   const deadline = Date.now() + (options.timeBudgetMs ?? 4000);
   const owned = roster.filter(row => !(row.fields.owned?.status === 'known' && row.fields.owned.value === false));
   const rooms = new Map(catalog.rooms.map(room => [room.id, room]));
-  const capacity = (facility: Facility) => rooms.get(ROOM_OF[facility.type])?.phases[facility.level - 1]?.maxStationedNum ?? 0;
+  // 訓練室只排協助位（另一格是受訓幹員，由使用者決定）。
+  const capacity = (facility: Facility) => { const seats = rooms.get(ROOM_OF[facility.type])?.phases[facility.level - 1]?.maxStationedNum ?? 0; return facility.type === 'training' ? Math.min(1, seats) : seats; };
   const characterOf = (id: string) => catalog.meta?.[id]?.character ?? id;
   // 宿舍維持推薦結果（恢復效果不在整體效益內），其餘設施參與搜尋。
   const searchable = base.facilities.filter(facility => facility.type !== 'dormitory' && capacity(facility) > 0);
-  const start = options.start ?? recommendBase(base, catalog, owned, definitions).assignments;
+  const start = options.start ?? recommendBase(base, catalog, owned, definitions, options.weights).assignments;
   let current: Record<string, string[]> = Object.fromEntries(base.facilities.map(facility => [facility.id, [...(start[facility.id] ?? [])].slice(0, capacity(facility))]));
   let evaluations = 0;
   // 製造站產品也是搜尋的一部分：權重偏重龍門幣時可能多開赤金站，偏重經驗時則相反。
