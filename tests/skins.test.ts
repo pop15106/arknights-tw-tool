@@ -15,6 +15,10 @@ test('時裝清單只收有名稱的時裝；檔名規則與台服 skin_table �
   assert.equal(skinPortraitId('char_002_amiya@winter#1'), 'char_002_amiya_winter#1');
   assert.equal(skinFileName('char_002_amiya@winter#1'), 'char_002_amiya_winter-1.png');
   assert.ok(!SKIN_ID.test('char_002_amiya#1'));
+  // 結尾帶 + 的時裝：檔名只能用預覽伺服器接受的字元（與 vite.config.ts 的規則一致）。
+  const plus = skinFileName('char_002_amiya@winter#1+');
+  assert.equal(plus, 'char_002_amiya_winter-1p.png');
+  assert.match(plus, /^[A-Za-z0-9_.-]+\.png$/u);
 });
 
 test('服裝設定：只接受該幹員自己的時裝 ID', async () => {

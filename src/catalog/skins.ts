@@ -5,9 +5,9 @@ export type SkinCatalog = Record<string, OperatorSkin[]>;
 /** 時裝 ID，例如 char_002_amiya@winter#1。 */
 export const SKIN_ID = /^char_[A-Za-z0-9_]+@[A-Za-z0-9_]+#\d+\+?$/u;
 
-/** 立繪檔名規則：時裝 ID 的 @ 換成 _（台服 484 套全部符合）；本機檔名再把 # 換成 -，避免網址錨點。 */
+/** 立繪檔名規則：時裝 ID 的 @ 換成 _（台服 484 套全部符合）；本機檔名再把 # 換成 -、+ 換成 p，只用預覽伺服器接受的字元。 */
 export const skinPortraitId = (skinId: string) => skinId.replace('@', '_');
-export const skinFileName = (skinId: string) => `${skinPortraitId(skinId).replace(/#/gu, '-')}.png`;
+export const skinFileName = (skinId: string) => `${skinPortraitId(skinId).replace(/#/gu, '-').replace(/\+/gu, 'p')}.png`;
 
 export function buildSkinCatalog(table: unknown): SkinCatalog {
   const skins = (table as { charSkins?: Record<string, { skinId?: unknown; charId?: unknown; displaySkin?: { skinName?: unknown; skinGroupName?: unknown } | null }> })?.charSkins ?? {};
