@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { OperatorDefinition, OwnedOperator } from './domain/model';
 import { isOriginalModule, moduleProblems } from './domain/module-consistency';
+import { SKIN_ID, skinFileName, type OperatorSkin, type SkinCatalog } from './catalog/skins';
 
 const PORTRAIT_PATH = /^\/assets\/operators\/[A-Za-z0-9_.-]+\.png$/u;
 /**
- * 依精英階段顯示立繪：精英 2 用 {id}_2，其餘用 {id}_1；檔案還沒同步或不存在時，依序退回預設肖像。
+ * 立繪優先順序：選擇的時裝 → 依精英階段（精英 2 用 {id}_2，其餘 {id}_1）→ 預設肖像；檔案不存在就往下一個。
  */
-export function OperatorPortrait({ definition, large = false, elite }: { definition: OperatorDefinition; large?: boolean; elite?: number }) {
+export function OperatorPortrait({ definition, large = false, elite, skin }: { definition: OperatorDefinition; large?: boolean; elite?: number; skin?: string }) {
   const base = definition.portrait;
   const sources = [
+    ...(skin && SKIN_ID.test(skin) && skin.startsWith(`${definition.id}@`) ? [`/assets/operators/${skinFileName(skin)}`] : []),
     ...(base && PORTRAIT_PATH.test(base) && /^char_[A-Za-z0-9_.-]+$/u.test(definition.id) ? [...(elite === 2 ? [`/assets/operators/${definition.id}_2.png`] : []), `/assets/operators/${definition.id}_1.png`] : []),
     ...(typeof base === 'string' && PORTRAIT_PATH.test(base) ? [base] : []),
   ];
@@ -110,12 +112,12 @@ function ModuleDescription({ module, row }: { module: Module; row: OwnedOperator
   </article>;
 }
 
-export function OperatorEncyclopedia({ definition, row }: { definition: OperatorDefinition; row: OwnedOperator }) {
+export function OperatorEncyclopedia({ definition, row, skin }: { definition: OperatorDefinition; row: OwnedOperator; skin?: string }) {
   const talents = definition.talents ?? [];
   const originalModulesOnly = definition.modules.length > 0 && definition.modules.every(isOriginalModule);
   const confirmed = ['elite', 'level', 'potential'].every(field => row.fields[field]?.manuallyConfirmed);
   return <section className="operator-encyclopedia" aria-label="幹員資料與能力說明">
-    <div className={`encyclopedia-profile rarity-${definition.rarity}`}><OperatorPortrait definition={definition} large elite={knownNumber(row, 'elite')}/><div><span className="operator-rarity" role="img" aria-label={`${definition.rarity} 星`}>{'★'.repeat(definition.rarity)}</span><h3>{definition.displayName}</h3><p>{definition.profession} · {definition.branch}<br/>{definition.faction}</p></div></div>
+    <div className={`encyclopedia-profile rarity-${definition.rarity}`}><OperatorPortrait definition={definition} large elite={knownNumber(row, 'elite')} skin={skin}/><div><span className="operator-rarity" role="img" aria-label={`${definition.rarity} 星`}>{'★'.repeat(definition.rarity)}</span><h3>{definition.displayName}</h3><p>{definition.profession} · {definition.branch}<br/>{definition.faction}</p></div></div>
     <h3>技能說明</h3><p className="fine-print">選擇等級可查看資料包的中文說明；切換說明不會改變你的養成紀錄，也不代表已解鎖或已專精。</p>
     <div className="encyclopedia-list">{definition.skills.map(skill => <SkillDescription key={`${row.operatorId}-${skill.id}`} skill={skill} row={row}/>)}</div>
     <h3 className="encyclopedia-subheading">天賦與解鎖條件</h3><p className="fine-print">以下保留資料包中的各條件版本，不代表全部同時生效或可相加。條件依目前紀錄比對；未知養成值不視為已達成。</p>
@@ -228,4 +230,43 @@ function PortraitSync() {
     {(error || job?.error) && <p role="alert" className="toast error">{error || job?.error}</p>}
     <button type="button" className="button secondary" disabled={job?.running} onClick={() => void start()}>{job?.running ? '同步中…' : '同步幹員立繪'}</button>
   </div>;
+}
+
+let skinCache: Promise<SkinCatalog> | null = null;
+function loadSkinCatalog(): Promise<SkinCatalog> {
+  skinCache ??= fetch('/api/game-data/skins', { credentials: 'omit', redirect: 'error', cache: 'no-store' })
+    .then(async response => { if (!response.ok) throw new Error('無法取得服裝清單，請確認本機資料服務已啟動並可連線。'); return await response.json() as SkinCatalog; })
+    .catch(error => { skinCache = null; throw error; });
+  return skinCache;
+}
+
+/** 服裝選擇：資料裡看不到你穿哪套，所以手動選；選了才下載那一套的立繪。 */
+export function OutfitPicker({ definition, skin, busy, onChange }: { definition: OperatorDefinition; skin?: string; busy: boolean; onChange: (skin: string | null) => void }) {
+  const [skins, setSkins] = useState<OperatorSkin[] | null>(null);
+  const [message, setMessage] = useState('');
+  const [working, setWorking] = useState(false);
+  useEffect(() => {
+    let active = true;
+    loadSkinCatalog().then(catalog => { if (active) setSkins(catalog[definition.id] ?? []); }, error => { if (active) { setSkins([]); setMessage(error instanceof Error ? error.message : '無法取得服裝清單。'); } });
+    return () => { active = false; };
+  }, [definition.id]);
+  const choose = async (value: string) => {
+    setMessage('');
+    if (!value) { onChange(null); return; }
+    setWorking(true);
+    try {
+      const response = await fetch(`/api/game-data/skin-portrait?id=${encodeURIComponent(value)}`, { method: 'POST', headers: { 'X-Game-Data-Sync': '1' }, credentials: 'omit', redirect: 'error', cache: 'no-store' });
+      if (!response.ok) throw new Error('這套服裝的立繪下載失敗，請稍後再試。');
+      onChange(value);
+    } catch (error) { setMessage(error instanceof Error ? error.message : '下載失敗。'); } finally { setWorking(false); }
+  };
+  if (skins && !skins.length && !message) return <p className="fine-print outfit-picker">這位幹員在台服沒有時裝。</p>;
+  return <label className="outfit-picker">
+    <span>目前服裝</span>
+    <select className="text-input" value={skin ?? ''} disabled={busy || working || !skins} onChange={event => void choose(event.currentTarget.value)}>
+      <option value="">預設（依精英化階段）</option>
+      {(skins ?? []).map(item => <option key={item.id} value={item.id}>{item.name}{item.group ? `（${item.group}）` : ''}</option>)}
+    </select>
+    <small className="fine-print">{working ? '下載立繪中…' : message || '遊戲資料看不到你穿哪套，請手動選擇；只會下載你選的那套。'}</small>
+  </label>;
 }

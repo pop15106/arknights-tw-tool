@@ -16,13 +16,13 @@ function stat(row: OwnedOperator, field: string): { text: string; unknown: boole
   return { text: valueText(evidence), unknown };
 }
 
-function OperatorCard({ row, definition, isDemo, onOpen }: { row: OwnedOperator; definition: OperatorDefinition; isDemo: boolean; onOpen: () => void }) {
+function OperatorCard({ row, definition, isDemo, skin, onOpen }: { row: OwnedOperator; definition: OperatorDefinition; isDemo: boolean; skin?: string; onOpen: () => void }) {
   const missing = missingCount(row, definition), unverified = unverifiedCount(row, definition);
   const elite = stat(row, 'elite'), level = stat(row, 'level'), skill = stat(row, 'skillLevel');
   return <article className={`operator-card rarity-${definition.rarity}`} data-testid="operator-card">
     <button type="button" className="operator-card-hit" aria-label={`檢視與修正 ${definition.displayName}（${definition.profession}）`} onClick={onOpen}/>
     <div className="operator-art">
-      <OperatorPortrait definition={definition} elite={eliteValue(row)}/>
+      <OperatorPortrait definition={definition} elite={eliteValue(row)} skin={skin}/>
       <span className="operator-stars" role="img" aria-label={`${definition.rarity} 星`}>{'★'.repeat(definition.rarity)}</span>
       <span className="operator-profession">{definition.profession}</span>
     </div>
@@ -91,7 +91,7 @@ export function RosterPage({ state, isDemo, busy, onOpen, onImport, onPreviewDem
       </div>
     </div>
     {pageCount > 1 && pagination('上方')}
-    {filtered.length ? <div className="roster-grid">{visible.map(({ row, definition }) => <OperatorCard key={row.operatorId} row={row} definition={definition} isDemo={isDemo} onOpen={() => onOpen(row.operatorId)}/>)}</div>
+    {filtered.length ? <div className="roster-grid">{visible.map(({ row, definition }) => <OperatorCard key={row.operatorId} row={row} definition={definition} isDemo={isDemo} skin={state.settings.skins?.[row.operatorId]} onOpen={() => onOpen(row.operatorId)}/>)}</div>
       : <div className="empty-inline"><strong>沒有符合條件的幹員</strong><span>試著調整名稱、職業、星級、精英階段或資料狀態。</span></div>}
     {pageCount > 1 && pagination('下方')}
     <p className="page-caption">本機 IndexedDB 保存，請定期匯出備份 · 資料集 {state.dataset.metadata.version} · 格式 v{state.schemaVersion}</p>

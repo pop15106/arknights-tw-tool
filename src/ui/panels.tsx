@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { fieldKeys, MAX_IMPORT_BYTES, unknown, type AppState, type Evidence, type FieldConflict, type OperatorDefinition, type OwnedOperator } from '../domain/model';
 import type { ImportPreview } from '../domain/import';
 import { missingCount } from '../domain/roster-query';
-import { OperatorEncyclopedia, OperatorPortrait } from '../OperatorEncyclopedia';
+import { OperatorEncyclopedia, OperatorPortrait, OutfitPicker } from '../OperatorEncyclopedia';
 import { ReferenceDetails } from '../ReferenceDetails';
 import { ScreenshotReview } from '../ScreenshotReview';
 import { FieldEditor } from './FieldEditor';
@@ -155,8 +155,9 @@ export function PreviewPanel({ preview, busy, notice, onClose, onAccept }: { pre
   </Modal>;
 }
 
-export function DetailPanel({ definition, row, personal, revision, busy, notice, onClose, onBatch, onPreview }: {
+export function DetailPanel({ definition, row, personal, revision, busy, notice, skin, onSkin, onClose, onBatch, onPreview }: {
   definition: OperatorDefinition; row: OwnedOperator; personal: boolean; revision: number; busy: boolean; notice: NoticeValue;
+  skin?: string; onSkin?: (skin: string | null) => void;
   onClose: () => void; onBatch: () => void; onPreview: (field: string, evidence: Evidence) => void;
 }) {
   const [tab, setTab] = useState<'ability' | 'fields'>('ability');
@@ -169,7 +170,7 @@ export function DetailPanel({ definition, row, personal, revision, busy, notice,
       <button type="button" role="tab" aria-selected={tab === 'ability'} className={tab === 'ability' ? 'active' : ''} onClick={() => setTab('ability')}>能力與圖鑑</button>
       <button type="button" role="tab" aria-selected={tab === 'fields'} className={tab === 'fields' ? 'active' : ''} onClick={() => setTab('fields')}>養成紀錄與修正</button>
     </div>
-    {tab === 'ability' ? <ReferenceDetails key={`${row.operatorId}-${revision}`} definition={definition} row={row} personal={personal}/> : <>
+    {tab === 'ability' ? <>{personal && onSkin && <OutfitPicker definition={definition} skin={skin} busy={busy} onChange={onSkin}/>}<ReferenceDetails key={`${row.operatorId}-${revision}`} definition={definition} row={row} personal={personal} skin={skin}/></> : <>
       <p className="fine-print">每個欄位可獨立改為已知、未知或不適用。修正先進入候選預覽，接受後保留人工來源；這是例外修正流程，大量調整請用批次修正。</p>
       <div className="evidence-list">{fieldKeys(definition).map(field => <FieldEditor key={`${row.operatorId}-${field}-${revision}`} field={field} evidence={row.fields[field] ?? unknown('來源未提供此欄位')} definition={definition} busy={busy} onPreview={onPreview}/>)}</div>
     </>}

@@ -3,7 +3,7 @@ import type { OperatorDefinition, OwnedOperator } from './domain/model';
 import { loadReferenceDataset } from './importers/local-file';
 import { OperatorEncyclopedia } from './OperatorEncyclopedia';
 
-export function ReferenceDetails({ definition, row, personal }: { definition: OperatorDefinition; row: OwnedOperator; personal: boolean }) {
+export function ReferenceDetails({ definition, row, personal, skin }: { definition: OperatorDefinition; row: OwnedOperator; personal: boolean; skin?: string }) {
   const [reference, setReference] = useState<OperatorDefinition | null>(null);
   const [status, setStatus] = useState(personal ? '正在讀取本機圖鑑…' : '示範資料');
   const [attempt, setAttempt] = useState(0);
@@ -28,6 +28,6 @@ export function ReferenceDetails({ definition, row, personal }: { definition: Op
   }, [personal, definition.id, attempt]);
   return <>
     {personal && <p className="fine-print" role="status">{status}{failed && <button type="button" className="button ghost small" onClick={() => setAttempt(value => value + 1)}>重新載入說明</button>}</p>}
-    <OperatorEncyclopedia key={`${definition.id}-${reference ? 'reference' : 'saved'}`} definition={reference ?? definition} row={row}/>
+    <OperatorEncyclopedia key={`${definition.id}-${reference ? 'reference' : 'saved'}`} definition={reference ?? definition} row={row} skin={skin}/>
   </>;
 }

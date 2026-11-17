@@ -2,6 +2,7 @@ import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/pro
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { buildSkinCatalog, SKIN_ID, skinFileName, skinPortraitId, type SkinCatalog } from '../src/catalog/skins.ts';
 import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DATA_COMMIT, type GameDataSnapshot, type GameDataTables } from '../src/catalog/build.ts';
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
 import { parseTradingWikitext, PRTS_TRADING_API, validateTradingParams, type TradingParams } from '../src/catalog/trading.ts';
@@ -257,7 +258,31 @@ export function createGameDataStore(options: {
     }));
     return result;
   }
-  return { syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
+  /** 台服時裝清單：第一次讀取時下載 skin_table，整理成精簡清單快取在本機。 */
+  async function loadSkins(): Promise<SkinCatalog> {
+    const file = path.join(cache, `skins-${MODULE_DATA_COMMIT}.json`);
+    try { return JSON.parse(await readFile(file, 'utf8')) as SkinCatalog; } catch { /* 沒有快取 */ }
+    const table = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/skin_table.json`, 24 * 1024 * 1024)).toString('utf8'));
+    const catalog = buildSkinCatalog(table);
+    await mkdir(cache, { recursive: true });
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(catalog), { flag: 'wx' }); await rename(temporary, file);
+    return catalog;
+  }
+  /** 下載單一時裝立繪（選擇服裝時才抓，不一次下載全部 484 套）。 */
+  async function skinPortrait(skinId: string): Promise<string> {
+    if (!SKIN_ID.test(skinId)) throw new Error('時裝 ID 無效。');
+    const target = path.join(assets, skinFileName(skinId));
+    if (!(await fileExists(target))) {
+      const image = await bytes(`${PORTRAIT_SOURCE}/${encodeURIComponent(skinPortraitId(skinId))}.png`, 2 * 1024 * 1024);
+      if (!image.subarray(0, 8).equals(PNG)) throw new Error('立繪來源未回傳 PNG。');
+      await mkdir(assets, { recursive: true });
+      const temporary = `${target}.${crypto.randomUUID()}.tmp`;
+      await writeFile(temporary, image, { flag: 'wx' }); await rename(temporary, target);
+    }
+    return `/assets/operators/${skinFileName(skinId)}`;
+  }
+  return { loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
 }
 
 const defaultStore = createGameDataStore();
@@ -270,3 +295,5 @@ export const stageEnemiesData = defaultStore.stageEnemies;
 export const loadCnEventsData = defaultStore.loadCnEvents;
 export const rogueAnalysisData = defaultStore.rogueAnalysis;
 export const syncPortraitsData = defaultStore.syncPortraits;
+export const loadSkinsData = defaultStore.loadSkins;
+export const skinPortraitData = defaultStore.skinPortrait;

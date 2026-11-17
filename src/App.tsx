@@ -249,6 +249,8 @@ export default function App() {
     {panel === 'import' && <ImportPanel isDemo={isDemo} busy={busy} notice={panelNotice} onClose={closePanel} onFile={importFile} onText={importText} onPreviewDemo={previewDemo}/>}
     {panel === 'preview' && preview && <PreviewPanel preview={preview} busy={busy} notice={panelNotice} onClose={closePanel} onAccept={acceptImport}/>}
     {panel === 'detail' && selectedRow && selectedDefinition && <DetailPanel definition={selectedDefinition} row={selectedRow} personal={!isDemo} revision={state.revision} busy={busy} notice={panelNotice} onClose={closePanel} onPreview={previewManual}
+      skin={state.settings.skins?.[selectedRow.operatorId]}
+      onSkin={skin => void run(async () => { const skins = { ...(state.settings.skins ?? {}) }; if (skin) skins[selectedRow.operatorId] = skin; else delete skins[selectedRow.operatorId]; const { skins: _old, ...rest } = state.settings; await persist({ ...state, revision: state.revision + 1, settings: Object.keys(skins).length ? { ...rest, skins } : rest }, state.revision); })}
       onBatch={() => { setBatchInitialId(selectedRow.operatorId); setPanel(null); setPage('批次修正'); window.scrollTo({ top: 0 }); }}/>}
     {panel === 'restore' && restored && <RestorePanel state={state} restored={restored.state} isDemo={isDemo} busy={busy} notice={panelNotice} onClose={closePanel} onBackup={downloadBackup}
       onConfirm={() => void run(async () => { if (state.revision !== restored.baseRevision) throw new Error('復原預覽已過期，請重新選取備份。'); await persist({ ...restored.state, profileId: state.profileId, revision: state.revision + 1 }, restored.baseRevision); setPanel(null); setRestored(null); setNotice({ text: '備份已通過驗證並以交易取代目前工作區，修訂版本已遞增。', error: false }); })}/>}
