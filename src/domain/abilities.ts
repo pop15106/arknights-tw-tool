@@ -48,7 +48,9 @@ const RULES: { key: AbilityKey; test: RegExp }[] = [
   { key: 'eliteBonus', test: /(?:精英|領袖)敵人[^。]{0,16}(?:傷害|攻擊力)/u },
 ];
 const AOE = /至多(\d+)個|範圍內(?:的)?所有|周圍(?:的)?(?:所有)?敵人|多個目標|同時攻擊(\d+)|爆炸|擴散|濺射|全體|所有敵人/u;
-const SELF_OR_IMMUNE = /自身|自己|免疫|不受|抵抗|無法被/u;
+// 「自身」只在句子沒有敵人／目標時才算自身代價（「自身周圍的敵人」仍是對敵人）。
+const IMMUNE = /免疫|不受|抵抗|無法被/u;
+const selfOrImmune = (clause: string) => IMMUNE.test(clause) || /自身|自己/u.test(clause) && !/敵人|目標|敵方/u.test(clause);
 const ALLY = /友方|隊友|所有[^，。]{0,6}幹員|周圍[^，。]{0,4}幹員/u;
 
 /** 解析一段文字（技能某等級、天賦或模組效果）。 */
@@ -58,7 +60,7 @@ export function parseAbilityText(text: string, source: AbilitySource): Ability[]
   const clauses = clean.split(/[，。；]/u);
   for (const rule of RULES) {
     // 控場類要確認對象是敵人：排除「自身暈眩」這類代價，以及「免疫暈眩」這類抗性描述。
-    const hit = CONTROL.includes(rule.key) ? clauses.some(clause => rule.test.test(clause) && !SELF_OR_IMMUNE.test(clause)) : rule.test.test(clean);
+    const hit = CONTROL.includes(rule.key) ? clauses.some(clause => rule.test.test(clause) && !selfOrImmune(clause)) : rule.test.test(clean);
     if (hit) out.push({ key: rule.key, source, text: clean });
   }
   // 群攻要是攻擊敵人：排除「範圍內所有友方幹員」這類多目標增益或治療。

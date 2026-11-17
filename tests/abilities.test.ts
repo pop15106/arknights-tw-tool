@@ -24,6 +24,8 @@ test('能力解析：自身暈眩、免疫暈眩不算控場', () => {
   assert.ok(!keys('攻擊力+200%，技能結束後自身暈眩10秒').includes('stun'));
   assert.ok(!keys('免疫暈眩與凍結').includes('stun'));
   assert.ok(keys('攻擊力+200%，使目標暈眩2秒，技能結束後自身暈眩10秒').includes('stun'));
+  assert.ok(keys('使自身周圍的敵人暈眩2秒').includes('stun'));
+  assert.ok(keys('自身攻擊範圍內的敵人移動速度降低50%').includes('slow'));
 });
 
 test('能力解析：隱匿要分清楚是「自己隱匿」還是「看穿隱匿」', () => {
