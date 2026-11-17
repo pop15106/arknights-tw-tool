@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { OperatorDefinition, OwnedOperator } from './domain/model';
 import { isOriginalModule, moduleProblems } from './domain/module-consistency';
+import { clearGameDataCache } from './ui/gameData';
 import { SKIN_ID, skinFileName, type OperatorSkin, type SkinCatalog } from './catalog/skins';
 
 const PORTRAIT_PATH = /^\/assets\/operators\/[A-Za-z0-9_.-]+\.png$/u;
@@ -167,6 +168,8 @@ export function GameDataSettings() {
       if (sync) {
         const response = await fetch('/api/game-data/sync', { method: 'POST', headers: { 'X-Game-Data-Sync': '1' }, credentials: 'omit', redirect: 'error', signal: current.signal, cache: 'no-store' });
         if (!response.ok) throw new Error('更新未完成。原有遊戲資料仍會保留，請稍後重試。');
+        // 資料已更新：丟掉各頁已讀進來的遊戲資料，回到基建、養成、關卡時重新讀取。
+        clearGameDataCache();
       }
       const response = await fetch('/api/game-data/status', { credentials: 'omit', redirect: 'error', signal: current.signal, cache: 'no-store' });
       if (!response.ok) throw new Error('暫時無法讀取遊戲資料狀態，請確認本機資料服務已啟動。');
