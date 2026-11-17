@@ -181,6 +181,13 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .sidebar {
   position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: 24px;
   padding: 20px 14px; border-right: 1px solid var(--line); background: var(--surface);
+  /* 視窗較矮時（例如被工作列擋住）可以捲動，底部的工作區與版本資訊不會被切掉。 */
+  overflow-y: auto; overscroll-behavior: contain;
+}
+@media (max-height: 820px) {
+  .sidebar { gap: 14px; padding-top: 14px; padding-bottom: 14px; }
+  .sidebar .nav-item small { display: none; }
+  .sidebar-footer { gap: 8px; }
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; }
 .brand-mark {
@@ -998,3 +1005,26 @@ h2 { font-weight: 800; }
 .synergy-card.owned { outline: 2px solid rgba(46, 160, 67, .45); }
 .buzz-section { margin: 16px 0; padding-top: 12px; border-top: 1px solid var(--line, rgba(0,0,0,.12)); } .buzz-section h4 { margin: 0; }
 .buzz-rank { margin: 6px 0; padding-left: 22px; line-height: 1.7; }
+/* 新手導覽 */
+.guide-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; }
+.guide-hero h2 { margin: 2px 0 10px; }
+.guide-chibi { display: grid; place-items: end center; overflow: hidden; flex: none; }
+.guide-chibi video { display: block; width: 100%; height: auto; transform: scale(1.35); transform-origin: 50% 80%; pointer-events: none; }
+.guide-mascot { animation: guide-sway 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes guide-sway { 0%, 100% { transform: rotate(-4deg) translateY(0); } 50% { transform: rotate(4deg) translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .guide-mascot { animation: none; } }
+.guide-bubble { position: relative; background: var(--surface-2, #fff); border: 2px solid var(--line); border-radius: 16px; padding: 12px 14px; margin: 6px 0 10px; }
+.guide-bubble::before { content: ''; position: absolute; left: -10px; top: 18px; border: 8px solid transparent; border-right-color: var(--line); }
+.guide-bubble strong { display: block; font-size: .85em; color: var(--accent, #e8590c); margin-bottom: 4px; }
+.guide-bubble p { margin: 0 0 6px; line-height: 1.6; }
+.guide-quote { font-size: .92em; color: var(--muted, #6b5b4b); }
+.guide-quote small { display: block; font-size: .8em; color: var(--faint); }
+.guide-dots { display: flex; gap: 6px; margin: 6px 0 10px; }
+.guide-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.guide-dots span.active { background: var(--accent, #e8590c); width: 20px; border-radius: 4px; }
+.guide-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: .9em; }
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 14px; }
+.guide-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px; border: 2px solid var(--line); border-radius: var(--radius, 16px); background: var(--surface); }
+.guide-card .eyebrow { margin: 0; }
+.guide-faq-list { display: grid; gap: 6px; }
+@media (max-width: 640px) { .guide-hero, .guide-card { grid-template-columns: 1fr; justify-items: center; } .guide-bubble::before { display: none; } }

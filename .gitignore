@@ -4,6 +4,7 @@ coverage/
 .local/
 private-fixtures/
 public/assets/operators/
+public/assets/guide/
 test-results/
 .serena/
 __pycache__/

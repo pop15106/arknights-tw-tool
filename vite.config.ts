@@ -6,19 +6,26 @@ import { defineConfig, type Plugin } from 'vite';
 // 建置版（npm run start:fast／preview）只提供建置當下的 dist，之後下載的圖片會 404；
 // 這裡讓預覽伺服器直接讀 public 資料夾，更新資料後不用重新建置就看得到。
 const PORTRAIT = /^\/([A-Za-z0-9_.-]+\.png)(?:\?.*)?$/u;
+const GUIDE_FILE = /^\/([A-Za-z0-9_.-]+\.(webm|mp3))(?:\?.*)?$/u;
+function serveFrom(directory: string, pattern: RegExp, types: Record<string, string>) {
+  return (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: () => void) => {
+    const match = pattern.exec(req.url ?? '');
+    const name = match?.[1];
+    if (!name || name.includes('..') || (req.method !== 'GET' && req.method !== 'HEAD')) { next(); return; }
+    readFile(path.join(directory, name)).then(data => {
+      res.writeHead(200, { 'Content-Type': types[name.split('.').pop()!] ?? 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
+      res.end(req.method === 'HEAD' ? undefined : data);
+    }, () => next());
+  };
+}
 function livePortraits(): Plugin {
-  const directory = path.resolve(import.meta.dirname, 'public/assets/operators');
+  const root = import.meta.dirname;
   return {
     name: 'live-operator-portraits',
     configurePreviewServer(server) {
-      server.middlewares.use('/assets/operators', (req, res, next) => {
-        const name = PORTRAIT.exec(req.url ?? '')?.[1];
-        if (!name || name.includes('..') || (req.method !== 'GET' && req.method !== 'HEAD')) { next(); return; }
-        readFile(path.join(directory, name)).then(image => {
-          res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': image.length, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
-          res.end(req.method === 'HEAD' ? undefined : image);
-        }, () => next());
-      });
+      server.middlewares.use('/assets/operators', serveFrom(path.resolve(root, 'public/assets/operators'), PORTRAIT, { png: 'image/png' }));
+      // 導覽素材（Q 版小人動畫、語音）同樣在建置後才下載。
+      server.middlewares.use('/assets/guide', serveFrom(path.resolve(root, 'public/assets/guide'), GUIDE_FILE, { webm: 'video/webm', mp3: 'audio/mpeg' }));
     },
   };
 }

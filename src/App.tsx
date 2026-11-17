@@ -18,18 +18,21 @@ import { GrowthPage } from './ui/GrowthPage';
 import { StagePage } from './ui/StagePage';
 import { TeamPage } from './ui/TeamPage';
 import { ToolsPage } from './ui/ToolsPage';
+import { GuidePage, guideSeen } from './ui/GuidePage';
 import { PlannedPage, SettingsPage, type PlannedName } from './ui/pages';
 import { DetailPanel, ImportPanel, PreviewPanel, RestorePanel, SwitchPanel, type Decisions } from './ui/panels';
 import './styles.css';
 
-type Page = '幹員庫' | '批次修正' | PlannedName | '關卡' | '工具' | '設定';
+type Page = '導覽' | '幹員庫' | '批次修正' | PlannedName | '關卡' | '工具' | '設定';
 type Panel = 'import' | 'preview' | 'detail' | 'restore' | 'switch' | null;
 const NAV: { label: Page; icon: IconName; hint: string }[] = [
+  { label: '導覽', icon: 'monitor', hint: '使用教學與功能介紹' },
   { label: '幹員庫', icon: 'roster', hint: '查詢與檢視' }, { label: '批次修正', icon: 'edit', hint: '逐列核對欄位' },
   { label: '基建', icon: 'base', hint: '設施配置與技能' }, { label: '養成', icon: 'grow', hint: '材料與龍門幣計算' }, { label: '關卡', icon: 'database', hint: '活動與材料掉落' }, { label: '搭配', icon: 'link', hint: '相性、編隊與關卡' }, { label: '工具', icon: 'check', hint: '公招、專精、體檢' },
   { label: '設定', icon: 'settings', hint: '保存、備份與來源' },
 ];
 const SUBTITLE: Record<Page, string> = {
+  導覽: '跟著幹員認識每個功能，第一次使用請從這裡開始。',
   幹員庫: '整理養成進度、核對資料缺口。', 批次修正: '左側勾選角色，右側直接改欄位；預覽確認後才保存。',
   基建: '設施配置、進駐名單與可追溯的技能加成。', 養成: '精英化、技能、專精與模組的材料計算。', 關卡: '台服活動時間表與材料掉落來源。', 工具: '公招計算、專精規劃與帳號體檢。', 搭配: '幹員相性、編隊建議與依關卡推薦。', 設定: '來源與版本、本機保存及備份。',
 };
@@ -38,7 +41,7 @@ export default function App() {
   const [namespace, setNamespace] = useState<Namespace>(window.location.hash === '#personal' ? 'personal' : 'demo');
   const [state, setState] = useState<AppState | null>(null);
   const [initError, setInitError] = useState('');
-  const [page, setPage] = useState<Page>('幹員庫');
+  const [page, setPage] = useState<Page>(() => guideSeen() ? '幹員庫' : '導覽');
   const [panel, setPanel] = useState<Panel>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
@@ -215,7 +218,7 @@ export default function App() {
         <button type="button" className={`workspace-switch ${isDemo ? 'demo' : 'personal'}`} disabled={busy} onClick={() => openPanel('switch')}>
           <span className="workspace-dot"/><span><strong>{isDemo ? '示範工作區' : '個人工作區'}</strong><small>點此切換</small></span>
         </button>
-        <p>本機優先 · 無帳號連線<br/>版本 1.2.0</p>
+        <p>本機優先 · 無帳號連線<br/>版本 1.3.0</p>
       </div>
     </aside>
     <div className="main">
@@ -233,6 +236,7 @@ export default function App() {
       </header>
       <main className="content" id="main">
         {!panel && <Notice notice={notice}/>}
+        {page === '導覽' && <GuidePage onNavigate={next => goto(next as Page)}/>}
         {page === '幹員庫' && <RosterPage key={namespace} state={state} isDemo={isDemo} busy={busy} onImport={() => openPanel('import')} onPreviewDemo={previewDemo} onOpen={id => { setSelectedId(id); openPanel('detail'); }}/>}
         <div hidden={page !== '批次修正'}><BatchEditor key={namespace} state={state} initialId={batchInitialId} onInitialHandled={() => setBatchInitialId(null)} onSave={saveBatch}/></div>
         {page === '設定' && <SettingsPage state={state} isDemo={isDemo} busy={busy} persistence={persistence} onSwitch={() => openPanel('switch')} onPreviewDemo={previewDemo} onBackup={downloadBackup} onRestoreFile={readBackupFile}
