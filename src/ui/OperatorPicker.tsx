@@ -46,8 +46,10 @@ export function OperatorPicker({ candidates, definitions, label, disabled, onPic
   const branchCounts = useMemo(() => {
     const counts = new Map<string, number>();
     if (profession) for (const item of inProfession) { const name = definitions.get(item.operatorId)?.branch ?? ''; counts.set(name, (counts.get(name) ?? 0) + 1); }
+    // 已選的分支即使目前 0 人也保留，畫面上才看得到篩選條件、也能取消。
+    if (branch && !counts.has(branch)) counts.set(branch, 0);
     return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hant'));
-  }, [inProfession, profession]);
+  }, [inProfession, profession, branch]);
   const shown = branch ? inProfession.filter(item => definitions.get(item.operatorId)?.branch === branch) : inProfession;
   const groups = (['ready', 'unknown', 'locked', 'none', 'other'] as const).map(key => ({ key, items: shown.filter(item => groupOf(item.state) === key).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'zh-Hant')) })).filter(group => group.items.length);
 
@@ -67,16 +69,16 @@ export function OperatorPicker({ candidates, definitions, label, disabled, onPic
       <button type="button" className={`chip ${profession ? '' : 'active'}`} aria-pressed={!profession} onClick={() => pickProfession('')}>全部 <small>{base.length}</small></button>
       {PROFESSIONS.map(name => {
         const count = professionCounts.get(name) ?? 0;
-        return <button key={name} type="button" className={`chip ${profession === name ? 'active' : ''}`} aria-pressed={profession === name} disabled={!count} onClick={() => pickProfession(name)}>{name} <small>{count}</small></button>;
+        return <button key={name} type="button" className={`chip ${profession === name ? 'active' : ''}`} aria-pressed={profession === name} disabled={!count && profession !== name} onClick={() => pickProfession(name)}>{name} <small>{count}</small></button>;
       })}
     </div>
-    {profession && branchCounts.length > 1 && <div className="picker-chips branch" role="group" aria-label="分支">
+    {profession && (branchCounts.length > 1 || branch) && <div className="picker-chips branch" role="group" aria-label="分支">
       <button type="button" className={`chip small ${branch ? '' : 'active'}`} aria-pressed={!branch} onClick={() => setBranch('')}>全部分支</button>
       {branchCounts.map(([name, count]) => <button key={name} type="button" className={`chip small ${branch === name ? 'active' : ''}`} aria-pressed={branch === name} onClick={() => setBranch(current => current === name ? '' : name)}>{name} <small>{count}</small></button>)}
     </div>}
     {hasSkilled && <label className="checkbox-line picker-toggle"><input type="checkbox" checked={skilledOnly} onChange={event => setSkilledOnly(event.currentTarget.checked)}/><span>只看有此設施技能的幹員</span></label>}
     <div className="picker-list">
-      {!groups.length && <p className="fine-print">沒有符合條件的幹員{onlySkilled ? '，可以取消「只看有此設施技能」再找找' : ''}。</p>}
+      {!groups.length && <p className="fine-print">沒有符合條件的幹員{branch ? `（目前只看「${branch}」分支，可以點「全部分支」）` : profession ? `（目前只看「${profession}」，可以點「全部」）` : onlySkilled ? '，可以取消「只看有此設施技能」再找找' : ''}。</p>}
       {groups.map(group => <section key={group.key}>
         <h4>{STATE_LABEL[group.key]}（{group.items.length}）</h4>
         <ul>{group.items.map(item => {
