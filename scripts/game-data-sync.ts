@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { parseCommunity, type CommunityData } from '../src/catalog/community.ts';
+import type { BuzzData } from '../src/catalog/buzz.ts';
+import { collectBuzz } from './buzz.ts';
 import { buildSkinCatalog, SKIN_ID, skinFileName, skinPortraitId, type SkinCatalog } from '../src/catalog/skins.ts';
 import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DATA_COMMIT, type GameDataSnapshot, type GameDataTables } from '../src/catalog/build.ts';
 import { validateDataset, verifyDatasetChecksum } from '../src/domain/model.ts';
@@ -301,7 +303,26 @@ export function createGameDataStore(options: {
     await writeFile(temporary, JSON.stringify(latest), { flag: 'wx' }); await rename(temporary, file);
     return loadCommunity();
   }
-  return { loadCommunity, syncCommunity, loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
+  /** 最新討論熱度：讀取上次抓取的結果（沒有就回傳 null）。 */
+  async function loadBuzz(): Promise<BuzzData | null> {
+    try { return JSON.parse(await readFile(path.join(cache, 'buzz.json'), 'utf8')) as BuzzData; } catch { return null; }
+  }
+  /** 重新抓取巴哈姆特與 B 站的搜尋結果並統計提到次數。 */
+  async function syncBuzz(): Promise<BuzzData> {
+    const snapshot = await load();
+    if (!snapshot) throw new Error('請先更新遊戲資料。');
+    const names = new Map<string, string>();
+    for (const op of snapshot.dataset.operators) names.set(op.displayName, op.id);
+    const cn = JSON.parse(await readFile(path.join(project, 'data/community/cn-names.json'), 'utf8')) as { names: Record<string, string> };
+    for (const [id, name] of Object.entries(cn.names)) if (snapshot.dataset.operators.some(op => op.id === id)) names.set(name, id);
+    const data = await collectBuzz({ fetch: fetcher, names });
+    await mkdir(cache, { recursive: true });
+    const file = path.join(cache, 'buzz.json');
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(data), { flag: 'wx' }); await rename(temporary, file);
+    return data;
+  }
+  return { loadBuzz, syncBuzz, loadCommunity, syncCommunity, loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
 }
 
 const defaultStore = createGameDataStore();
@@ -318,3 +339,5 @@ export const loadSkinsData = defaultStore.loadSkins;
 export const skinPortraitData = defaultStore.skinPortrait;
 export const loadCommunityData = defaultStore.loadCommunity;
 export const syncCommunityData = defaultStore.syncCommunity;
+export const loadBuzzData = defaultStore.loadBuzz;
+export const syncBuzzData = defaultStore.syncBuzz;

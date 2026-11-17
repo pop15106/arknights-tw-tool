@@ -19,14 +19,14 @@ const TRIGGER_LABEL: Record<SynergyLink['trigger'], string> = { squad: '編入�
 const KIND_ORDER: SynergyLink['target']['kind'][] = ['operator', 'group', 'profession', 'branch', 'rarity', 'position'];
 const KIND_LABEL: Record<SynergyLink['target']['kind'], string> = { operator: '指定幹員', group: '陣營', profession: '職業', branch: '分支', rarity: '星級', position: '位置' };
 
-export function TeamPage({ state, isDemo, onSaveNotes }: { state: AppState; isDemo: boolean; onSaveNotes?: (notes: NonNullable<AppState['settings']['reviewNotes']>) => void }) {
+export function TeamPage({ state, isDemo, onSaveNotes, onBuzzMode }: { state: AppState; isDemo: boolean; onSaveNotes?: (notes: NonNullable<AppState['settings']['reviewNotes']>) => void; onBuzzMode?: (mode: NonNullable<AppState['settings']['communityBuzz']>) => void }) {
   const [tab, setTab] = useState<'synergy' | 'squad' | 'stage' | 'review' | 'rogue'>('synergy');
   const tabs = <div className="segmented" role="tablist">{([['synergy', '幹員相性'], ['squad', '編隊建議'], ['stage', '依關卡推薦'], ['review', '幹員簡評'], ['rogue', '模式分析']] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>;
   return <div className="team-page">
     {tab === 'synergy' && <SynergyTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'squad' && <SquadTab state={state} isDemo={isDemo} tabs={tabs}/>}
     {tab === 'stage' && <StageTab state={state} isDemo={isDemo} tabs={tabs}/>}
-    {tab === 'rogue' && <RogueTab state={state} isDemo={isDemo} tabs={tabs}/>}
+    {tab === 'rogue' && <RogueTab state={state} isDemo={isDemo} tabs={tabs} onBuzzMode={onBuzzMode}/>}
     {tab === 'review' && <ReviewTab state={state} isDemo={isDemo} tabs={tabs} onSaveNotes={onSaveNotes}/>}
   </div>;
 }
@@ -293,7 +293,7 @@ function FitView({ fit, level }: { fit: ThemeFit; level: '高' | '中' | '低' }
   </div>;
 }
 
-function RogueTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; tabs: preact.JSX.Element }) {
+function RogueTab({ state, isDemo, tabs, onBuzzMode }: { state: AppState; isDemo: boolean; tabs: preact.JSX.Element; onBuzzMode?: (mode: NonNullable<AppState['settings']['communityBuzz']>) => void }) {
   const { catalog: growth } = useGrowthCatalog(isDemo);
   const { catalog: base } = useBaseCatalog(isDemo, 0);
   const rogue = useRogueFits(isDemo, state, growth, base);
@@ -336,7 +336,7 @@ function RogueTab({ state, isDemo, tabs }: { state: AppState; isDemo: boolean; t
       </tbody></table></div>
       {special.length > 0 && <details className="plain-details"><summary>點名特定分支／陣營／機制的{mode === 'security' ? '戰術裝備卡' : '藏品'}（{special.length}）</summary><ul className="gap-list">{special.map(relic => <li key={relic.id}><strong>{relic.name}</strong>：{relic.usage}</li>)}</ul></details>}
     </section>
-    {mode === 'roguelike' && <CommunityThemePanel community={community} themeId={analysis.id} owned={owned} nameOf={name}/>}
+    {mode === 'roguelike' && <CommunityThemePanel community={community} themeId={analysis.id} owned={owned} nameOf={name} buzzMode={state.settings.communityBuzz ?? 'reference'} onBuzzMode={onBuzzMode}/>}
     <section className="panel" aria-label="你的契合幹員">
       <h3>你持有的幹員中契合度最高</h3>
       <div className="synergy-grid">{top.map(([id, fit]) => <article key={id} className="synergy-card"><header><strong>{name(id)}</strong></header><FitView fit={fit} level={fitLevel(fit.score, scores)}/></article>)}</div>

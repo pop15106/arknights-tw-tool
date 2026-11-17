@@ -215,7 +215,7 @@ export default function App() {
         <button type="button" className={`workspace-switch ${isDemo ? 'demo' : 'personal'}`} disabled={busy} onClick={() => openPanel('switch')}>
           <span className="workspace-dot"/><span><strong>{isDemo ? '示範工作區' : '個人工作區'}</strong><small>點此切換</small></span>
         </button>
-        <p>本機優先 · 無帳號連線<br/>版本 1.1.1</p>
+        <p>本機優先 · 無帳號連線<br/>版本 1.2.0</p>
       </div>
     </aside>
     <div className="main">
@@ -241,7 +241,8 @@ export default function App() {
         {page === '基建' && <BasePage key={namespace} state={state} isDemo={isDemo} busy={busy} onSave={base => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, base } }, state.revision); setNotice({ text: '基建配置已保存至本機。', error: false }); })}/>}
         {page === '養成' && <GrowthPage key={namespace} state={state} isDemo={isDemo} busy={busy} onSave={growth => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, growth } }, state.revision); setNotice({ text: '養成計畫已保存至本機。', error: false }); })}/>}
         {page === '關卡' && <StagePage key={namespace} isDemo={isDemo}/>}
-        {page === '搭配' && <TeamPage key={namespace} state={state} isDemo={isDemo} onSaveNotes={reviewNotes => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, reviewNotes } }, state.revision); setNotice({ text: '簡評筆記已保存至本機。', error: false }); })}/>}
+        {page === '搭配' && <TeamPage key={namespace} state={state} isDemo={isDemo} onSaveNotes={reviewNotes => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, reviewNotes } }, state.revision); setNotice({ text: '簡評筆記已保存至本機。', error: false }); })}
+          onBuzzMode={communityBuzz => void run(async () => { await persist({ ...state, revision: state.revision + 1, settings: { ...state.settings, communityBuzz } }, state.revision); })}/>}
         {page === '工具' && <ToolsPage key={namespace} state={state} isDemo={isDemo}/>}
       </main>
     </div>

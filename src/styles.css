@@ -996,3 +996,5 @@ h2 { font-weight: 800; }
 .community-pick.stance-recommend .community-tag { background: rgba(46, 160, 67, .16); }
 .community-pick.stance-avoid .community-tag { background: rgba(220, 53, 69, .16); }
 .synergy-card.owned { outline: 2px solid rgba(46, 160, 67, .45); }
+.buzz-section { margin: 16px 0; padding-top: 12px; border-top: 1px solid var(--line, rgba(0,0,0,.12)); } .buzz-section h4 { margin: 0; }
+.buzz-rank { margin: 6px 0; padding-left: 22px; line-height: 1.7; }
