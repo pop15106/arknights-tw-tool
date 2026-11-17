@@ -76,7 +76,8 @@ export function createNotifier(options: NotifierOptions = {}) {
     return status();
   }
   async function clearTelegram(): Promise<NotifyStatus> {
-    const { telegram: _removed, ...rest } = await load();
+    // 排程只有 Telegram 會用；移除機器人時一起清掉，頁面才會改回瀏覽器通知。
+    const { telegram: _removed, schedule: _schedule, ...rest } = await load();
     await save(rest);
     return status();
   }
@@ -106,8 +107,13 @@ export function createNotifier(options: NotifierOptions = {}) {
     try {
       try { await send(current.schedule.text); lastError = undefined; }
       catch (error) { lastError = error instanceof NotifyError ? error.message : '推播失敗。'; }
-      let next = current.schedule.next; while (next <= now()) next += current.schedule.hours * HOUR;
-      await save({ ...current, schedule: { ...current.schedule, next } });
+      // 發送期間使用者可能已關閉提醒或移除機器人：以最新設定為準，排程沒變才往後排。
+      const latest = await load();
+      const same = latest.schedule && latest.schedule.next === current.schedule.next && latest.schedule.hours === current.schedule.hours && latest.schedule.text === current.schedule.text;
+      if (same && latest.schedule) {
+        let next = latest.schedule.next; while (next <= now()) next += latest.schedule.hours * HOUR;
+        await save({ ...latest, schedule: { ...latest.schedule, next } });
+      }
     } finally { sending = false; }
   }
   function start(intervalMs = 30_000): () => void {

@@ -58,7 +58,7 @@ export function ShiftReminder({ hours }: { hours: number }) {
     const timer = setInterval(() => {
       if (Date.now() < reminder.next) return;
       // 已交給 Telegram 推播時不重複跳瀏覽器通知。
-      if (!notify?.schedule) { try { new Notification('該換班了', { body: `基建已經過 ${reminder.hours} 小時，記得換班與收取產物。` }); } catch { /* 通知被拒絕時只更新時間 */ } }
+      if (!(notify?.telegram && notify.schedule)) { try { new Notification('該換班了', { body: `基建已經過 ${reminder.hours} 小時，記得換班與收取產物。` }); } catch { /* 通知被拒絕時只更新時間 */ } }
       let next = reminder.next; while (next <= Date.now()) next += reminder.hours * 3600_000;
       const updated = { ...reminder, next }; write(updated); setReminder(updated);
     }, 30_000);
@@ -87,7 +87,7 @@ export function ShiftReminder({ hours }: { hours: number }) {
     <strong>換班提醒</strong>
     {reminder ? <span>下次提醒：<b>{time(reminder.next)}</b>，之後每 {reminder.hours} 小時一次。<button type="button" className="button ghost small" onClick={() => void disable()}>關閉提醒</button></span>
       : <span>下次換班時間 <input className="text-input" type="time" value={start} onInput={event => setStart(event.currentTarget.value)}/>，每 {hours} 小時提醒 <button type="button" className="button secondary small" onClick={() => void enable()}>開啟提醒</button></span>}
-    <small>{message || (notify?.schedule ? `Telegram 推播已排程（下次 ${time(notify.schedule.next)}），關掉頁面也會送。` : '使用瀏覽器通知，只在這個頁面開著時有效；設定 Telegram 後關掉頁面也會推播。')}</small>
+    <small>{message || (notify?.telegram && notify.schedule ? `Telegram 推播已排程（下次 ${time(notify.schedule.next)}），關掉頁面也會送。` : '使用瀏覽器通知，只在這個頁面開著時有效；設定 Telegram 後關掉頁面也會推播。')}</small>
     <TelegramSetup status={notify} onChange={setNotify}/>
   </div>;
 }

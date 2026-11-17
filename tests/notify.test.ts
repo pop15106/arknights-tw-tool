@@ -76,3 +76,28 @@ test('本機服務：只接受本機頁面明確發出的 POST；狀態可讀', 
   const formPost = await fetch(`${service.origin}/api/notify/test`, { method: 'POST', headers: { ...headers, 'Content-Type': 'text/plain' }, body: '{}' });
   assert.equal(formPost.status, 415);
 });
+
+test('Codex 回饋：發送中關閉提醒或移除機器人，送完不會把設定寫回來', async t => {
+  let clock = Date.parse('2026-11-17T00:00:00Z');
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const base = fakeTelegram({ chats: [42] });
+  const fetchImpl = (async (input: string | URL, init?: RequestInit) => { if (String(input).endsWith('sendMessage')) await gate; return base.fetchImpl(input, init); }) as typeof fetch;
+  const { notifier } = await setup(t, { calls: base.calls, fetchImpl }, () => clock);
+  await notifier.setTelegram(TOKEN, '42');
+  await notifier.setSchedule(clock + 1000, 8, '該換班了');
+  clock += 2000;
+  const pending = notifier.tick();
+  await new Promise(resolve => setImmediate(resolve));
+  await notifier.clearSchedule();
+  release(); await pending;
+  assert.equal((await notifier.status()).schedule, undefined);
+});
+
+test('Codex 回饋：移除機器人時一併清除排程，頁面改回瀏覽器通知', async t => {
+  const { notifier } = await setup(t);
+  await notifier.setTelegram(TOKEN, '42');
+  await notifier.setSchedule(Date.parse('2026-11-17T01:00:00Z'), 8, '該換班了');
+  const status = await notifier.clearTelegram();
+  assert.equal(status.telegram, false); assert.equal(status.schedule, undefined);
+});
