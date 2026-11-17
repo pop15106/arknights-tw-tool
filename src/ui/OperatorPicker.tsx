@@ -20,7 +20,10 @@ export function OperatorPicker({ candidates, definitions, label, disabled, onPic
   const hasSkilled = candidates.some(item => item.state === 'ready' || item.state === 'unknown');
   const [skilledOnly, setSkilledOnly] = useState(true);
   const search = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (open) search.current?.focus(); }, [open]);
+  const opener = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  // 打開時游標進搜尋框；關閉後游標回到「加入幹員」按鈕，鍵盤操作（例如再按 Esc 關閉設定視窗）才接得上。
+  useEffect(() => { if (open) search.current?.focus(); else if (wasOpen.current) opener.current?.focus(); wasOpen.current = open; }, [open]);
 
   const onlySkilled = skilledOnly && hasSkilled;
   // 先套用「只看有技能」與搜尋，職業／分支的數量才會跟著列表變。
@@ -51,7 +54,7 @@ export function OperatorPicker({ candidates, definitions, label, disabled, onPic
   const pickProfession = (value: string) => { setProfession(current => current === value ? '' : value); setBranch(''); };
   const close = () => { setOpen(false); setQuery(''); };
 
-  if (!open) return <button type="button" className="button secondary small picker-open" disabled={disabled || !candidates.length} onClick={() => setOpen(true)} aria-label={`加入幹員到${label}`}>
+  if (!open) return <button ref={opener} type="button" className="button secondary small picker-open" disabled={disabled || !candidates.length} onClick={() => setOpen(true)} aria-label={`加入幹員到${label}`}>
     {candidates.length ? '＋ 加入幹員' : '沒有可加入的幹員'}
   </button>;
 
