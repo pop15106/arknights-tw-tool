@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { parseCommunity, type CommunityData } from '../src/catalog/community.ts';
 import type { BuzzData } from '../src/catalog/buzz.ts';
+import { chibiFile, GUIDE_CAST, voiceFile, type GuideLang, type GuideLine, type GuideManifest } from '../src/catalog/guide.ts';
 import { collectBuzz } from './buzz.ts';
 import { buildSkinCatalog, SKIN_ID, skinFileName, skinPortraitId, type SkinCatalog } from '../src/catalog/skins.ts';
 import { buildGameData, DATA_REPO, CATALOG_REVISION, MODULE_DATA_REPO, MODULE_DATA_COMMIT, type GameDataSnapshot, type GameDataTables } from '../src/catalog/build.ts';
@@ -18,12 +19,14 @@ const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const TABLES = { characters: 'character_table.json', patches: 'char_patch_table.json', skills: 'skill_table.json', modules: 'uniequip_table.json', stages: 'stage_table.json', activities: 'activity_table.json', items: 'item_table.json', building: 'building_data.json', constants: 'gamedata_const.json', gacha: 'gacha_table.json' } as const;
 const PNG = Buffer.from([137,80,78,71,13,10,26,10]);
 const COMMUNITY_SOURCE = 'https://raw.githubusercontent.com/pop15106/arknights-tw-tool/main/data/community/rogue.json';
+const CHIBI_SOURCE = 'https://raw.githubusercontent.com/ArknightsAssets/ArknightsSpines/cn/build/Relax';
+const VOICE_SOURCE = 'https://raw.githubusercontent.com/ArknightsAssets/ArknightsAssets2/voice/assets/dyn/audio/sound_beta_2';
 const PORTRAIT_SOURCE = 'https://raw.githubusercontent.com/ArknightsAssets/ArknightsAssets2/cn/assets/dyn/arts/charportraits';
 const validVersion = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{40}$/u.test(value);
 type Source = { commit: string; sourceUpdatedAt: string; syncedAt: string };
 
 export function createGameDataStore(options: {
-  cacheDirectory?: string; assetDirectory?: string; fetcher?: typeof fetch;
+  cacheDirectory?: string; assetDirectory?: string; guideDirectory?: string; fetcher?: typeof fetch;
   build?: typeof buildGameData;
 } = {}) {
   const cache = options.cacheDirectory ?? path.join(project, '.local/game-data');
@@ -322,7 +325,53 @@ export function createGameDataStore(options: {
     await writeFile(temporary, JSON.stringify(data), { flag: 'wx' }); await rename(temporary, file);
     return data;
   }
-  return { loadBuzz, syncBuzz, loadCommunity, syncCommunity, loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
+  const guideDir = options.guideDirectory ?? path.join(project, 'public/assets/guide');
+  /** 導覽素材：上次下載的清單（沒有就回傳 null）。 */
+  async function loadGuide(): Promise<GuideManifest | null> {
+    try { return JSON.parse(await readFile(path.join(cache, 'guide.json'), 'utf8')) as GuideManifest; } catch { return null; }
+  }
+  /** 下載導覽用的 Q 版小人動畫、語音與台服台詞字幕；個別檔案失敗只略過，不影響其他。 */
+  async function syncGuide(lang: GuideLang): Promise<GuideManifest> {
+    if (!['voice', 'voice_cn', 'voice_kr', 'voice_en'].includes(lang)) throw new Error('語音語言無效。');
+    await mkdir(guideDir, { recursive: true });
+    const save = async (file: string, data: Buffer) => { const target = path.join(guideDir, file); const temporary = `${target}.${crypto.randomUUID()}.tmp`; await writeFile(temporary, data, { flag: 'wx' }); await rename(temporary, target); };
+    const words = JSON.parse((await bytes(`https://raw.githubusercontent.com/${MODULE_DATA_REPO}/${MODULE_DATA_COMMIT}/tw/gamedata/excel/charword_table.json`, 24 * 1024 * 1024)).toString('utf8')) as { charWords: Record<string, { charId: string; wordKey: string; voiceId: string; voiceTitle: string; voiceText: string }> };
+    const chibi: Record<string, string> = {}, lines: Record<string, GuideLine[]> = {};
+    for (const cast of GUIDE_CAST) {
+      const name = chibiFile(cast.charId);
+      try {
+        if (!(await fileExists(path.join(guideDir, name)))) {
+          const video = await bytes(`${CHIBI_SOURCE}/build_${cast.charId}.webm`, 4 * 1024 * 1024);
+          if (video.subarray(0, 4).toString('hex') !== '1a45dfa3') throw new Error('not webm');
+          await save(name, video);
+        }
+        chibi[cast.charId] = `/assets/guide/${name}`;
+      } catch { /* 沒有這位的小人動畫：頁面會改用原創小角色 */ }
+      lines[cast.charId] = [];
+      for (const voiceId of cast.voices) {
+        const word = Object.values(words.charWords).find(item => item.charId === cast.charId && item.wordKey === cast.charId && item.voiceId === voiceId);
+        if (!word) continue;
+        const text = word.voiceText.replace(/\{@nickname\}/gu, '博士').slice(0, 300);
+        const file = voiceFile(cast.charId, lang, voiceId);
+        let ok = await fileExists(path.join(guideDir, file));
+        if (!ok) {
+          try {
+            const audio = await bytes(`${VOICE_SOURCE}/${lang}/${cast.charId}/${voiceId.toLowerCase()}.mp3`, 2 * 1024 * 1024);
+            const head = audio.subarray(0, 3).toString('latin1');
+            if (head !== 'ID3' && !(audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0)) throw new Error('not mp3');
+            await save(file, audio); ok = true;
+          } catch { ok = false; }
+        }
+        lines[cast.charId].push({ voiceId, title: word.voiceTitle, text, ...(ok ? { file: `/assets/guide/${file}` } : {}) });
+      }
+    }
+    const manifest: GuideManifest = { lang, syncedAt: new Date().toISOString(), chibi, lines };
+    await mkdir(cache, { recursive: true });
+    const target = path.join(cache, 'guide.json'); const temporary = `${target}.${crypto.randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(manifest), { flag: 'wx' }); await rename(temporary, target);
+    return manifest;
+  }
+  return { loadGuide, syncGuide, loadBuzz, syncBuzz, loadCommunity, syncCommunity, loadSkins, skinPortrait, syncPortraits, load, sync, seed: publish, loadTrading, refreshTrading, loadDrops, refreshDrops, stageEnemies, loadCnEvents, refreshCnEvents, rogueAnalysis };
 }
 
 const defaultStore = createGameDataStore();
@@ -341,3 +390,5 @@ export const loadCommunityData = defaultStore.loadCommunity;
 export const syncCommunityData = defaultStore.syncCommunity;
 export const loadBuzzData = defaultStore.loadBuzz;
 export const syncBuzzData = defaultStore.syncBuzz;
+export const loadGuideData = defaultStore.loadGuide;
+export const syncGuideData = defaultStore.syncGuide;
