@@ -4,7 +4,7 @@ import type { AppState, Evidence, ImportDocument, Namespace } from './domain/mod
 import { applyImport, previewImport, undoLastImport } from './domain/import';
 import type { ImportPreview } from './domain/import';
 import { createBackup, parseBackup } from './storage/backup';
-import { loadState, openDatabase, queryPersistence, requestPersistence, saveState } from './storage/database';
+import { loadState, openDatabase, overwriteRepaired, queryPersistence, readRawState, repairUnknownFields, requestPersistence, saveState } from './storage/database';
 import { createDemoDataset, createDemoImport, createPersonalDataset } from './demo';
 import { prepareLocalImportText } from './importers/local-file';
 import { BatchEditor } from './BatchEditor';
@@ -48,6 +48,8 @@ export default function App() {
   const [restored, setRestored] = useState<{ state: AppState; baseRevision: number } | null>(null);
   const [persistence, setPersistence] = useState<Awaited<ReturnType<typeof queryPersistence>> | null>(null);
   const database = useRef<IDBDatabase | null>(null);
+  const repairable = useRef<IDBDatabase | null>(null);
+  const [repairing, setRepairing] = useState(false);
   const operation = useRef(false);
   const theme = useTheme();
 
@@ -66,9 +68,13 @@ export default function App() {
         if (!active) { opened.close(); return; }
         database.current = opened; setState(initial);
         void queryPersistence().then(result => { if (active) setPersistence(result); }).catch(() => { if (active) setPersistence(null); });
-      } catch (error) { if (active) setInitError(friendlyError(error)); opened?.close(); }
+      } catch (error) {
+        // 其他版本寫入了本版不認得的欄位：保留連線，讓使用者先備份再修復。
+        if (active && opened && error instanceof Error && /包含未允許欄位/u.test(error.message)) { repairable.current = opened; setInitError(friendlyError(error)); return; }
+        if (active) setInitError(friendlyError(error)); opened?.close();
+      }
     })();
-    return () => { active = false; opened?.close(); database.current = null; };
+    return () => { active = false; opened?.close(); database.current = null; repairable.current = null; };
   }, [namespace]);
 
   async function run(action: () => Promise<void>) {
@@ -165,10 +171,29 @@ export default function App() {
     });
   }
 
+  async function repairDatabase() {
+    const db = repairable.current;
+    if (!db || repairing) return;
+    setRepairing(true);
+    try {
+      const raw = await readRawState(db);
+      const { state: repaired, removed } = await repairUnknownFields(raw);
+      // 先把原樣內容存成檔案，修復失敗或想還原時都還有原始資料。
+      const url = URL.createObjectURL(new Blob([JSON.stringify(raw)], { type: 'application/json;charset=utf-8' }));
+      const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = `arknights-${namespace}-raw-before-repair-${taipeiDate(new Date().toISOString())}.json`; anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await overwriteRepaired(db, repaired);
+      window.alert(`已移除不相容欄位：${removed.join('、')}。幹員與設定其餘內容保留，原始資料已下載備份。`);
+      window.location.reload();
+    } catch (error) { setInitError(friendlyError(error)); setRepairing(false); }
+  }
+
   if (initError || !state) return <div className="loading">
     <div className="loading-mark"><Icon name={initError ? 'alert' : 'database'} size={24}/></div>
     <h1>{initError ? '本機資料庫未就緒' : '正在開啟本機幹員庫'}</h1>
     <p>{initError || '確認資料版本及本機儲存狀態，請稍候。'}</p>
+    {initError && /包含未允許欄位/u.test(initError) && <><p>這通常是用過其他版本留下的欄位。可以先下載原始資料，再移除本版不認得的欄位，幹員與設定其餘內容會保留。</p><button type="button" className="button" disabled={repairing} onClick={() => void repairDatabase()}>{repairing ? '修復中…' : '下載原始資料並修復'}</button></>}
     {initError && <><p>已停止所有寫入；請勿清除網站資料。請保留既有備份，確認瀏覽器允許儲存後重試。</p><button type="button" className="button secondary" onClick={() => window.location.reload()}>重新讀取</button></>}
   </div>;
 
@@ -190,7 +215,7 @@ export default function App() {
         <button type="button" className={`workspace-switch ${isDemo ? 'demo' : 'personal'}`} disabled={busy} onClick={() => openPanel('switch')}>
           <span className="workspace-dot"/><span><strong>{isDemo ? '示範工作區' : '個人工作區'}</strong><small>點此切換</small></span>
         </button>
-        <p>本機優先 · 無帳號連線<br/>版本 1.0.0</p>
+        <p>本機優先 · 無帳號連線<br/>版本 1.0.1</p>
       </div>
     </aside>
     <div className="main">

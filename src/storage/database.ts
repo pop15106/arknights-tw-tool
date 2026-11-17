@@ -1,4 +1,4 @@
-import { validateAppState, verifyDatasetChecksum, type AppState } from '../domain/model.ts';
+import { hashValue, validateAppState, verifyDatasetChecksum, type AppState } from '../domain/model.ts';
 import { createBackup } from './backup.ts';
 
 const STORE_NAME = 'state';
@@ -55,6 +55,66 @@ export async function loadState(db: IDBDatabase): Promise<AppState | null> {
   await verifyDatasetChecksum(state.dataset);
   if (state.undo) await verifyDatasetChecksum(state.undo.dataset);
   return structuredClone(state);
+}
+
+/** 讀出資料庫原始內容（不驗證），只用於修復前下載原樣備份。 */
+export function readRawState(db: IDBDatabase): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    try {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const request = transaction.objectStore(STORE_NAME).get(ACTIVE_KEY);
+      let result: unknown;
+      request.onsuccess = () => { result = request.result; };
+      transaction.oncomplete = () => resolve(result);
+      transaction.onabort = () => reject(storageError(transaction.error));
+    } catch (error) { reject(storageError(error)); }
+  });
+}
+
+const isPlain = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
+function removeFirst(value: unknown, key: string): boolean {
+  if (Array.isArray(value)) return value.some(item => removeFirst(item, key));
+  if (!isPlain(value)) return false;
+  if (Object.hasOwn(value, key)) { delete value[key]; return true; }
+  return Object.values(value).some(item => removeFirst(item, key));
+}
+
+/**
+ * 其他版本寫入了本版不認得的欄位時，逐一移除這些欄位，直到整份資料通過驗證。
+ * 只移除「未允許欄位」；其他錯誤（缺欄位、格式錯）一律停止，不猜測修補。
+ */
+export async function repairUnknownFields(raw: unknown): Promise<{ state: AppState; removed: string[] }> {
+  const value = structuredClone(raw);
+  const removed: string[] = [];
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { validateAppState(value); break; }
+    catch (error) {
+      const key = error instanceof Error ? error.message.match(/^包含未允許欄位：(.+?)。/u)?.[1] : undefined;
+      if (!key || !removeFirst(value, key)) throw error;
+      removed.push(key);
+    }
+  }
+  const state = validateAppState(value);
+  // 欄位若位在幹員定義內會改變校驗值；移除後依剩餘內容重新計算。
+  for (const dataset of [state.dataset, state.undo?.dataset]) {
+    if (!dataset) continue;
+    try { await verifyDatasetChecksum(dataset); } catch { if (removed.length) dataset.metadata.checksum = await hashValue(dataset.operators); else throw new Error('資料集校驗值不符，未修改原資料。'); }
+  }
+  return { state, removed: [...new Set(removed)] };
+}
+
+/** 用修復後的資料覆寫目前內容（原內容無法通過驗證，所以不比對修訂版本）。 */
+export async function overwriteRepaired(db: IDBDatabase, repaired: AppState): Promise<void> {
+  const state = structuredClone(validateAppState(repaired));
+  await createBackup(state);
+  return new Promise((resolve, reject) => {
+    try {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      transaction.objectStore(STORE_NAME).put(state, ACTIVE_KEY);
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(storageError(transaction.error));
+    } catch (error) { reject(storageError(error)); }
+  });
 }
 
 export async function saveState(db: IDBDatabase, stateValue: AppState, expectedRevision: number): Promise<void> {
