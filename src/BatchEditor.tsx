@@ -3,7 +3,6 @@ import { fieldKeys, type AppState, type Evidence, type OperatorDefinition } from
 import { BATCH_FIELDS, createGridEdit, matchingModules, type BatchField, type GridChange } from './domain/batch-edit';
 import { previewImport, type ImportPreview } from './domain/import';
 import { queryRoster } from './domain/roster-query';
-import './batch-editor.css';
 
 type Draft = { status: Evidence['status']; value: string };
 type Drafts = Record<string, Record<string, Draft>>;
@@ -39,13 +38,13 @@ function FieldControl({ value, info, label, busy, onChange }: { value: Draft; in
   if (info.options) return <select className="filter" aria-label={label} disabled={busy} value={value.status === 'known' ? value.value : `__${value.status}`} onChange={event => { const next = event.currentTarget.value; onChange(next.startsWith('__') ? { status: next.slice(2) as Draft['status'], value: '' } : { status: 'known', value: next }); }}>
     <option value="" disabled>選擇新值</option><option value="__unknown">未知</option><option value="__not-applicable">不適用</option>{info.options.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
   </select>;
-  return <div className="batch-number-control"><input className="text-input" type="number" inputMode="numeric" aria-label={label} min={info.min} max={info.max} step="1" placeholder={value.status === 'not-applicable' ? '不適用' : `未知 · ${info.min}–${info.max}`} disabled={busy} value={value.status === 'known' ? value.value : ''} onInput={event => onChange({ status: event.currentTarget.value === '' ? 'unknown' : 'known', value: event.currentTarget.value })}/><select className="filter batch-value-status" aria-label={`${label}資料狀態`} value={value.status} disabled={busy} onChange={event => onChange({ status: event.currentTarget.value as Draft['status'], value: value.value })}><option value="known">已知</option><option value="unknown">未知</option><option value="not-applicable">不適用</option></select></div>;
+  return <div className="batch-number-control"><input className="text-input" type="number" inputMode="numeric" aria-label={label} min={info.min} max={info.max} step="1" placeholder={value.status === 'not-applicable' ? '不適用' : `未知 · ${info.min}–${info.max}`} disabled={busy} value={value.status === 'known' ? value.value : ''} onInput={event => onChange({ status: 'known', value: event.currentTarget.value })}/><select className="filter batch-value-status" aria-label={`${label}資料狀態`} value={value.status} disabled={busy} onChange={event => onChange({ status: event.currentTarget.value as Draft['status'], value: value.value })}><option value="known">已知</option><option value="unknown">未知</option><option value="not-applicable">不適用</option></select></div>;
 }
 
 export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { state: AppState; initialId: string | null; onInitialHandled: () => void; onSave: (preview: ImportPreview) => Promise<void> }) {
   const [search, setSearch] = useState('');
   const [profession, setProfession] = useState('all');
-  const [group, setGroup] = useState('basic');
+  const [group, setGroup] = useState('all');
   const [onlyPending, setOnlyPending] = useState(true);
   const [selected, setSelected] = useState<string[]>(initialId ? [initialId] : []);
   const [page, setPage] = useState(0);
@@ -64,15 +63,20 @@ export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { st
   const messageRef = useRef<HTMLParagraphElement>(null);
   const definitions = new Map(state.dataset.operators.map(item => [item.id, item]));
   const rows = state.roster.map(row => ({ row, definition: definitions.get(row.operatorId)! }));
-  const filtered = queryRoster(rows, { search, profession, sort: 'name' });
+  const selectedSet = new Set(selected);
+  const matched = queryRoster(rows, { search, profession, sort: 'name' });
+  // 只看待確認時，隱藏此分類已無待確認欄位的角色；已勾選或有草稿的角色一律保留。
+  const filtered = onlyPending ? matched.filter(({ row, definition }) => selectedSet.has(row.operatorId) || drafts[row.operatorId] || fieldsFor(definition).some(field => pending(row.fields[field]))) : matched;
+  const hiddenComplete = matched.length - filtered.length;
   const pages = Math.max(1, Math.ceil(filtered.length / 12)), currentPage = Math.min(page, pages - 1);
   const visible = filtered.slice(currentPage * 12, (currentPage + 1) * 12);
-  const selectedSet = new Set(selected);
   const changedIds = selected.filter(id => Object.keys(drafts[id] ?? {}).length > 0);
   const changedCount = changedIds.reduce((count, id) => count + Object.keys(drafts[id]).length, 0);
   const hiddenSelected = selected.filter(id => !filtered.some(item => item.row.operatorId === id)).length;
   const usesModule = [moduleUnlocked, moduleLevel, moduleEquipped].some(value => value !== 'keep');
   const invalidModules = usesModule ? rows.filter(item => selectedSet.has(item.row.operatorId) && matchingModules(item.definition, moduleKind).length !== 1) : [];
+  const latestRevision = useRef(state.revision);
+  latestRevision.current = state.revision;
   useEffect(() => { setPreview(null); setAgreed(false); }, [state.revision]);
   useEffect(() => { if (initialId) { setSelected(current => current.includes(initialId) ? current : [...current, initialId]); onInitialHandled(); } }, [initialId]);
   useEffect(() => { if (preview) { previewRef.current?.focus(); previewRef.current?.scrollIntoView({ block: 'start' }); } }, [preview]);
@@ -125,7 +129,10 @@ export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { st
     setBusy(true); setMessage('');
     try {
       const changes = Object.fromEntries(changedIds.map(id => [id, Object.fromEntries(Object.entries(drafts[id]).map(([field, draft]) => [field, convert(draft, fieldInfo(field, definitions.get(id)!))]))]));
-      setPreview(await previewImport(state, createGridEdit(state, changes))); setAgreed(false);
+      const base = state.revision, next = await previewImport(state, createGridEdit(state, changes));
+      // 預覽期間若其他操作已保存，捨棄這份過期預覽，避免保存時才被拒絕。
+      if (latestRevision.current !== base) { setMessage('資料已在預覽期間更新，請重新預覽。'); return; }
+      setPreview(next); setAgreed(false);
     } catch (error) { setPreview(null); setMessage(error instanceof Error ? error.message : '無法產生預覽。'); }
     finally { setBusy(false); }
   }
@@ -147,8 +154,6 @@ export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { st
     });
   }
   return <section className="batch-editor" aria-label="批次修正幹員">
-    <div className="section-heading"><h2>批次修正</h2><span>左側選角色 · 右側直接改欄位</span></div>
-    <p className="fine-print">下拉選擇或直接填入，修改先留在草稿。多選角色後可用「批次填入」一起調整；預覽確認後才保存。</p>
     <section className="panel batch-bulk" aria-label="批次填入欄位">
       <details><summary>批次填入 · 已選 {selected.length} 名角色<span className="fine-print">　可一次填多個欄位</span></summary>
         <p className="fine-print">勾選欄位並設定新值，按「套用到勾選角色」。會更新這些角色的同名草稿欄位，其他欄位保留。</p>
@@ -176,10 +181,10 @@ export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { st
       <div className="inline-actions"><button type="button" className="button secondary" disabled={busy} onClick={() => { setPreview(null); setAgreed(false); }}>返回修改</button><button type="button" className="button primary" disabled={busy || !agreed} onClick={() => void save()}>{busy ? '保存中…' : '確認保存'}</button></div>
     </section>}
     <section className="panel batch-grid-panel" aria-label="角色與待確認欄位">
-      <div className="batch-filters"><input type="search" className="text-input" aria-label="搜尋批次修正幹員" placeholder="搜尋角色名稱、別名或 ID" value={search} disabled={busy} onInput={event => { setSearch(event.currentTarget.value); setPage(0); }}/><select className="filter" aria-label="批次修正職業篩選" value={profession} disabled={busy} onChange={event => { setProfession(event.currentTarget.value); setPage(0); }}><option value="all">所有職業</option>{[...new Set(rows.map(item => item.definition.profession))].sort().map(name => <option key={name} value={name}>{name}</option>)}</select><select className="filter" aria-label="顯示欄位分類" value={group} disabled={busy} onChange={event => setGroup(event.currentTarget.value)}><option value="basic">養成欄位</option><option value="skills">技能與專精</option><option value="modules">模組欄位</option><option value="all">全部欄位</option></select></div>
+      <div className="batch-filters"><input type="search" className="text-input" aria-label="搜尋批次修正幹員" placeholder="搜尋角色名稱、別名或 ID" value={search} disabled={busy} onInput={event => { setSearch(event.currentTarget.value); setPage(0); }}/><select className="filter" aria-label="批次修正職業篩選" value={profession} disabled={busy} onChange={event => { setProfession(event.currentTarget.value); setPage(0); }}><option value="all">所有職業</option>{[...new Set(rows.map(item => item.definition.profession))].sort().map(name => <option key={name} value={name}>{name}</option>)}</select><select className="filter" aria-label="顯示欄位分類" value={group} disabled={busy} onChange={event => setGroup(event.currentTarget.value)}><option value="all">全部欄位</option><option value="basic">養成欄位</option><option value="skills">技能與專精</option><option value="modules">模組欄位</option></select></div>
       <div className="inline-actions"><button type="button" className="button secondary small" disabled={busy || !filtered.length} onClick={() => choose([...new Set([...selected, ...filtered.map(item => item.row.operatorId)])])}>全選篩選結果（{filtered.length} 名）</button><button type="button" className="button ghost small" disabled={busy || !selected.length} onClick={() => choose([])}>取消全選與草稿</button><strong>已選 {selected.length} 名{hiddenSelected > 0 && `（篩選外 ${hiddenSelected} 名）`}</strong><label className="checkbox-line"><input type="checkbox" checked={onlyPending} disabled={busy} onChange={event => setOnlyPending(event.currentTarget.checked)}/><span>只顯示待確認欄位</span></label></div>
       <p className="fine-print">待確認包含未知及低信心匯入值；不代表資料有錯。編輯欄位會自動勾選角色。取消勾選會移除該角色草稿，搜尋與翻頁則保留。</p>
-      <div className="batch-grid-head"><span>角色</span><span>{onlyPending ? '待確認欄位 · 直接修改' : '全部欄位 · 直接修改'}</span></div>
+      {visible.length > 0 && <div className="batch-grid-head"><span>角色</span><span>{onlyPending ? '待確認欄位 · 直接修改' : '全部欄位 · 直接修改'}</span></div>}
       <div className="batch-roster">{visible.map(({ row, definition }) => {
         const rowDrafts = drafts[row.operatorId] ?? {}, allFields = fieldsFor(definition);
         const shown = allFields.filter(field => !onlyPending || pending(row.fields[field]) || rowDrafts[field]);
@@ -196,7 +201,8 @@ export function BatchEditor({ state, initialId, onInitialHandled, onSave }: { st
           })}{!shown.length && (allFields.length > 0 || !moduleMessage) && <p className="fine-print">{onlyPending && allFields.length > 0 ? '此分類沒有待確認欄位。取消「只顯示待確認欄位」即可修改既有值。' : '此分類沒有可編輯欄位。'}</p>}</div>
         </article>;
       })}</div>
-      {!filtered.length && <p>沒有符合條件的角色。</p>}
+      {hiddenComplete > 0 && <p className="fine-print batch-hidden-note">另有 {hiddenComplete} 名角色在此分類沒有待確認欄位，已隱藏。取消「只顯示待確認欄位」即可修改既有值。</p>}
+      {!filtered.length && !hiddenComplete && <p>沒有符合條件的角色。</p>}
       {pages > 1 && <nav className="roster-pagination" aria-label="批次修正分頁"><span>第 {currentPage + 1} / {pages} 頁 · 勾選與草稿跨頁保留</span><div className="inline-actions"><button type="button" className="button secondary small" disabled={busy || currentPage === 0} onClick={() => setPage(currentPage - 1)}>上一頁</button><button type="button" className="button secondary small" disabled={busy || currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>下一頁</button></div></nav>}
     </section>
     {changedCount > 0 && <aside className="batch-savebar" aria-label="草稿保存工具列"><span><strong>{changedIds.length} 名角色 · {changedCount} 個欄位</strong><small>草稿尚未保存</small></span><div className="inline-actions"><button type="button" className="button ghost small" disabled={busy} onClick={() => { invalidate(); setDrafts({}); }}>清空草稿</button><button type="button" className="button primary" disabled={busy} onClick={() => void prepare()}>{busy ? '處理中…' : '預覽全部變更'}</button></div></aside>}

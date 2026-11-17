@@ -94,7 +94,30 @@ export interface BatchRecord {
   revertedBatchId?: string;
 }
 export interface Settings {
-  base: { facilities: { id: string; type: 'control' | 'manufacturing' | 'trading' | 'power' | 'dormitory'; level: number; product?: 'gold' | 'record' | 'lmd'; atmosphere?: number }[]; onlineSlots: string[] };
+  base: {
+    facilities: { id: string; type: 'control' | 'manufacturing' | 'trading' | 'power' | 'dormitory' | 'meeting' | 'office' | 'training' | 'workshop'; level: number; product?: 'gold' | 'record' | 'lmd'; atmosphere?: number }[];
+    onlineSlots: string[];
+    /** 設施 ID → 進駐幹員 ID。只是配置草稿，不代表遊戲內現況。 */
+    assignments?: Record<string, string[]>;
+    /** 訓練室：正在專精的幹員職業與目標專精等級（影響訓練加速技能）。 */
+    training?: { profession?: string; mastery?: 1 | 2 | 3 };
+    /** 加工站：主要加工類別（影響副產品技能）。 */
+    workshop?: 'elite' | 'skill' | 'base' | 'any';
+    /** 已開啟的額外招募位（不含初始招募位，0～3），影響依招募位產生資源的技能。 */
+    recruitSlots?: number;
+    /** 會客室是否處於線索交流期間（部分技能只在此時生效）。 */
+    clueExchange?: boolean;
+    /** 無人機上限（巡線框架用）；未設定時視為滿等已達技能上限。 */
+    droneCap?: number;
+    /** 遊戲內實際顯示的設施數值（生產力％、訂單效率％、無人機充能％），用來和計算值比對。 */
+    observed?: Record<string, number>;
+    /** 加工站要加工的配方（workshopFormulas 的 formulaId）。 */
+    workshopFormula?: string;
+  };
+  /** 幹員簡評的個人筆記：幹員 ID → 模式 → 文字（只存在本機）。 */
+  reviewNotes?: Record<string, Record<string, string>>;
+  /** 養成計畫：各幹員的目標，以及材料庫存（本機手動輸入）。 */
+  growth?: { plans: { operatorId: string; target: { elite: number; level: number; skillLevel: number; masteries: Record<string, number>; modules: Record<string, number> } }[]; expand?: boolean; inventory?: Record<string, number> };
   analysis: { mode: 'story' | 'integrated-strategies' | 'reclamation' | 'stationary-security' | 'defense'; goal: string; budget: number };
   lastBackupAt?: string;
 }
@@ -324,13 +347,44 @@ export function parseJson(textValue: string, maxBytes: number): unknown {
 export function parseImportText(textValue: string): ImportDocument { return validateImportDocument(parseJson(textValue, MAX_IMPORT_BYTES)); }
 
 function validateSettings(value: unknown): void {
-  const settings = object(value, ['base', 'analysis', 'lastBackupAt'], ['base', 'analysis']);
-  const base = object(settings.base, ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
+  const settings = object(value, ['base', 'analysis', 'lastBackupAt', 'growth', 'reviewNotes'], ['base', 'analysis']);
+  if (settings.reviewNotes !== undefined) for (const [key, notes] of Object.entries(object(settings.reviewNotes, Object.keys(settings.reviewNotes as object), []))) { id(key); for (const [mode, note] of Object.entries(object(notes, Object.keys(notes as object), []))) { if (!/^[a-z0-9_-]{1,40}$/u.test(mode) || typeof note !== 'string' || note.length > 1000) throw new Error('簡評筆記格式不正確（每則最多 1000 字）。'); } }
+  if (settings.growth !== undefined) {
+    const growth = object(settings.growth, ['plans', 'expand', 'inventory'], ['plans']); list(growth.plans, 200, '養成計畫');
+    for (const item of growth.plans as unknown[]) {
+      const plan = object(item, ['operatorId', 'target'], ['operatorId', 'target']); id(plan.operatorId);
+      const target = object(plan.target, ['elite', 'level', 'skillLevel', 'masteries', 'modules'], ['elite', 'level', 'skillLevel', 'masteries', 'modules']);
+      integer(target.elite, 0, 2, '目標精英'); integer(target.level, 1, 90, '目標等級'); integer(target.skillLevel, 1, 7, '目標技能等級');
+      for (const [key, level] of Object.entries(object(target.masteries, Object.keys(target.masteries as object), []))) { id(key); integer(level, 0, 3, '目標專精'); }
+      for (const [key, level] of Object.entries(object(target.modules, Object.keys(target.modules as object), []))) { id(key); integer(level, 0, 3, '目標模組等級'); }
+    }
+    unique((growth.plans as { operatorId: string }[]).map(plan => plan.operatorId), '養成計畫');
+    if (growth.expand !== undefined && typeof growth.expand !== 'boolean') throw new Error('展開合成設定必須是是／否。');
+    if (growth.inventory !== undefined) for (const [key, count] of Object.entries(object(growth.inventory, Object.keys(growth.inventory as object), []))) { id(key); integer(count, 0, 10_000_000, '庫存數量'); }
+  }
+  const base = object(settings.base, ['facilities', 'onlineSlots', 'assignments', 'training', 'workshop', 'recruitSlots', 'clueExchange', 'workshopFormula', 'droneCap', 'observed'], ['facilities', 'onlineSlots']); list(base.facilities, 20, '設施'); list(base.onlineSlots, 24, '可上線時段');
   for (const item of base.facilities) {
-    const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
+    const facility = object(item, ['id', 'type', 'level', 'product', 'atmosphere'], ['id', 'type', 'level']); id(facility.id); choice(facility.type, ['control', 'manufacturing', 'trading', 'power', 'dormitory', 'meeting', 'office', 'training', 'workshop'], '設施種類'); integer(facility.level, 1, 5, '設施等級');
     if (facility.product !== undefined) choice(facility.product, ['gold', 'record', 'lmd'], '產品'); if (facility.atmosphere !== undefined) integer(facility.atmosphere, 0, 10000, '氛圍');
   }
   unique((base.facilities as { id: string }[]).map(f => f.id), '設施');
+  if (base.training !== undefined) {
+    const training = object(base.training, ['profession', 'mastery'], []);
+    if (training.profession !== undefined) choice(training.profession, ['先鋒', '近衛', '重裝', '狙擊', '術師', '醫療', '輔助', '特種'], '訓練職業');
+    if (training.mastery !== undefined) choice(training.mastery, [1, 2, 3], '目標專精等級');
+  }
+  if (base.workshop !== undefined) choice(base.workshop, ['elite', 'skill', 'base', 'any'], '加工類別');
+  if (base.recruitSlots !== undefined) integer(base.recruitSlots, 0, 3, '額外招募位');
+  if (base.droneCap !== undefined) integer(base.droneCap, 0, 999, '無人機上限');
+  if (base.observed !== undefined) for (const [key, value] of Object.entries(object(base.observed, Object.keys(base.observed as object), []))) { id(key); if (typeof value !== 'number' || !Number.isFinite(value) || value < -100 || value > 2000) throw new Error('實測數值必須介於 -100 與 2000。'); }
+  if (base.clueExchange !== undefined && typeof base.clueExchange !== 'boolean') throw new Error('線索交流設定必須是是／否。');
+  if (base.workshopFormula !== undefined && (typeof base.workshopFormula !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/u.test(base.workshopFormula))) throw new Error('加工配方代碼格式不正確。');
+  if (base.assignments !== undefined) {
+    // 幹員是否仍在幹員庫由基建頁提示，不在此阻擋，避免撤銷匯入後整庫無法保存。
+    const facilityIds = (base.facilities as { id: string }[]).map(f => f.id);
+    const assignments = object(base.assignments, facilityIds, []);
+    for (const ids of Object.values(assignments)) { list(ids, 5, '設施進駐幹員'); ids.forEach(value => id(value, '進駐幹員 ID')); unique(ids as string[], '設施進駐幹員'); }
+  }
   for (const slot of base.onlineSlots) if (typeof slot !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/u.test(slot)) throw new Error('可上線時段必須為 HH:mm。');
   const analysis = object(settings.analysis, ['mode', 'goal', 'budget']); choice(analysis.mode, ['story', 'integrated-strategies', 'reclamation', 'stationary-security', 'defense'], '分析模式'); text(analysis.goal, '目標'); integer(analysis.budget, 0, 1_000_000_000, '預算');
   if (settings.lastBackupAt !== undefined) timestamp(settings.lastBackupAt);

@@ -1,5 +1,6 @@
 import { known, sealDataset, unknown } from './domain/model.ts';
 import type { Dataset, ImportDocument, OperatorDefinition } from './domain/model.ts';
+import type { BaseCatalog } from './catalog/base.ts';
 
 const DEMO_TIME = '2026-11-13T00:00:00.000Z';
 const DEMO_SOURCE = '本工具自製虛構示範；不是遊戲資料';
@@ -27,6 +28,53 @@ export async function createDemoDataset(): Promise<Dataset> {
     },
     operators,
   });
+}
+
+/** 示範庫用的虛構基建資料：數值與技能都是自製測試用，不代表遊戲規則。 */
+export function createDemoBaseCatalog(): BaseCatalog {
+  const skill = (id: string, name: string, roomType: string, description: string) => ({ id, name, roomType, description });
+  const skills = {
+    'demo-manu-1': skill('demo-manu-1', '示範・流水線', 'MANUFACTURE', '進駐製造站時，生產力+15%'),
+    'demo-manu-2': skill('demo-manu-2', '示範・流水線β', 'MANUFACTURE', '進駐製造站時，生產力+25%'),
+    'demo-gold': skill('demo-gold', '示範・精煉', 'MANUFACTURE', '進駐製造站時，貴金屬類配方的生產力+30%'),
+    'demo-record': skill('demo-record', '示範・歸檔', 'MANUFACTURE', '進駐製造站時，作戰記錄類配方的生產力+30%'),
+    'demo-combo': skill('demo-combo', '示範・協作', 'MANUFACTURE', '進駐製造站時，每有 1 名其他示範幹員，生產力+5%'),
+    'demo-trade': skill('demo-trade', '示範・議價', 'TRADING', '進駐貿易站時，訂單獲取效率+30%'),
+    'demo-trade-2': skill('demo-trade-2', '示範・長單', 'TRADING', '進駐貿易站時，訂單獲取效率+20%，且訂單上限+2'),
+    'demo-power': skill('demo-power', '示範・充能', 'POWER', '進駐發電站時，無人機充能速度+15%'),
+    'demo-dorm': skill('demo-dorm', '示範・安眠', 'DORMITORY', '進駐宿舍時，該宿舍內所有幹員的心情每小時恢復+0.2（同種效果取最高）'),
+    'demo-ctrl': skill('demo-ctrl', '示範・指揮', 'CONTROL', '進駐控制中樞時，所有製造站生產力+2%（同種效果取最高）'),
+  };
+  const slot = (...versions: [string, 0 | 1 | 2, number][]) => versions.map(([buffId, elite, level]) => ({ buffId, elite, level }));
+  return {
+    source: DEMO_SOURCE, version: 'demo-0.1.0',
+    rooms: [
+      { id: 'CONTROL', name: '控制中樞', maxCount: 1, phases: [1, 2, 3, 4, 5].map(n => ({ maxStationedNum: n, electricity: 0 })) },
+      { id: 'POWER', name: '發電站', maxCount: 3, phases: [60, 130, 270].map(electricity => ({ maxStationedNum: 1, electricity })) },
+      { id: 'MANUFACTURE', name: '製造站', maxCount: 5, phases: [[1, -10], [2, -30], [3, -60]].map(([maxStationedNum, electricity]) => ({ maxStationedNum, electricity })) },
+      { id: 'TRADING', name: '貿易站', maxCount: 5, phases: [[1, -10], [2, -30], [3, -60]].map(([maxStationedNum, electricity]) => ({ maxStationedNum, electricity })) },
+      { id: 'DORMITORY', name: '宿舍', maxCount: 4, phases: [-10, -20, -30, -45, -65].map(electricity => ({ maxStationedNum: 5, electricity })) },
+      ...(['MEETING', 'HIRE', 'TRAINING', 'WORKSHOP'] as const).map(id => ({ id, name: { MEETING: '會客室', HIRE: '辦公室', TRAINING: '訓練室', WORKSHOP: '加工站' }[id], maxCount: 1, phases: [-10, -30, -60].map(electricity => ({ maxStationedNum: id === 'HIRE' || id === 'WORKSHOP' ? 1 : 2, electricity })) })),
+    ],
+    basicSpeedPercent: { MANUFACTURE: 1, TRADING: 1 },
+    formulas: { gold: { itemId: 'demo-gold', name: '示範赤金', seconds: 4320, weight: 2 }, records: [
+      { itemId: 'demo-r1', name: '示範記錄 I', seconds: 2700, weight: 2, level: 1, exp: 200 },
+      { itemId: 'demo-r2', name: '示範記錄 II', seconds: 4800, weight: 3, level: 2, exp: 400 },
+      { itemId: 'demo-r3', name: '示範記錄 III', seconds: 10800, weight: 5, level: 3, exp: 1000 }] },
+    outputCapacity: [24, 36, 54],
+    mood: { max: 24, costPerHour: { CONTROL: [1, 1, 1, 1, 1], POWER: [1, 1, 1], MANUFACTURE: [1, 1, 1], TRADING: [1, 1, 1], DORMITORY: [0, 0, 0, 0, 0], MEETING: [1, 1, 1], HIRE: [1, 1, 1], TRAINING: [1, 1, 1], WORKSHOP: [1, 1, 1] }, dormRecover: [1.6, 1.7, 1.8, 1.9, 2.0] },
+    skills,
+    operators: {
+      'demo-1': [slot(['demo-manu-1', 0, 1], ['demo-manu-2', 2, 1]), slot(['demo-ctrl', 1, 1])],
+      'demo-2': [slot(['demo-trade', 0, 1])],
+      'demo-3': [slot(['demo-gold', 0, 1]), slot(['demo-combo', 1, 30])],
+      'demo-4': [slot(['demo-record', 0, 1])],
+      'demo-5': [slot(['demo-dorm', 0, 1])],
+      'demo-6': [slot(['demo-power', 0, 1]), slot(['demo-manu-1', 2, 1])],
+      'demo-7': [slot(['demo-trade-2', 1, 1])],
+      'demo-8': [slot(['demo-manu-1', 0, 1], ['demo-manu-2', 1, 50])],
+    },
+  };
 }
 
 export async function createPersonalDataset(): Promise<Dataset> {

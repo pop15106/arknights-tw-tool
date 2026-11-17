@@ -1,7 +1,10 @@
 import { canonical, fieldKeys, hashValue, object, unknown, validateAppState, validateImportDocument, verifyDatasetChecksum, type AppState, type BatchRecord, type Dataset, type Evidence, type FieldConflict, type ImportCounts, type ImportDocument, type OwnedOperator } from './model.ts';
+import { affectedModuleIds, formatModuleIssues, moduleIssuesFor, type ModuleIssue } from './module-consistency.ts';
 
 export interface ImportPreview {
   input: ImportDocument;
+  /** 假設所有衝突都採用新值時的模組矛盾；保存時依實際決策再檢查一次。 */
+  moduleIssues: ModuleIssue[];
   dataset: Dataset;
   candidates: OwnedOperator[];
   conflicts: FieldConflict[];
@@ -104,7 +107,10 @@ export async function previewImport(state: AppState, inputValue: ImportDocument)
   counts.conflicts = conflicts.length;
   const contentHash = await hashValue(input);
   const duplicateOf = state.batches.find(batch => batch.kind === 'import' && batch.contentHash === contentHash)?.id;
-  return { input, dataset: input.dataset, candidates, conflicts, counts, baseRevision: state.revision, contentHash, datasetSignature: canonical(input.dataset), ...(duplicateOf ? { duplicateOf } : {}), baseSignature: canonical(state) };
+  const allIncoming = Object.fromEntries(conflicts.map(conflict => [conflict.id, 'incoming' as const]));
+  const projected = mergeRoster(state.roster, candidates, allIncoming, new Map(conflicts.map(conflict => [conflict.id, conflict])), new Set());
+  const moduleIssues = mergedModuleIssues(state.roster, projected, { input, dataset: input.dataset });
+  return { input, moduleIssues, dataset: input.dataset, candidates, conflicts, counts, baseRevision: state.revision, contentHash, datasetSignature: canonical(input.dataset), ...(duplicateOf ? { duplicateOf } : {}), baseSignature: canonical(state) };
 }
 
 function sourceAcceptedFields(state: AppState, preview: ImportPreview, decisions: Record<string, 'keep' | 'incoming'>, conflicts: Map<string, FieldConflict>, options?: ImportAcceptanceOptions): Set<string> {
@@ -133,6 +139,43 @@ function sourceAcceptedFields(state: AppState, preview: ImportPreview, decisions
   return new Set(ids as string[]);
 }
 
+function mergeRoster(roster: OwnedOperator[], candidates: OwnedOperator[], decisions: Record<string, 'keep' | 'incoming'>, conflictMap: Map<string, FieldConflict>, sourceAccepted: Set<string>): OwnedOperator[] {
+  const rows = new Map(structuredClone(roster).map(row => [row.operatorId, row]));
+  for (const candidate of candidates) {
+    const row = rows.get(candidate.operatorId) ?? { operatorId: candidate.operatorId, fields: {} };
+    for (const [field, incoming] of Object.entries(candidate.fields)) {
+      const previous = row.fields[field];
+      const decision = decisions[conflictId(candidate.operatorId, field)];
+      const conflict = conflictMap.get(conflictId(candidate.operatorId, field));
+      if (decision === 'keep') { row.fields[field] = previous && sameValue(previous, conflict!.current) ? previous : { ...structuredClone(conflict!.current), manuallyConfirmed: conflict!.current.status !== 'unknown' }; continue; }
+      if (decision === 'incoming') { row.fields[field] = { ...structuredClone(conflict!.incoming), manuallyConfirmed: !sourceAccepted.has(conflict!.id) }; continue; }
+      if (!previous || (previous.status === 'unknown' && incoming.status !== 'unknown')) row.fields[field] = structuredClone(incoming);
+      else if (sameValue(previous, incoming) && incoming.manuallyConfirmed && !previous.manuallyConfirmed) row.fields[field] = structuredClone(incoming);
+    }
+    rows.set(row.operatorId, row);
+  }
+  return [...rows.values()].sort((a, b) => a.operatorId.localeCompare(b.operatorId));
+}
+
+// 只檢查本次來源實際帶出的欄位（不含正規化補上的未知），既有但未觸及的矛盾不阻擋其他修正。
+function mergedModuleIssues(before: OwnedOperator[], after: OwnedOperator[], preview: Pick<ImportPreview, 'input' | 'dataset'>): ModuleIssue[] {
+  const definitions = new Map(preview.dataset.operators.map(op => [op.id, op]));
+  const previous = new Map(before.map(row => [row.operatorId, row.fields]));
+  const merged = new Map(after.map(row => [row.operatorId, row.fields]));
+  const touched = new Map<string, Set<string>>();
+  for (const candidate of preview.input.candidates) {
+    const fields = touched.get(candidate.operatorId) ?? new Set<string>();
+    Object.keys(candidate.fields).forEach(field => fields.add(field));
+    touched.set(candidate.operatorId, fields);
+  }
+  const issues: ModuleIssue[] = [];
+  for (const [operatorId, fields] of touched) {
+    const definition = definitions.get(operatorId)!, prior = previous.get(operatorId) ?? {}, next = merged.get(operatorId) ?? {};
+    issues.push(...moduleIssuesFor(definition, next, affectedModuleIds(fields, prior, next)));
+  }
+  return issues;
+}
+
 export function applyImport(state: AppState, preview: ImportPreview, decisions: Record<string, 'keep' | 'incoming'>, options?: ImportAcceptanceOptions): AppState {
   validateAppState(state);
   if (state.revision !== preview.baseRevision || canonical(state) !== preview.baseSignature) throw new Error('預覽已過期，請重新預覽後再合併。');
@@ -145,21 +188,9 @@ export function applyImport(state: AppState, preview: ImportPreview, decisions: 
   const sourceAccepted = sourceAcceptedFields(state, preview, decisions, conflictMap, options);
   const result = structuredClone(state);
   result.dataset = structuredClone(preview.dataset);
-  const roster = new Map(result.roster.map(row => [row.operatorId, row]));
-  for (const candidate of preview.candidates) {
-    const row = roster.get(candidate.operatorId) ?? { operatorId: candidate.operatorId, fields: {} };
-    for (const [field, incoming] of Object.entries(candidate.fields)) {
-      const previous = row.fields[field];
-      const decision = decisions[conflictId(candidate.operatorId, field)];
-      const conflict = conflictMap.get(conflictId(candidate.operatorId, field));
-      if (decision === 'keep') { row.fields[field] = previous && sameValue(previous, conflict!.current) ? previous : { ...structuredClone(conflict!.current), manuallyConfirmed: conflict!.current.status !== 'unknown' }; continue; }
-      if (decision === 'incoming') { row.fields[field] = { ...structuredClone(conflict!.incoming), manuallyConfirmed: !sourceAccepted.has(conflict!.id) }; continue; }
-      if (!previous || (previous.status === 'unknown' && incoming.status !== 'unknown')) row.fields[field] = structuredClone(incoming);
-      else if (sameValue(previous, incoming) && incoming.manuallyConfirmed && !previous.manuallyConfirmed) row.fields[field] = structuredClone(incoming);
-    }
-    roster.set(row.operatorId, row);
-  }
-  result.roster = [...roster.values()].sort((a, b) => a.operatorId.localeCompare(b.operatorId));
+  result.roster = mergeRoster(state.roster, preview.candidates, decisions, conflictMap, sourceAccepted);
+  const issues = mergedModuleIssues(state.roster, result.roster, preview);
+  if (issues.length) throw new Error(`保存前發現模組解鎖、等級或裝備互相矛盾，原資料未修改。請對相關衝突選擇保留既有值，或修正來源後重新預覽：${formatModuleIssues(issues)}`);
   const batch: BatchRecord = { id: `batch-${crypto.randomUUID()}`, kind: 'import', source: preview.input.source, contentHash: preview.contentHash, createdAt: new Date().toISOString(), completeness: preview.input.completeness, adapterVersion: preview.input.adapterVersion, counts: { ...preview.counts }, decisions: { ...decisions }, candidates: structuredClone(preview.candidates), conflicts: structuredClone(preview.conflicts), ...(preview.duplicateOf ? { duplicateOf: preview.duplicateOf } : {}) };
   result.batches.push(batch);
   result.undo = { batchId: batch.id, roster: structuredClone(state.roster), dataset: structuredClone(state.dataset) };

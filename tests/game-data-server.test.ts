@@ -49,6 +49,12 @@ test('公開資料 API 回傳 status、完整 Dataset 與預設分頁，不允�
   assert.equal(f.syncCalls(), 0);
 });
 
+test('status 會帶出模組補表版本，供設定頁顯示', async t => {
+  const moduleSource = { version: 'c'.repeat(40), sourceUrl: 'https://example.test/modules', sourceUpdatedAt: '2026-11-12T00:00:00.000Z' };
+  const f = await fixture(t, { load: async () => ({ ...snapshot, status: { ...snapshot.status, moduleSource } }) as Snapshot });
+  assert.deepEqual((await (await fetch(`${f.origin}/api/game-data/status`)).json() as { moduleSource: unknown }).moduleSource, moduleSource);
+});
+
 test('尚無快取回 503；讀取不會暗中同步或請求外網', async t => {
   const f = await fixture(t, { load: async () => null });
   for (const path of ['status', 'operators', 'stages', 'events']) {
@@ -68,16 +74,19 @@ test('分頁在篩選後計算 total；查詢有界且拒絕未知及重複參�
   for (const query of ['limit=0', 'limit=1001', 'limit=1.5', 'limit=1e2', 'offset=-1', 'offset=9007199254740992', 'limit=1&limit=2', 'q=a&q=b', 'url=https://example.test', `q=${'x'.repeat(101)}`]) {
     assert.equal((await fetch(`${f.origin}/api/game-data/stages?${query}`)).status, 400, query);
   }
+  // 查詢只比對值，不比對屬性名稱。
+  const byKey = await fetch(`${f.origin}/api/game-data/stages?q=name`);
+  assert.equal((await byKey.json() as { total: number }).total, 0);
   assert.equal((await fetch(`${f.origin}/api/game-data/operators?url=https://example.test`)).status, 400);
   assert.equal((await fetch(`${f.origin}/api/game-data/status?token=synthetic-secret`)).status, 400);
 });
 
-test('所有路由驗證 Host；僅接受實際 loopback 或 Vite 代理 Host', async t => {
+test('所有路由驗證 Host；只接受 127.0.0.1 的連接埠（Vite 換埠時仍可用）', async t => {
   const f = await fixture(t);
-  for (const host of ['attacker.test', 'localhost:5188', '127.0.0.1:9999']) {
+  for (const host of ['attacker.test', 'localhost:5188', '127.0.0.1.attacker.test:5173', '127.0.0.1', '127.0.0.1:5173.evil']) {
     assert.equal((await rawRequest(f.origin, '/api/game-data/status', { Host: host })).status, 403);
   }
-  for (const host of ['127.0.0.1:5173', '127.0.0.1:4173']) {
+  for (const host of ['127.0.0.1:5173', '127.0.0.1:4173', '127.0.0.1:5174']) {
     assert.equal((await rawRequest(f.origin, '/api/game-data/status', { Host: host })).status, 200);
   }
   assert.equal((await fetch(`${f.origin}/api/game-data/status`, { headers: { Authorization: 'Bearer SYNTHETIC_SECRET' } })).status, 400);
